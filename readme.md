@@ -1,0 +1,64 @@
+# Experimental compiler for exploring better compiler architecture
+
+## Development infrastructure
+- Documentation
+  - Changelog
+  - readme.md file
+  - license.md file
+  - issue template
+  - Internals and contributor's guide
+  - File with links to resources
+  - How to build project and examples
+  - How to use compiler/backend as a library from D
+  - CLI reference
+  - Language reference
+  - Lang lib tutorial
+  - Lang lib API reference
+  - Backend lib tutorial
+  - Backend lib API reference
+  - NIH language as an example of using VBE (Vox backend)
+- Examples:
+  - Using compiler as CLI (as dll or as static lib)
+  - Using backend (as dll or as static lib)
+- Editing
+  - .editorconfig
+  - .gitignore
+- CI:
+  - On each commit and on new tags
+  - Build each config for every OS and arch combination
+- Error management and logging
+  - Result type
+  - Custom `assert`
+  - Stack trace generation
+  - Exception handler
+  - Structured logging for errors and other textual output
+- Build artifacts (15 permutations):
+  - OS:
+    - `windows`
+    - `linux`
+    - `macos`
+  - CLI lang compiler executable
+  - Lang compiler as a library
+    - dll
+    - static lib
+  - Backend as a library
+    - static lib
+    - dll
+  - Debug info: on/off
+  - Should compile with both dmd and ldc compilers
+  - Make dub package for using Lang and Backend from D
+  - Compiling with `-betterC` mode and without libc to minimize size
+- Testing:
+  - Text format for test case definitions and result definitions, IR text format
+  - Test suite:
+    - Individual units
+    - Lang compiler tests
+    - Backend tests
+  - Fuzzing
+    - Entry points for various components
+    - Backend (whole and each pass)
+    - Lang compiler
+- Benchmarks:
+  - Compilation speed
+  - Runtime speed
+  - Memory consumption during compilation
