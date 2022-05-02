@@ -1,3 +1,5 @@
+# Repository permission needs `Read and write permissions` setting selected under `Workflow permissions` to allow to update/create new tag
+
 name: CI
 on:
   push: # test + build + release
@@ -41,7 +43,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: artifact
-          path: .
+          path: ./bin/
       # Update tag, so that we get proper date and commit on github
       - name: Update CI tag
         uses: richardsimko/update-tag@master
@@ -62,4 +64,4 @@ jobs:
           fi
           
           # --clobber Overwrite existing assets of the same name
-          gh release upload $tag './*.zip' --clobber
+          gh release upload $tag './bin/*.zip' --clobber
