@@ -24,9 +24,8 @@ jobs:
           compiler: ${{ env.DC }}
       - name: Build
         run: |
-          cd build
-          ./setup.sh
-          ./builder --action=pack --remove-build --build=debug --config=nihcli --compiler=ldc2 --print-commands --print-callees
+          ./build/setup.sh
+          ./build/builder --action=pack --remove-build --build=debug --config=nihcli --compiler=ldc2 --print-commands --print-callees
       - uses: actions/upload-artifact@v3
         with:
           path: ./bin/
