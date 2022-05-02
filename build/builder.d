@@ -516,7 +516,9 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 			case f_msg_gnu: flags ~= "verror-style=gnu"; break;
 			case f_checkaction_halt: flags ~= "checkaction=halt"; break;
 			case f_m64: flags ~= "m64"; break;
-			case f_link_internally: if (compiler == "ldc2") flags ~= "link-internally"; break;
+			case f_link_internally:
+				version(Windows) if (compiler == "ldc2") flags ~= "link-internally";
+				break;
 			case f_opt:
 				if (compiler == "dmd")
 					flags ~= "O";
