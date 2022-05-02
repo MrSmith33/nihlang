@@ -18,7 +18,12 @@ defaults:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        mode: [debug-fast, release-fast]
+        config: [nihcli, nihslib, nihdlib, vbeslib, vbedlib]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: dlang-community/setup-dlang@v1
@@ -27,7 +32,7 @@ jobs:
       - name: Build
         run: |
           ./build/setup.sh
-          ./build/builder --action=pack --remove-build --build=debug --config=nihcli --compiler=ldc2 --print-commands --print-callees
+          ./build/builder --action=pack --remove-build --build=${{matrix.mode}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees
       - uses: actions/upload-artifact@v3
         with:
           path: bin/
