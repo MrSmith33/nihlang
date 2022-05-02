@@ -4,7 +4,7 @@
 
 // Notes:
 // DMD does not produce .lib and .exp files if program contains no symbols marked as `export`
-// when previous build was done with different compiler, .pdb files can confuse linker making it exit with an error.
+// When previous build was done with different compiler, .pdb files can confuse linker making it exit with an error.
 module builder;
 
 import std.algorithm : filter, joiner, canFind, map;
@@ -251,20 +251,8 @@ struct CompileParams
 	string targetName;
 	string compiler;
 
-	string makeExecutablePath() const {
-		return artifactDir.buildPath(targetName).setExtension(exeExt);
-	}
-	string makeStaticLibraryPath() const {
-		return artifactDir.buildPath(targetName).setExtension(slibExt);
-	}
-	string makeDynamicLibraryPath() const {
-		return artifactDir.buildPath(targetName).setExtension(dlibExt);
-	}
-	string makeDebugInfoPath() const {
-		return artifactDir.buildPath(targetName).setExtension(dbiExt);
-	}
-	string makeObjPath() const {
-		return artifactDir.buildPath(targetName).setExtension(objExt);
+	string makeArtifactPath(string extension) const {
+		return artifactDir.buildPath(targetName).setExtension(extension);
 	}
 }
 
@@ -275,6 +263,8 @@ struct Job {
 	// Artifacts that are produces by the job, but we don't want to include them into the package
 	// Useful to know, so we can delete them
 	string[] extraArtifacts;
+	// Remove artifacts of previous run before execution
+	bool cleanBeforeRun;
 }
 
 Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
@@ -287,21 +277,24 @@ Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
 	final switch(params.targetType) with(TargetType) {
 		case unknown: assert(false);
 		case executable:
-			artifacts ~= params.makeExecutablePath();
-			extraArtifacts ~= params.makeObjPath();
+			artifacts ~= params.makeArtifactPath(exeExt);
+			version(Windows) extraArtifacts ~= params.makeArtifactPath(".exp");
+			version(Windows) extraArtifacts ~= params.makeArtifactPath(".ilk");
 			break;
 		case staticLibrary:
-			artifacts ~= params.makeStaticLibraryPath();
-			extraArtifacts ~= params.makeObjPath();
+			artifacts ~= params.makeArtifactPath(slibExt);
 			break;
 		case dynamicLibrary:
-			artifacts ~= params.makeDynamicLibraryPath();
-			extraArtifacts ~= params.makeObjPath();
+			artifacts ~= params.makeArtifactPath(dlibExt);
 			version(Windows) {
-				artifacts ~= params.makeStaticLibraryPath(); // import .lib
+				artifacts ~= params.makeArtifactPath(slibExt); // import .lib
+				extraArtifacts ~= params.makeArtifactPath(".exp");
+				extraArtifacts ~= params.makeArtifactPath(".ilk");
 			}
 			break;
 	}
+
+	extraArtifacts ~= params.makeArtifactPath(objExt);
 
 	Flags flags = selectFlags(g, params);
 	string[] flagsStrings = flagsToStrings(cast(size_t)flags, params.compiler);
@@ -309,7 +302,7 @@ Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
 	version(Windows) {
 		if (params.targetType == TargetType.executable || params.targetType == TargetType.dynamicLibrary) {
 			if (flags & Flags.f_debug_info) {
-				artifacts ~= params.makeDebugInfoPath(); // .pdb file
+				artifacts ~= params.makeArtifactPath(dbiExt); // .pdb file
 			}
 		}
 	}
@@ -334,10 +327,10 @@ Job makePackageJob(JobResult res) {
 		"7z a -mx9 %s %-(%s %)",
 		archiveName, res.job.artifacts);
 
-	Job job = { command : command, artifacts : [archiveName] };
+	// cleanBeforeRun removes old archive, because 7z will update existing archive
+	Job job = { command : command, artifacts : [archiveName], cleanBeforeRun : true };
 	return job;
 }
-
 
 struct JobResult {
 	const Job job;
@@ -346,6 +339,8 @@ struct JobResult {
 }
 
 JobResult runJob(in GlobalSettings gs, in Job job) {
+
+	if (job.cleanBeforeRun) gs.deleteArtifacts(job);
 
 	void printCommand() {
 		stderr.writeln("> ", job.command);

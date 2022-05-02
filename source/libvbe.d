@@ -5,6 +5,13 @@ import vox.all;
 
 extern(C) export:
 
+version (D_BetterC) {} else {
+	version(Windows) {
+		import core.sys.windows.dll;
+		mixin SimpleDllMain;
+	}
+}
+
 struct VbeState {
 	ubyte dummy;
 }
