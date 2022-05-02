@@ -30,7 +30,7 @@ jobs:
           ./build/builder --action=pack --remove-build --build=debug --config=nihcli --compiler=ldc2 --print-commands --print-callees
       - uses: actions/upload-artifact@v3
         with:
-          path: ./bin/
+          path: bin/
   upload:
     name: Upload build
     if: github.event_name != 'pull_request'
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: artifact
-          path: ./bin/
+          path: bin/
       # Update tag, so that we get proper date and commit on github
       - name: Update CI tag
         uses: richardsimko/update-tag@master
@@ -64,4 +64,4 @@ jobs:
           fi
           
           # --clobber Overwrite existing assets of the same name
-          gh release upload $tag './bin/*.zip' --clobber
+          gh release upload $tag bin/*.zip --clobber
