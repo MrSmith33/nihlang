@@ -1,0 +1,14 @@
+.dub
+.vs
+.vscode
+*.code-workspace
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.o
+*.exe
+*.lst
+*.zip
+*.sublime-project
+*.sublime-workspace
