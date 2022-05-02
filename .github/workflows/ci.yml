@@ -1,0 +1,70 @@
+name: CI
+on:
+  push: # test + build + release
+    branches: [ master ]
+  pull_request: # test + build
+    branches: [ master ]
+  release: # test + build + release
+    types: [ published ]
+env:
+  DC: ldc-1.29.0
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        mode: [debug-fast, release-fast]
+        config: [nihcli, nihslib, nihdlib, vbeslib, vbedlib]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ env.DC }}
+      - name: Build
+        run: |
+          ./build/setup.sh
+          ./build/builder --action=pack --remove-build --build=${{matrix.mode}} --config=${{matrix.config}} --print-commands
+      - uses: actions/upload-artifact@v3
+        with:
+          path: ./bin/
+  upload:
+    name: Upload build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      # Cloning is needed for `gh release create` to work. It looks repository up in .git folder
+      - uses: actions/checkout@v2
+      # Download build artifacts of other jobs
+      - uses: actions/download-artifact@v3
+        with:
+          name: artifact
+          path: .
+      # Update tag, so that we get proper date and commit on github
+      - name: Update CI tag
+        uses: richardsimko/update-tag@master
+        if: github.ref == 'refs/heads/master'
+        with:
+          tag_name: CI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Create CI release and upload builds
+      - name: Upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -R
+          tag=`basename ${{ github.ref }}`
+          if [ $tag = 'master' ]; then
+            tag='CI'
+          fi
+          
+          # --clobber Overwrite existing assets of the same name
+          gh release upload $tag './*.zip' --clobber
