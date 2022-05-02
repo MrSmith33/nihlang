@@ -524,7 +524,7 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 					flags ~= ["O3", "mcpu=x86-64-v3", "boundscheck=off", "enable-inlining", "flto=full", "linkonce-templates", "defaultlib=phobos2-ldc-lto,druntime-ldc-lto"];
 				break;
 			case f_link_debug_full:
-				flags ~= "L/DEBUG:FULL";
+				version(Windows) flags ~= "L/DEBUG:FULL";
 				break;
 		}
 
