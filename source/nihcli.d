@@ -3,7 +3,7 @@
 /// Authors: Andrey Penechko
 module main;
 
-@nogc nothrow:
+//@nogc nothrow:
 
 void main(string[] args)
 {

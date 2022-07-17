@@ -179,14 +179,14 @@ void printOptions() {
 
 void printConfigs() {
 	stderr.writeln("Configs:");
-	stderr.writeln("             all      Select all configs. Ignores other config options.");
-	stderr.writeln("             nihcli   Compiler CLI executable (default)");
-	stderr.writeln("             nihslib  Compiler static library");
-	stderr.writeln("             nihdlib  Compiler dynamic library");
-	stderr.writeln("             vbeslib  Backend static library");
-	stderr.writeln("             vbedlib  Backend dynamic library");
-	stderr.writeln("             testone  Single test executable");
-	stderr.writeln("             test     Full test suite executable");
+	stderr.writeln("            all         Select all configs. Ignores other config options.");
+	stderr.writeln("            nih-cli     Compiler CLI executable (default)");
+	stderr.writeln("            nih-static  Compiler static library");
+	stderr.writeln("            nih-shared  Compiler dynamic library");
+	stderr.writeln("            vbe-static  Backend static library");
+	stderr.writeln("            vbe-shared  Backend dynamic library");
+	stderr.writeln("            testone     Single test executable");
+	stderr.writeln("            test        Full test suite executable");
 }
 
 GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] configs) {
@@ -247,7 +247,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 
 	foreach(name; settings.configNames) {
 		if (!configs.map!(c => c.name).canFind(name)) {
-			stderr.writefln("Unknown config (%s)", buildType);
+			stderr.writefln("Unknown config (%s)", name);
 			needsHelp = true;
 			return settings;
 		}
