@@ -16,33 +16,31 @@ import std.string : format, lineSplitter;
 
 int main(string[] args)
 {
+	string artifactDir = thisExePath.dirName.dirName.buildPath("bin").makeCanonicalPath;
+	string srcDir = thisExePath.dirName.dirName.buildPath("source").makeCanonicalPath;
+
+	auto nihcli  = Config("nih-cli",  "nihcli.d",   artifactDir, srcDir, TargetType.executable, "nih");
+	auto nihslib = Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary);
+	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.dynamicLibrary);
+	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary);
+	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.dynamicLibrary);
+	auto testone = Config("testone", "testone.d",   artifactDir, srcDir, TargetType.executable);
+	auto test    = Config("test",    "test.d",   artifactDir, srcDir, TargetType.executable);
+
+	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, testone, test];
+
 	bool needsHelp;
-	GlobalSettings gs = args.parseSettings(needsHelp);
+	GlobalSettings gs = args.parseSettings(needsHelp, configs);
 
 	if (needsHelp) {
 		printHelp;
 		return 1;
 	}
 
-	string artifactDir = thisExePath.dirName.dirName.buildPath("bin").makeCanonicalPath;
-	string srcDir = thisExePath.dirName.dirName.buildPath("source").makeCanonicalPath;
-
-	auto nihcli  = Config("nihcli",  "main.d",   artifactDir, srcDir, TargetType.executable, "nih");
-	auto nihslib = Config("nihslib", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary);
-	auto nihdlib = Config("nihdlib", "libnih.d", artifactDir, srcDir, TargetType.dynamicLibrary);
-	auto vbeslib = Config("vbeslib", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary);
-	auto vbedlib = Config("vbedlib", "libvbe.d", artifactDir, srcDir, TargetType.dynamicLibrary);
-	auto devtest = Config("devtest", "main.d",   artifactDir, srcDir, TargetType.executable);
-	auto test    = Config("test",    "main.d",   artifactDir, srcDir, TargetType.executable);
-
-	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, devtest, test];
-
-	gs.setDefaultConfigs(configs);
-
-	return selectAndRunConfigs(gs, configs);
+	return runSelectedConfigs(gs, configs);
 }
 
-int selectAndRunConfigs(in GlobalSettings gs, in Config[] configs)
+int runSelectedConfigs(in GlobalSettings gs, in Config[] configs)
 {
 	foreach(configName; gs.configNames)
 	{
@@ -72,30 +70,43 @@ int runConfig(in GlobalSettings gs, in Config config)
 		rootFile : config.rootFile,
 	};
 
-	auto job = gs.makeCompileJob(params);
-	JobResult res1 = gs.runJob(job);
+	Job compileJob = gs.makeCompileJob(params);
+	JobResult res1 = gs.runJob(compileJob);
 
 	if (res1.status != 0) {
 		if (gs.compiler == "dmd" && res1.output.canFind("-1073741819")) {
 			// This a link.exe bug, where it crashes when previous compilation was done with ldc2, and old .pdb file is present
 			// delete that file and retry
-			gs.deletePdbArtifacts(job);
+			gs.deletePdbArtifacts(compileJob);
 			stderr.writeln("Retrying");
-			JobResult retryRes = gs.runJob(job);
+			JobResult retryRes = gs.runJob(compileJob);
 			res1.status = retryRes.status;
 		}
 	}
 
 	if (res1.status != 0) return res1.status;
 
-	if (gs.action == Action.pack) {
-		auto packageJob = makePackageJob(res1);
-		JobResult res2 = gs.runJob(packageJob);
-		if (res2.status != 0) return res2.status;
+	final switch(gs.action)
+	{
+		case Action.build:
+			break;
+
+		case Action.run:
+			Job runJob = gs.makeRunJob(res1);
+			JobResult res2 = gs.runJob(runJob);
+			if (res2.status != 0) return res2.status;
+			break;
+
+		case Action.pack:
+			Job packageJob = gs.makePackageJob(res1);
+			JobResult res2 = gs.runJob(packageJob);
+			if (res2.status != 0) return res2.status;
+
+			break;
 	}
 
-	if (gs.action == Action.pack && gs.removeBuild) {
-		gs.deleteArtifacts(job);
+	if (gs.removeBuild) {
+		gs.deleteArtifacts(compileJob);
 	}
 
 	return 0;
@@ -142,30 +153,25 @@ struct GlobalSettings
 	bool dryRun;
 	bool removeBuild;
 	bool printCommands;
+	bool prettyPrint;
 	bool printCallees;
 	bool verboseCallees;
-
-	void setDefaultConfigs(in Config[] configs) {
-		if (configNames.canFind("all")) {
-			configNames = configs.map!(c => c.name).array;
-		} else if (configNames.empty) {
-			configNames ~= configs[0].name;
-		}
-	}
 }
 
 void printOptions() {
 	stderr.writeln("Usage: build <command> [options]...");
 	stderr.writeln("Options:");
-	stderr.writeln("   --action=<action>  Select action [build(default), package]");
-	stderr.writeln("               build  Build artifact");
-	stderr.writeln("                pack  Build artifact and package into a .zip");
+	stderr.writeln("   --action=<action>  Select action [build(default), run, pack]");
+	stderr.writeln("            build     Build artifact");
+	stderr.writeln("            run       Build and run resulting executable");
+	stderr.writeln("            pack      Build artifact and package into a .zip");
 	stderr.writeln("   --build=<type>     Select build type [debug(default), debug-fast, release-fast]");
 	stderr.writeln("   --compiler=<name>  Select compiler [dmd, ldc2] (by default dmd is used for debug and ldc2 for release)");
 	stderr.writeln("   --config=<name>    Select config. Can be specified multiple times, or comma-separated (--config=a,b,c)");
 	stderr.writeln("   --dry-run          Do not run any commands");
 	stderr.writeln("   --remove-build     Delete build artifacts after completion. Useful for building only .zip");
 	stderr.writeln("   --print-commands   Print commands that are being run");
+	stderr.writeln("   --pretty           Enable pretty printing of the commands");
 	stderr.writeln("   --print-callees    Print output of callee programs");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
 	stderr.writeln("-h --help             This help information");
@@ -173,17 +179,17 @@ void printOptions() {
 
 void printConfigs() {
 	stderr.writeln("Configs:");
-	stderr.writeln("                 all  Select all configs. Ignores other config options.");
-	stderr.writeln("              nihcli  Compiler CLI executable (default)");
+	stderr.writeln("             all      Select all configs. Ignores other config options.");
+	stderr.writeln("             nihcli   Compiler CLI executable (default)");
 	stderr.writeln("             nihslib  Compiler static library");
 	stderr.writeln("             nihdlib  Compiler dynamic library");
 	stderr.writeln("             vbeslib  Backend static library");
 	stderr.writeln("             vbedlib  Backend dynamic library");
-	stderr.writeln("             devtest  Single test executable");
-	stderr.writeln("                test  Full test suite executable");
+	stderr.writeln("             testone  Single test executable");
+	stderr.writeln("             test     Full test suite executable");
 }
 
-GlobalSettings parseSettings(string[] args, out bool needsHelp) {
+GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] configs) {
 	import std.getopt : GetoptResult, GetOptException, getopt, arraySep;
 	GlobalSettings settings;
 	string compiler;
@@ -206,6 +212,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp) {
 			"dry-run", "", &settings.dryRun,
 			"remove-build", "", &settings.removeBuild,
 			"print-commands", "", &settings.printCommands,
+			"pretty", "", &settings.prettyPrint,
 			"print-callees", "", &settings.printCallees,
 			"verbose-callees", "", &settings.verboseCallees,
 		);
@@ -238,6 +245,22 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp) {
 
 	if (optResult.helpWanted) needsHelp = true;
 
+	foreach(name; settings.configNames) {
+		if (!configs.map!(c => c.name).canFind(name)) {
+			stderr.writefln("Unknown config (%s)", buildType);
+			needsHelp = true;
+			return settings;
+		}
+	}
+
+	if (settings.configNames.canFind("all")) {
+		// Select all configs
+		settings.configNames = configs.map!(c => c.name).array;
+	} else if (settings.configNames.empty) {
+		// Select default config
+		settings.configNames ~= configs[0].name;
+	}
+
 	return settings;
 }
 
@@ -258,16 +281,20 @@ struct CompileParams
 
 struct Job {
 	CompileParams params;
-	string command;
+	string[] args;
+	string workDir;
+	// When executable is produced it will be a first artifact
 	string[] artifacts;
 	// Artifacts that are produces by the job, but we don't want to include them into the package
 	// Useful to know, so we can delete them
 	string[] extraArtifacts;
 	// Remove artifacts of previous run before execution
 	bool cleanBeforeRun;
+	// Always print the output of the command
+	bool printOutput;
 }
 
-Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
+Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	import std.path : buildPath;
 	import std.conv : text;
 
@@ -296,7 +323,7 @@ Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
 
 	extraArtifacts ~= params.makeArtifactPath(objExt);
 
-	Flags flags = selectFlags(g, params);
+	Flags flags = selectFlags(gs, params);
 	string[] flagsStrings = flagsToStrings(cast(size_t)flags, params.compiler);
 
 	version(Windows) {
@@ -311,24 +338,57 @@ Job makeCompileJob(in GlobalSettings g, in CompileParams params) {
 
 	string imports = text("-I=", params.srcDir);
 
-	string command = format(
-		"%s %s %-(-%s %) -of=%s -i %s",
-		params.compiler, imports, flagsStrings, artifacts[0], mainFile);
+	string[] args;
+	args ~= params.compiler;
+	args ~= imports;
+	args ~= flagsStrings;
+	args ~= text("-of=", artifacts[0]);
+	args ~= mainFile;
 
-	Job job = { params : params, command : command, artifacts : artifacts, extraArtifacts : extraArtifacts };
+	Job job = {
+		params : params,
+		args : args,
+		artifacts : artifacts,
+		extraArtifacts : extraArtifacts,
+		printOutput : gs.printCallees };
 	return job;
 }
 
-Job makePackageJob(JobResult res) {
-	string packageName = res.job.params.makePackageName;
-	string archiveName = res.job.params.artifactDir.buildPath(packageName).setExtension(".zip");
+Job makePackageJob(in GlobalSettings gs, JobResult compileRes) {
+	string packageName = compileRes.job.params.makePackageName;
+	string archiveName = compileRes.job.params.artifactDir.buildPath(packageName).setExtension(".zip");
 
-	string command = format(
-		"7z a -mx9 %s %-(%s %)",
-		archiveName, res.job.artifacts);
+	string[] args;
+	args ~= "7z";
+	args ~= "a";
+	args ~= "-mx9";
+	args ~= archiveName;
+	args ~= compileRes.job.artifacts;
 
-	// cleanBeforeRun removes old archive, because 7z will update existing archive
-	Job job = { command : command, artifacts : [archiveName], cleanBeforeRun : true };
+	// cleanBeforeRun removes old archive. We want to create a new archive, othewise 7z will update existing one
+	Job job = { args : args, artifacts : [archiveName], cleanBeforeRun : true, printOutput : gs.printCallees };
+	return job;
+}
+
+Job makeGitTagJob(in GlobalSettings gs, JobResult res) {
+	string[] args = [
+		"git",
+		"describe",
+		"--tags",
+		"--match",
+		"v*.*.*",
+		"--abbrev=9"
+	];
+
+	Job job = { args : args, printOutput : gs.printCallees };
+	return job;
+}
+
+Job makeRunJob(in GlobalSettings gs, JobResult compileRes) {
+	string[] args;
+	args ~= compileRes.job.artifacts[0];
+	string workDir = compileRes.job.params.artifactDir;
+	Job job = { args : args, workDir : workDir, printOutput : true };
 	return job;
 }
 
@@ -343,22 +403,25 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	if (job.cleanBeforeRun) gs.deleteArtifacts(job);
 
 	void printCommand() {
-		stderr.writeln("> ", job.command);
+		if (gs.prettyPrint)
+			stderr.writefln("> %-(%s\n| %)", job.args);
+		else
+			stderr.writefln("> %-(%s %)", job.args);
 	}
 
 	if (gs.printCommands) printCommand;
 
 	if (gs.dryRun) return JobResult(job, 0);
 
-	import std.process : executeShell;
-	auto result = executeShell(job.command);
+	import std.process : execute, Config;
+	auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
 
 	void printCalleeOutput() {
 		stderr.writeln(result.output.lineSplitter.filter!(l => !l.empty).joiner("\n"));
 	}
 
 	if (result.status == 0) {
-		if (gs.printCallees) printCalleeOutput;
+		if (job.printOutput) printCalleeOutput;
 	} else {
 		if (!gs.printCommands) printCommand; // print command on error if we didn't print it yet
 		printCalleeOutput; // always print on error
@@ -487,46 +550,46 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 		size_t lowestSetBit = bits & -bits;
 
 		final switch(cast(Flags)lowestSetBit) with(Flags) {
-			case f_verbose: flags ~= "v"; break;
-			case f_warn_error: flags ~= "w"; break;
-			case f_warn_info: flags ~= "wi"; break;
-			case f_msg_columns: flags ~= "vcolumns"; break;
+			case f_verbose: flags ~= "-v"; break;
+			case f_warn_error: flags ~= "-w"; break;
+			case f_warn_info: flags ~= "-wi"; break;
+			case f_msg_columns: flags ~= "-vcolumns"; break;
 			case f_msg_context:
 				if (compiler == "dmd")
-					flags ~= "verrors=context";
+					flags ~= "-verrors=context";
 				else
-					flags ~= "verrors-context";
+					flags ~= "-verrors-context";
 				break;
-			case f_better_c: flags ~= "betterC"; break;
-			case f_static_lib: flags ~= "lib"; break;
+			case f_better_c: flags ~= "-betterC"; break;
+			case f_static_lib: flags ~= "-lib"; break;
 			case f_dynamic_lib:
-				flags ~= "shared";
+				flags ~= "-shared";
 				if (compiler == "ldc2") {
-					flags ~= ["fvisibility=hidden", "link-defaultlib-shared=false"];
+					flags ~= ["-fvisibility=hidden", "-link-defaultlib-shared=false"];
 				}
 				break;
-			case f_release: flags ~= "release"; break;
+			case f_release: flags ~= "-release"; break;
 			case f_debug:
 				if (compiler == "dmd")
-					flags ~= "debug";
+					flags ~= "-debug";
 				else
-					flags ~= "d-debug";
+					flags ~= "-d-debug";
 				break;
-			case f_debug_info: flags ~= "g"; break;
-			case f_msg_gnu: flags ~= "verror-style=gnu"; break;
-			case f_checkaction_halt: flags ~= "checkaction=halt"; break;
-			case f_m64: flags ~= "m64"; break;
+			case f_debug_info: flags ~= "-g"; break;
+			case f_msg_gnu: flags ~= "-verror-style=gnu"; break;
+			case f_checkaction_halt: flags ~= "-checkaction=halt"; break;
+			case f_m64: flags ~= "-m64"; break;
 			case f_link_internally:
-				version(Windows) if (compiler == "ldc2") flags ~= "link-internally";
+				version(Windows) if (compiler == "ldc2") flags ~= "-link-internally";
 				break;
 			case f_opt:
 				if (compiler == "dmd")
-					flags ~= "O";
+					flags ~= "-O";
 				else
-					flags ~= ["O3", "mcpu=x86-64-v3", "boundscheck=off", "enable-inlining", "flto=full", "linkonce-templates", "defaultlib=phobos2-ldc-lto,druntime-ldc-lto"];
+					flags ~= ["-O3", "-mcpu=x86-64-v3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates", "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto"];
 				break;
 			case f_link_debug_full:
-				version(Windows) flags ~= "L/DEBUG:FULL";
+				version(Windows) flags ~= "-L/DEBUG:FULL";
 				break;
 		}
 
@@ -569,6 +632,7 @@ enum TargetType : ubyte {
 
 enum Action : ubyte {
 	build,
+	run,
 	pack,
 }
 

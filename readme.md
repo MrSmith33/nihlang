@@ -1,5 +1,12 @@
 # Experimental compiler for exploring better compiler architecture
 
+Exploring ways of doing:
+- lexing
+- multithreading compilation
+- CTFE
+- IR design
+- standalone backend
+
 ## Development infrastructure
 - Documentation
   - Changelog
@@ -26,6 +33,7 @@
 - CI:
   - On each commit and on new tags
   - Build each config for every OS and arch combination
+  - Create Github Action that downloads a specific version of CLI binary
 - Error management and logging
   - Result type
   - Custom `assert`

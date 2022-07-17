@@ -3,10 +3,11 @@
 /// Authors: Andrey Penechko
 module main;
 
-import nih.all;
+//@nogc nothrow:
 
 void main(string[] args)
 {
+	import nih.all;
 	import std.stdio;
-	stderr.writeln("NIH compiler v0.0.0");
+	stderr.writeln("NIH single test v0.0.0");
 }
