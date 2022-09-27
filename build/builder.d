@@ -19,13 +19,13 @@ int main(string[] args)
 	string artifactDir = thisExePath.dirName.dirName.buildPath("bin").makeCanonicalPath;
 	string srcDir = thisExePath.dirName.dirName.buildPath("source").makeCanonicalPath;
 
-	auto nihcli  = Config("nih-cli",  "nihcli.d",   artifactDir, srcDir, TargetType.executable, "nih");
-	auto nihslib = Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary);
-	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.dynamicLibrary);
-	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary);
-	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.dynamicLibrary);
-	auto testone = Config("testone", "testone.d",   artifactDir, srcDir, TargetType.executable);
-	auto test    = Config("test",    "test.d",   artifactDir, srcDir, TargetType.executable);
+	auto nihcli  = Config("nih-cli",    "nihcli.d", artifactDir, srcDir, TargetType.executable, "nih");
+	auto nihslib = Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary, "nih");
+	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.dynamicLibrary, "nih");
+	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe");
+	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.dynamicLibrary, "vbe");
+	auto testone = Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable);
+	auto test    = Config("test",         "test.d", artifactDir, srcDir, TargetType.executable);
 
 	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, testone, test];
 
@@ -68,6 +68,7 @@ int runConfig(in GlobalSettings gs, in Config config)
 		buildType : gs.buildType,
 		compiler : gs.compiler,
 		rootFile : config.rootFile,
+		archiveName : config.archiveName,
 	};
 
 	Job compileJob = gs.makeCompileJob(params);
@@ -75,7 +76,7 @@ int runConfig(in GlobalSettings gs, in Config config)
 
 	if (res1.status != 0) {
 		if (gs.compiler == "dmd" && res1.output.canFind("-1073741819")) {
-			// This a link.exe bug, where it crashes when previous compilation was done with ldc2, and old .pdb file is present
+			// This is a link.exe bug, where it crashes when previous compilation was done with ldc2, and old .pdb file is present
 			// delete that file and retry
 			gs.deletePdbArtifacts(compileJob);
 			stderr.writeln("Retrying");
@@ -125,8 +126,9 @@ struct Config
 	string srcDir;
 	TargetType targetType;
 	string targetName;
+	string archiveName;
 
-	this(string name, string rootFile, string artifactDir, string srcDir, TargetType targetType, string targetName = null) {
+	this(string name, string rootFile, string artifactDir, string srcDir, TargetType targetType, string targetName = null, string archiveName = null) {
 		this.name = name;
 		this.rootFile = rootFile;
 		this.artifactDir = artifactDir;
@@ -134,6 +136,7 @@ struct Config
 		this.targetType = targetType;
 		this.targetName = targetName;
 		if (this.targetName == null) this.targetName = this.name;
+		if (this.archiveName == null) this.archiveName = this.name;
 	}
 }
 
@@ -159,7 +162,7 @@ struct GlobalSettings
 }
 
 void printOptions() {
-	stderr.writeln("Usage: build <command> [options]...");
+	stderr.writeln("Usage: builder [options]...");
 	stderr.writeln("Options:");
 	stderr.writeln("   --action=<action>  Select action [build(default), run, pack]");
 	stderr.writeln("            build     Build artifact");
@@ -227,8 +230,16 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 		goto retry_parse_opts;
 	}
 
+	if (args.length > 1) {
+		// we have unrecognized options
+		needsHelp = true;
+		foreach(opt; args[1..$]) {
+			stderr.writefln("Unknown option: %s", opt);
+		}
+	}
+
 	if (!isValidCompiler(compiler)) {
-		stderr.writefln("Invalid compiler name (%s). Supported options: dmd, ldc2", compiler);
+		stderr.writefln("Invalid compiler name: %s. Supported options: dmd, ldc2", compiler);
 		needsHelp = true;
 		return settings;
 	}
@@ -236,7 +247,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 	settings.compiler = selectCompiler(settings, compiler);
 
 	if (!isValidBuildType(buildType)) {
-		stderr.writefln("Invalid build type (%s). Supported options: debug, debug-fast, release-fast", buildType);
+		stderr.writefln("Invalid build type: %s. Supported options: debug, debug-fast, release-fast", buildType);
 		needsHelp = true;
 		return settings;
 	}
@@ -245,20 +256,20 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 
 	if (optResult.helpWanted) needsHelp = true;
 
-	foreach(name; settings.configNames) {
-		if (!configs.map!(c => c.name).canFind(name)) {
-			stderr.writefln("Unknown config (%s)", name);
-			needsHelp = true;
-			return settings;
-		}
-	}
-
 	if (settings.configNames.canFind("all")) {
 		// Select all configs
 		settings.configNames = configs.map!(c => c.name).array;
 	} else if (settings.configNames.empty) {
 		// Select default config
 		settings.configNames ~= configs[0].name;
+	} else {
+		foreach(name; settings.configNames) {
+			if (!configs.map!(c => c.name).canFind(name)) {
+				stderr.writeln("Unknown config: ", name);
+				needsHelp = true;
+				return settings;
+			}
+		}
 	}
 
 	return settings;
@@ -272,6 +283,7 @@ struct CompileParams
 	TargetType targetType;
 	BuildType buildType;
 	string targetName;
+	string archiveName;
 	string compiler;
 
 	string makeArtifactPath(string extension) const {
@@ -355,18 +367,18 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 }
 
 Job makePackageJob(in GlobalSettings gs, JobResult compileRes) {
-	string packageName = compileRes.job.params.makePackageName;
-	string archiveName = compileRes.job.params.artifactDir.buildPath(packageName).setExtension(".zip");
+	string archiveName = compileRes.job.params.makeArchiveName;
+	string archivePath = compileRes.job.params.artifactDir.buildPath(archiveName).setExtension(".zip");
 
 	string[] args;
 	args ~= "7z";
 	args ~= "a";
 	args ~= "-mx9";
-	args ~= archiveName;
+	args ~= archivePath;
 	args ~= compileRes.job.artifacts;
 
 	// cleanBeforeRun removes old archive. We want to create a new archive, othewise 7z will update existing one
-	Job job = { args : args, artifacts : [archiveName], cleanBeforeRun : true, printOutput : gs.printCallees };
+	Job job = { args : args, artifacts : [archivePath], cleanBeforeRun : true, printOutput : gs.printCallees };
 	return job;
 }
 
@@ -457,10 +469,10 @@ string makeCanonicalPath(in string path) {
 	return path.expandTilde.asAbsolutePath.asNormalizedPath.array;
 }
 
-string makePackageName(in CompileParams params) {
+string makeArchiveName(in CompileParams params) {
 	static const archName = "x64";
 	string buildType = params.makeBuildTypeSuffix;
-	return format("%s-%s-%s-%s", params.targetName, osName, archName, buildType);
+	return format("%s-%s-%s-%s", params.archiveName, osName, archName, buildType);
 }
 
 bool isValidCompiler(in string c) {
