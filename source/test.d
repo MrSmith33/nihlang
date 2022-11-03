@@ -99,6 +99,65 @@ void printString(string str) {
 
 void main(string[] args)
 {
+	//testStackTrace;
+
+
+}
+
+const char[2][100] digits = [
+    "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
+    "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+    "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
+    "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
+    "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
+    "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
+    "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
+    "70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
+    "80", "81", "82", "83", "84", "85", "86", "87", "88", "89",
+    "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"
+];
+
+void write_uint(scope void delegate(const(char[])) sink, u64 u) {
+    if (u == 0) return sink("0");
+    u32 c = 0;
+    u32 d = 0;
+    u32 power = 1;
+    while (power <= u) {
+    	power *= 10;
+    	++c;
+    }
+    d = c;
+    while (c >= 2) {
+        *cast(u16*)(io.buf + io.end + c - 2) = *cast(u16*)(digits[u % 100]);
+        u /= 100;
+        c -= 2;
+    }
+    if (c) io.buf[io.end + c - 1] = "0123456789"[u % 10];
+    io.end += d;
+}
+void write_float(stream io, double f) {
+    if (f < 0) f = -f, put(io, '-');
+    i64 ipart = i64(f + 0.00000001);
+    write_uint(io, ipart);
+    put(io, '.');
+    double frac = f - ipart;
+    if (frac < 0) frac = -frac;
+    i64 ndigits = 0, nzeroes = -1;
+    while (frac - i64(frac) >= 0.0000001 && frac - i64(frac) <= 0.9999999 && ndigits < FP_PRECISION) {
+        if (i64(frac) == 0) nzeroes ++;
+        ndigits ++, frac *= 10;
+    }
+    if (frac - i64(frac) > 0.9999999) frac ++;
+    for (i64 i = 0; i < nzeroes; i ++) put(io, '0');
+    write_uint(io, i64(frac));
+}
+
+struct OutStream {
+	void* data;
+	void function(ubyte) put;
+}
+
+void testStackTrace() {
 	initDbgHelp;
 
 	simpleStackTrace();
