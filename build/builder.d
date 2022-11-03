@@ -151,6 +151,7 @@ struct GlobalSettings
 {
 	Action action;
 	BuildType buildType;
+	bool betterc;
 	string compiler;
 	const(string)[] configNames;
 	bool dryRun;
@@ -177,6 +178,7 @@ void printOptions() {
 	stderr.writeln("   --pretty           Enable pretty printing of the commands");
 	stderr.writeln("   --print-callees    Print output of callee programs");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
+	stderr.writeln("   --betterc          Compile in betterC mode");
 	stderr.writeln("-h --help             This help information");
 }
 
@@ -218,6 +220,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"pretty", "", &settings.prettyPrint,
 			"print-callees", "", &settings.printCallees,
 			"verbose-callees", "", &settings.verboseCallees,
+			"betterc", "", &settings.betterc,
 		);
 	}
 	catch(GetOptException e)
@@ -513,9 +516,8 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 {
 	Flags flags = Flags.f_m64 | Flags.f_warn_info | Flags.f_msg_columns | Flags.f_msg_gnu | Flags.f_msg_context | Flags.f_link_internally;
 
-	//flags |= Flags.f_better_c;
-
 	if (g.verboseCallees) flags |= Flags.f_verbose;
+	if (g.betterc) flags |= Flags.f_better_c;
 
 	final switch(params.targetType) with(TargetType) {
 		case unknown: assert(false);
@@ -577,7 +579,10 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 			case f_dynamic_lib:
 				flags ~= "-shared";
 				if (compiler == "ldc2") {
-					flags ~= ["-fvisibility=hidden", "-link-defaultlib-shared=false"];
+					flags ~= "-fvisibility=hidden";
+					if ((bits & Flags.f_better_c) == 0) {
+						flags ~= "-link-defaultlib-shared=false";
+					}
 				}
 				break;
 			case f_release: flags ~= "-release"; break;
@@ -597,8 +602,12 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 			case f_opt:
 				if (compiler == "dmd")
 					flags ~= "-O";
-				else
-					flags ~= ["-O3", "-mcpu=x86-64-v3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates", "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto"];
+				else {
+					flags ~= ["-O3", "-mcpu=x86-64-v3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates"];
+					if ((bits & Flags.f_better_c) == 0) {
+						flags ~= "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto";
+					}
+				}
 				break;
 			case f_link_debug_full:
 				version(Windows) flags ~= "-L/DEBUG:FULL";

@@ -3,19 +3,6 @@
 /// Authors: Andrey Penechko
 module vox.utils;
 
-
-version(D_BetterC) {
-	alias noreturn = typeof(*null);
-	alias string = immutable(char)[];
-}
-
-alias u8 = ubyte;
-alias u16 = ushort;
-alias u32 = uint;
-alias u64 = ulong;
-alias usize = typeof(int.sizeof);
-alias i8 = byte;
-alias i16 = short;
-alias i32 = int;
-alias i64 = long;
-alias isize = typeof(cast(void*)0 - cast(void*)0);
+public import vox.utils.format;
+public import vox.utils.log;
+public import vox.utils.types;
