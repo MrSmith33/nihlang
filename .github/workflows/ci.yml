@@ -61,7 +61,11 @@ jobs:
     name: Build WASM
     strategy:
       matrix:
-        target: [wasm32, wasm32-wasi]
+        include:
+          - target: wasm32
+            config: nih-cli,nih-shared,vbe-shared
+          - target: wasm32-wasi
+            config: nih-cli
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -71,12 +75,12 @@ jobs:
       - name: Build
         run: |
           ./build/setup.sh
-          ./build/builder --action=pack --remove-build --no-deps --build=release-fast --target=${{matrix.target}} --config=nih-cli,nih-shared,vbe-shared --compiler=ldc2 --print-commands --print-callees --pretty --color
+          ./build/builder --action=pack --remove-build --no-deps --build=release-fast --target=${{matrix.target}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --pretty --color
       - uses: actions/upload-artifact@v3
         with:
           path: bin/
   test:
-    name: Build no deps
+    name: Test
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
