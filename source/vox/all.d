@@ -3,6 +3,4 @@
 /// Authors: Andrey Penechko
 module vox.all;
 
-public:
-
-import vox.utils;
+public import vox.utils;

@@ -39,7 +39,7 @@ version(EXECUTABLE) {
 	}
 
 	version(VANILLA_D)
-	int main(string[] args) {
+	i32 main(string[] args) {
 		return vox_main(args);
 	}
 }
