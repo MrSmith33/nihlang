@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        build: [debug-fast]
+        build: [debug-fast, release-fast]
         config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared]
     runs-on: ${{ matrix.os }}
     steps:
@@ -32,7 +32,7 @@ jobs:
       - name: Build
         run: |
           ./build/setup.sh
-          ./build/builder --action=pack --remove-build --build=${{matrix.build}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --verbose-callees
+          ./build/builder --action=pack --remove-build --build=${{matrix.build}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --verbose-callees --pretty
       - uses: actions/upload-artifact@v3
         with:
           path: bin/
