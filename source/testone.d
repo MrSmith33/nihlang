@@ -3,11 +3,13 @@
 /// Authors: Andrey Penechko
 module testone;
 
-//@nogc nothrow:
+@nogc nothrow:
 
-void main(string[] args)
+import nih.all;
+
+pragma(mangle, "vox_main")
+i32 vox_main(string[] args)
 {
-	import nih.all;
-	import std.stdio;
-	stderr.writeln("NIH single test v0.0.0");
+	writeln("NIH single test v0.0.0");
+	return 0;
 }

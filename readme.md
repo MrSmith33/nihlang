@@ -41,10 +41,12 @@ Exploring ways of doing:
   - Exception handler
   - Structured logging for errors and other textual output
 - Build artifacts (15 permutations):
-  - OS:
-    - `windows`
-    - `linux`
-    - `macos`
+  - Target:
+    - `windows-x64`
+    - `linux-x64`
+    - `macos-x64`
+    - `wasm32-wasi`
+    - `wasm32`
   - CLI lang compiler executable
   - Lang compiler as a library
     - dll

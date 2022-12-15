@@ -7,12 +7,12 @@
 // When previous build was done with different compiler, .pdb files can confuse linker making it exit with an error.
 module builder;
 
-import std.algorithm : filter, joiner, canFind, map;
+import std.algorithm : filter, joiner, canFind, map, filter;
 import std.range : empty, array, chain;
 import std.file : thisExePath;
 import std.path : dirName, buildPath, setExtension;
 import std.stdio;
-import std.string : format, lineSplitter;
+import std.string : format, lineSplitter, strip;
 
 int main(string[] args)
 {
@@ -21,9 +21,9 @@ int main(string[] args)
 
 	auto nihcli  = Config("nih-cli",    "nihcli.d", artifactDir, srcDir, TargetType.executable, "nih");
 	auto nihslib = Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary, "nih");
-	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.dynamicLibrary, "nih");
+	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.sharedLibrary, "nih");
 	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe");
-	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.dynamicLibrary, "vbe");
+	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.sharedLibrary, "vbe");
 	auto testone = Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable);
 	auto test    = Config("test",         "test.d", artifactDir, srcDir, TargetType.executable);
 
@@ -67,6 +67,8 @@ int runConfig(in GlobalSettings gs, in Config config)
 		srcDir : config.srcDir,
 		buildType : gs.buildType,
 		compiler : gs.compiler,
+		targetOs : gs.targetOs,
+		targetArch : gs.targetArch,
 		rootFile : config.rootFile,
 		archiveName : config.archiveName,
 	};
@@ -75,7 +77,7 @@ int runConfig(in GlobalSettings gs, in Config config)
 	JobResult res1 = gs.runJob(compileJob);
 
 	if (res1.status != 0) {
-		if (gs.compiler == "dmd" && res1.output.canFind("-1073741819")) {
+		if (gs.compiler == Compiler.dmd && res1.output.canFind("-1073741819")) {
 			// This is a link.exe bug, where it crashes when previous compilation was done with ldc2, and old .pdb file is present
 			// delete that file and retry
 			gs.deletePdbArtifacts(compileJob);
@@ -107,7 +109,8 @@ int runConfig(in GlobalSettings gs, in Config config)
 	}
 
 	if (gs.removeBuild) {
-		gs.deleteArtifacts(compileJob);
+		gs.deleteArtifacts(compileJob.artifacts);
+		gs.deleteArtifacts(compileJob.extraArtifacts);
 	}
 
 	return 0;
@@ -138,6 +141,20 @@ struct Config
 		if (this.targetName == null) this.targetName = this.name;
 		if (this.archiveName == null) this.archiveName = this.name;
 	}
+
+	bool isValidForTriple(TargetArch arch, TargetOs os) const {
+		final switch(arch) with(TargetArch) {
+			case x64, arm64:
+				if (os == TargetOs.macos && targetType == TargetType.sharedLibrary) return false;
+				return true;
+			case wasm32:
+				final switch(os) with(TargetOs) {
+					case windows, linux, macos: assert(0);
+					case wasm: return targetType != TargetType.staticLibrary;
+					case wasi: return targetType == TargetType.executable;
+				}
+		}
+	}
 }
 
 Config findConfig(in Config[] configs, string configName) {
@@ -151,8 +168,18 @@ struct GlobalSettings
 {
 	Action action;
 	BuildType buildType;
+	TargetOs targetOs = hostOs;
+	TargetArch targetArch;
+	void nodeps() {
+		betterc = true;
+		nolibc = true;
+		customobject = true;
+	}
 	bool betterc;
-	string compiler;
+	bool nolibc;
+	bool customobject; // Use custom object.d from source/druntime/object.d
+	bool color;
+	Compiler compiler;
 	const(string)[] configNames;
 	bool dryRun;
 	bool removeBuild;
@@ -160,6 +187,10 @@ struct GlobalSettings
 	bool prettyPrint;
 	bool printCallees;
 	bool verboseCallees;
+
+	bool isCrossCompiling() const {
+		return targetOs != hostOs || targetArch != hostArch;
+	}
 }
 
 void printOptions() {
@@ -169,6 +200,7 @@ void printOptions() {
 	stderr.writeln("            build     Build artifact");
 	stderr.writeln("            run       Build and run resulting executable");
 	stderr.writeln("            pack      Build artifact and package into a .zip");
+	stderr.writeln("   --target=<target>  Select target [windows-x64, linux-x64, macos-x64, wasm32, wasm32-wasi]");
 	stderr.writeln("   --build=<type>     Select build type [debug(default), debug-fast, release-fast]");
 	stderr.writeln("   --compiler=<name>  Select compiler [dmd, ldc2] (by default dmd is used for debug and ldc2 for release)");
 	stderr.writeln("   --config=<name>    Select config. Can be specified multiple times, or comma-separated (--config=a,b,c)");
@@ -178,13 +210,18 @@ void printOptions() {
 	stderr.writeln("   --pretty           Enable pretty printing of the commands");
 	stderr.writeln("   --print-callees    Print output of callee programs");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
-	stderr.writeln("   --betterc          Compile in betterC mode");
+	stderr.writeln("   --no-deps          --betterc + --no-libc + --customobject");
+	stderr.writeln("     --betterc        Compile in betterC mode");
+	stderr.writeln("     --no-libc        Compile without libc dependency");
+	stderr.writeln("     --customobject   Use custom object.d");
+	stderr.writeln("   --color            Enable colored output");
 	stderr.writeln("-h --help             This help information");
 }
 
 void printConfigs() {
 	stderr.writeln("Configs:");
-	stderr.writeln("            all         Select all configs. Ignores other config options.");
+	stderr.writeln("            all         Select all configs valid for selected target.");
+	stderr.writeln("                        Ignores other config options.");
 	stderr.writeln("            nih-cli     Compiler CLI executable (default)");
 	stderr.writeln("            nih-static  Compiler static library");
 	stderr.writeln("            nih-shared  Compiler dynamic library");
@@ -198,6 +235,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 	import std.getopt : GetoptResult, GetOptException, getopt, arraySep;
 	GlobalSettings settings;
 	string compiler;
+	string target;
 	string buildType;
 
 	needsHelp = false;
@@ -212,6 +250,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			args,
 			"action", "", &settings.action,
 			"build", "", &buildType,
+			"target", "", &target,
 			"compiler", "", &compiler,
 			"config", "", &settings.configNames,
 			"dry-run", "", &settings.dryRun,
@@ -220,7 +259,11 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"pretty", "", &settings.prettyPrint,
 			"print-callees", "", &settings.printCallees,
 			"verbose-callees", "", &settings.verboseCallees,
+			"no-deps", "", &settings.nodeps,
 			"betterc", "", &settings.betterc,
+			"no-libc", "", &settings.nolibc,
+			"customobject", "", &settings.customobject,
+			"color", "", &settings.color,
 		);
 	}
 	catch(GetOptException e)
@@ -241,27 +284,61 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 		}
 	}
 
-	if (!isValidCompiler(compiler)) {
-		stderr.writefln("Invalid compiler name: %s. Supported options: dmd, ldc2", compiler);
-		needsHelp = true;
-		return settings;
-	}
-
-	settings.compiler = selectCompiler(settings, compiler);
-
 	if (!isValidBuildType(buildType)) {
 		stderr.writefln("Invalid build type: %s. Supported options: debug, debug-fast, release-fast", buildType);
 		needsHelp = true;
 		return settings;
 	}
-
 	settings.buildType = selectBuildType(buildType);
+
+	switch(target) {
+		case "windows-x64":
+			settings.targetOs = TargetOs.windows;
+			settings.targetArch = TargetArch.x64;
+			break;
+		case "linux-x64":
+			settings.targetOs = TargetOs.linux;
+			settings.targetArch = TargetArch.x64;
+			break;
+		case "macos-x64":
+			settings.targetOs = TargetOs.macos;
+			settings.targetArch = TargetArch.x64;
+			break;
+		case "wasm32":
+			settings.targetOs = TargetOs.wasm;
+			settings.targetArch = TargetArch.wasm32;
+			break;
+		case "wasm32-wasi":
+			settings.targetOs = TargetOs.wasi;
+			settings.targetArch = TargetArch.wasm32;
+			break;
+		case null:
+			break;
+		default:
+			stderr.writefln("Unknown target: %s", target);
+			needsHelp = true;
+	}
+
+	if (!isValidCompiler(compiler)) {
+		stderr.writefln("Invalid compiler name: %s. Supported options: dmd, ldc2", compiler);
+		needsHelp = true;
+		return settings;
+	}
+	if (settings.isCrossCompiling && compiler == "dmd") {
+		stderr.writefln("dmd cannot cross-compile");
+		needsHelp = true;
+		return settings;
+	}
+	settings.compiler = selectCompiler(settings, compiler);
 
 	if (optResult.helpWanted) needsHelp = true;
 
 	if (settings.configNames.canFind("all")) {
 		// Select all configs
-		settings.configNames = configs.map!(c => c.name).array;
+		settings.configNames = configs
+			.filter!(c => c.isValidForTriple(settings.targetArch, settings.targetOs))
+			.map!(c => c.name)
+			.array;
 	} else if (settings.configNames.empty) {
 		// Select default config
 		settings.configNames ~= configs[0].name;
@@ -287,7 +364,9 @@ struct CompileParams
 	BuildType buildType;
 	string targetName;
 	string archiveName;
-	string compiler;
+	Compiler compiler;
+	TargetOs targetOs;
+	TargetArch targetArch;
 
 	string makeArtifactPath(string extension) const {
 		return artifactDir.buildPath(targetName).setExtension(extension);
@@ -319,46 +398,53 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	final switch(params.targetType) with(TargetType) {
 		case unknown: assert(false);
 		case executable:
-			artifacts ~= params.makeArtifactPath(exeExt);
-			version(Windows) extraArtifacts ~= params.makeArtifactPath(".exp");
-			version(Windows) extraArtifacts ~= params.makeArtifactPath(".ilk");
+			artifacts ~= params.makeArtifactPath(osExeExt[gs.targetOs]);
+			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".exp");
+			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".ilk");
 			break;
 		case staticLibrary:
-			artifacts ~= params.makeArtifactPath(slibExt);
+			artifacts ~= params.makeArtifactPath(osStaticLibExt[gs.targetOs]);
 			break;
-		case dynamicLibrary:
-			artifacts ~= params.makeArtifactPath(dlibExt);
-			version(Windows) {
-				artifacts ~= params.makeArtifactPath(slibExt); // import .lib
+		case sharedLibrary:
+			artifacts ~= params.makeArtifactPath(osSharedLibExt[gs.targetOs]);
+			if (gs.targetOs == TargetOs.windows) {
+				artifacts ~= params.makeArtifactPath(osStaticLibExt[gs.targetOs]); // import .lib
 				extraArtifacts ~= params.makeArtifactPath(".exp");
 				extraArtifacts ~= params.makeArtifactPath(".ilk");
 			}
 			break;
 	}
 
-	extraArtifacts ~= params.makeArtifactPath(objExt);
+	extraArtifacts ~= params.makeArtifactPath(osObjExt[gs.targetOs]);
 
 	Flags flags = selectFlags(gs, params);
-	string[] flagsStrings = flagsToStrings(cast(size_t)flags, params.compiler);
+	string[] flagsStrings = flagsToStrings(gs, cast(size_t)flags);
 
-	version(Windows) {
-		if (params.targetType == TargetType.executable || params.targetType == TargetType.dynamicLibrary) {
+	flagsStrings ~= gs.makeTargetTripleFlag;
+
+	if (gs.targetOs == TargetOs.windows) {
+		if (params.targetType == TargetType.executable || params.targetType == TargetType.sharedLibrary) {
 			if (flags & Flags.f_debug_info) {
-				artifacts ~= params.makeArtifactPath(dbiExt); // .pdb file
+				artifacts ~= params.makeArtifactPath(osDebugInfoExt[gs.targetOs]); // .pdb file
 			}
 		}
 	}
 
 	string mainFile = buildPath(params.srcDir, params.rootFile);
+	string objectFile = buildPath(params.srcDir, "druntime", "object.d");
 
 	string imports = text("-I=", params.srcDir);
 
 	string[] args;
-	args ~= params.compiler;
+	args ~= compilerExeName[params.compiler];
 	args ~= imports;
 	args ~= flagsStrings;
 	args ~= text("-of=", artifacts[0]);
 	args ~= mainFile;
+
+	if (gs.customobject) {
+		args ~= objectFile;
+	}
 
 	Job job = {
 		params : params,
@@ -415,7 +501,10 @@ struct JobResult {
 
 JobResult runJob(in GlobalSettings gs, in Job job) {
 
-	if (job.cleanBeforeRun) gs.deleteArtifacts(job);
+	if (job.cleanBeforeRun) {
+		gs.deleteArtifacts(job.artifacts);
+		gs.deleteArtifacts(job.extraArtifacts);
+	}
 
 	void printCommand() {
 		if (gs.prettyPrint)
@@ -432,7 +521,9 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
 
 	void printCalleeOutput() {
-		stderr.writeln(result.output.lineSplitter.filter!(l => !l.empty).joiner("\n"));
+		auto stripped = result.output.strip;
+		if (stripped.empty) return;
+		stderr.writeln(stripped.lineSplitter.filter!(l => !l.empty).joiner("\n"));
 	}
 
 	if (result.status == 0) {
@@ -446,9 +537,9 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	return JobResult(job, 0);
 }
 
-void deleteArtifacts(in GlobalSettings gs, in Job job) {
+void deleteArtifacts(in GlobalSettings gs, in string[] artifacts) {
 	import std.file : exists, remove;
-	foreach(art; chain(job.artifacts, job.extraArtifacts))
+	foreach(art; artifacts)
 		if (exists(art)) {
 			if (gs.printCommands) stderr.writeln("> remove ", art);
 			remove(art);
@@ -473,22 +564,29 @@ string makeCanonicalPath(in string path) {
 }
 
 string makeArchiveName(in CompileParams params) {
-	static const archName = "x64";
 	string buildType = params.makeBuildTypeSuffix;
-	return format("%s-%s-%s-%s", params.archiveName, osName, archName, buildType);
+	return format("%s-%s-%s-%s", params.archiveName, osName[params.targetOs], archName[params.targetArch], buildType);
 }
 
 bool isValidCompiler(in string c) {
 	return [null, "dmd", "ldc2"].canFind(c);
 }
 
-string selectCompiler(in GlobalSettings g, in string providedCompiler) {
-	if (providedCompiler) return providedCompiler;
+Compiler selectCompiler(in GlobalSettings gs, in string providedCompiler) {
+	switch(providedCompiler) {
+		case "dmd": return Compiler.dmd;
+		case "ldc2": return Compiler.ldc;
+		default: break;
+	}
 
-	if (g.buildType == BuildType.dbg)
-		return "dmd";
+	if (gs.isCrossCompiling) {
+		return Compiler.ldc;
+	}
+
+	if (gs.buildType == BuildType.dbg)
+		return Compiler.dmd;
 	else
-		return "ldc2";
+		return Compiler.ldc;
 }
 
 bool isValidBuildType(in string b) {
@@ -514,20 +612,23 @@ string makeBuildTypeSuffix(in CompileParams params) {
 
 Flags selectFlags(in GlobalSettings g, in CompileParams params)
 {
-	Flags flags = Flags.f_m64 | Flags.f_warn_info | Flags.f_msg_columns | Flags.f_msg_gnu | Flags.f_msg_context | Flags.f_link_internally;
+	Flags flags = Flags.f_warn_info | Flags.f_msg_columns | Flags.f_msg_gnu | Flags.f_msg_context | Flags.f_link_internally | Flags.f_compile_imported;
 
 	if (g.verboseCallees) flags |= Flags.f_verbose;
 	if (g.betterc) flags |= Flags.f_better_c;
+	if (g.nolibc) flags |= Flags.f_no_libc;
+	if (g.color) flags |= Flags.f_msg_color;
 
 	final switch(params.targetType) with(TargetType) {
 		case unknown: assert(false);
 		case executable:
+			flags |= Flags.f_executable;
 			break;
 		case staticLibrary:
 			flags |= Flags.f_static_lib;
 			break;
-		case dynamicLibrary:
-			flags |= Flags.f_dynamic_lib;
+		case sharedLibrary:
+			flags |= Flags.f_shared_lib;
 			break;
 	}
 
@@ -552,16 +653,21 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 	return flags;
 }
 
-string[] flagsToStrings(size_t bits, in string compiler) {
+string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 	import core.bitop : bsf;
+	import std.conv : text;
 
 	string[] flags;
+	string[] versions;
+	string[] linkerFlags;
 
-	while (bits != 0)
+	size_t bitscopy = bits;
+
+	while (bitscopy != 0)
 	{
 		// Extract lowest set isolated bit
 		// 111000 -> 001000; 0 -> 0
-		size_t lowestSetBit = bits & -bits;
+		const size_t lowestSetBit = bitscopy & -bitscopy;
 
 		final switch(cast(Flags)lowestSetBit) with(Flags) {
 			case f_verbose: flags ~= "-v"; break;
@@ -569,25 +675,71 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 			case f_warn_info: flags ~= "-wi"; break;
 			case f_msg_columns: flags ~= "-vcolumns"; break;
 			case f_msg_context:
-				if (compiler == "dmd")
+				if (gs.compiler == Compiler.dmd)
 					flags ~= "-verrors=context";
 				else
 					flags ~= "-verrors-context";
 				break;
+			case f_msg_color: if (gs.compiler == Compiler.dmd) flags ~= "-color"; break;
 			case f_better_c: flags ~= "-betterC"; break;
-			case f_static_lib: flags ~= "-lib"; break;
-			case f_dynamic_lib:
-				flags ~= "-shared";
-				if (compiler == "ldc2") {
+			case f_no_libc:
+				versions ~= "NO_DEPS";
+				if (gs.targetOs == TargetOs.windows) {
+					if (gs.compiler == Compiler.dmd) {
+						// ldc need memset and memcpy from those libs
+						// Unlike dmd ldc produces compact artifact, so leaving those out is fine
+						linkerFlags ~= "/nodefaultlib:libcmt";
+						linkerFlags ~= "/nodefaultlib:libvcruntime";
+						linkerFlags ~= "/nodefaultlib:oldnames";
+					}
+				} else if (gs.targetOs == TargetOs.linux || gs.targetOs == TargetOs.macos) {
+					if (gs.compiler == Compiler.ldc) {
+						// Remove -lrt -ldl -lpthread -lm libraries
+						flags ~= "--platformlib=";
+					}
+				}
+				break;
+			case f_executable:
+				versions ~= "EXECUTABLE";
+				if (gs.targetOs == TargetOs.windows) {
+					if (bits & Flags.f_no_libc) {
+						linkerFlags ~= "/entry:" ~ osExecutableEntry[gs.targetOs];
+					}
+					linkerFlags ~= "/subsystem:console";
+				} else if (gs.targetOs == TargetOs.linux) {
+					if (gs.compiler == Compiler.ldc) {
+						if (bits & Flags.f_no_libc) {
+							linkerFlags ~= "--entry=" ~ osExecutableEntry[gs.targetOs];
+						}
+					}
+				}
+				break;
+			case f_static_lib:
+				versions ~= "STATIC_LIB";
+				if (gs.targetArch != TargetArch.wasm32) {
+					flags ~= "-lib";
+				}
+				break;
+			case f_shared_lib:
+				if (gs.targetArch != TargetArch.wasm32) {
+					flags ~= "-shared";
+				}
+				if (gs.compiler == Compiler.ldc) {
 					flags ~= "-fvisibility=hidden";
 					if ((bits & Flags.f_better_c) == 0) {
 						flags ~= "-link-defaultlib-shared=false";
 					}
 				}
+				versions ~= "SHARED_LIB";
+				if (gs.targetOs == TargetOs.windows) {
+					if (bits & Flags.f_no_libc) {
+						linkerFlags ~= "/entry:" ~ osSharedLibEntry[gs.targetOs];
+					}
+				}
 				break;
 			case f_release: flags ~= "-release"; break;
 			case f_debug:
-				if (compiler == "dmd")
+				if (gs.compiler == Compiler.dmd)
 					flags ~= "-debug";
 				else
 					flags ~= "-d-debug";
@@ -595,60 +747,83 @@ string[] flagsToStrings(size_t bits, in string compiler) {
 			case f_debug_info: flags ~= "-g"; break;
 			case f_msg_gnu: flags ~= "-verror-style=gnu"; break;
 			case f_checkaction_halt: flags ~= "-checkaction=halt"; break;
-			case f_m64: flags ~= "-m64"; break;
 			case f_link_internally:
-				version(Windows) if (compiler == "ldc2") flags ~= "-link-internally";
+				if (gs.compiler == Compiler.ldc) flags ~= "-link-internally";
 				break;
 			case f_opt:
-				if (compiler == "dmd")
+				if (gs.compiler == Compiler.dmd)
 					flags ~= "-O";
 				else {
-					flags ~= ["-O3", "-mcpu=x86-64-v3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates"];
+					flags ~= ["-O3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates"];
+					if (gs.targetArch == TargetArch.x64) {
+						flags ~= "-mcpu=x86-64-v3";
+					}
 					if ((bits & Flags.f_better_c) == 0) {
 						flags ~= "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto";
 					}
 				}
 				break;
 			case f_link_debug_full:
-				version(Windows) flags ~= "-L/DEBUG:FULL";
+				if (gs.targetOs == TargetOs.windows) linkerFlags ~= "/DEBUG:FULL";
+				break;
+			case f_compile_imported:
+				flags ~= "-i";
 				break;
 		}
 
 		// Disable lowest set isolated bit
 		// 111000 -> 110000
-		bits ^= lowestSetBit;
+		bitscopy ^= lowestSetBit;
 	}
+
+	if ((bits & Flags.f_no_libc) == 0) {
+		versions ~= "VANILLA_D";
+	}
+
+	final switch(gs.targetOs) with(TargetOs) {
+		case windows, linux, wasi: break;
+		case macos: {
+			if (gs.targetArch == TargetArch.x64) {
+				linkerFlags ~= "-arch";
+				linkerFlags ~= "x86_64";
+				linkerFlags ~= "-platform_version";
+				linkerFlags ~= "macos";
+				linkerFlags ~= "10.0";
+				linkerFlags ~= "11.0";
+			}
+			break;
+		}
+		case wasm: {
+			linkerFlags ~= "--no-entry";
+			break;
+		}
+	}
+
+	final switch(gs.targetArch) with(TargetArch) {
+		case x64, arm64: break;
+		case wasm32: {
+			linkerFlags ~= "-allow-undefined";
+			flags ~= "-fvisibility=hidden";
+			break;
+		}
+	}
+
+	foreach(flag; linkerFlags)
+		flags ~= text("-L", flag);
+
+	foreach(ver; versions) {
+		if (gs.compiler == Compiler.dmd) flags ~= text("-version=", ver);
+		if (gs.compiler == Compiler.ldc) flags ~= text("-d-version=", ver);
+	}
+
 	return flags;
 }
-
-version(Windows) {
-	const exeExt = ".exe";
-	const objExt = ".obj";
-	const slibExt = ".lib";
-	const dlibExt = ".dll";
-	const dbiExt = ".pdb";
-	const osName = "windows";
-} else version(linux) {
-	const exeExt = "";
-	const objExt = ".o";
-	const slibExt = ".a";
-	const dlibExt = ".so";
-	const dbiExt = "";
-	const osName = "linux";
-} else version(OSX) {
-	const exeExt = "";
-	const objExt = ".o";
-	const slibExt = ".a";
-	const dlibExt = ".dylib";
-	const dbiExt = "";
-	const osName = "macos";
-} else static assert(false, "Unsupported OS");
 
 enum TargetType : ubyte {
 	unknown,
 	executable,
 	staticLibrary,
-	dynamicLibrary,
+	sharedLibrary,
 }
 
 enum Action : ubyte {
@@ -663,34 +838,160 @@ enum BuildType : ubyte {
 	rel_fast,
 }
 
-enum Os : ubyte {
-	windows,
-	linux,
-	macos,
-}
-
 enum Compiler : ubyte {
-	autoselect, // based on Optimization
 	dmd,
 	ldc
 }
 
+immutable string[2] compilerExeName = [
+	Compiler.dmd : "dmd",
+	Compiler.ldc : "ldc2",
+];
+
 enum Flags : uint {
 	f_verbose            = 1 << 0,
-	f_better_c           = 1 << 1,
-	f_static_lib         = 1 << 2,
-	f_dynamic_lib        = 1 << 3,
-	f_warn_info          = 1 << 4,
-	f_warn_error         = 1 << 5,
-	f_release            = 1 << 6,
-	f_debug              = 1 << 7,
-	f_debug_info         = 1 << 8,
-	f_msg_columns        = 1 << 9,
-	f_msg_context        = 1 << 10,
-	f_msg_gnu            = 1 << 11,
-	f_checkaction_halt   = 1 << 12,
-	f_m64                = 1 << 13,
-	f_link_internally    = 1 << 14,
-	f_opt                = 1 << 15,
-	f_link_debug_full    = 1 << 16,
+	f_no_libc            = 1 << 1,
+	f_better_c           = 1 << 2,
+	f_executable         = 1 << 3,
+	f_static_lib         = 1 << 4,
+	f_shared_lib         = 1 << 5,
+	f_warn_info          = 1 << 6,
+	f_warn_error         = 1 << 7,
+	f_release            = 1 << 8,
+	f_debug              = 1 << 9,
+	f_debug_info         = 1 << 10,
+	f_msg_columns        = 1 << 11,
+	f_msg_context        = 1 << 12,
+	f_msg_color          = 1 << 13,
+	f_msg_gnu            = 1 << 14,
+	f_checkaction_halt   = 1 << 15,
+	f_link_internally    = 1 << 16,
+	f_opt                = 1 << 17,
+	f_link_debug_full    = 1 << 18,
+	f_compile_imported   = 1 << 19,
+}
+
+enum TargetOs : ubyte {
+	windows,
+	linux,
+	macos,
+	wasm,
+	wasi,
+}
+
+version(Windows) {
+	enum TargetOs hostOs = TargetOs.windows;
+} else version(linux) {
+	enum TargetOs hostOs = TargetOs.linux;
+} else version(OSX) {
+	enum TargetOs hostOs = TargetOs.macos;
+} else version(WASI) {
+	enum TargetOs hostOs = TargetOs.wasi;
+} else version(WebAssembly) {
+	enum TargetOs hostOs = TargetOs.wasm;
+} else static assert(false, "Unsupported OS");
+
+immutable string[5] osTripleName = [
+	TargetOs.windows : "windows-msvc",
+	TargetOs.linux : "linux-gnu",
+	TargetOs.macos : "apple-darwin",
+	TargetOs.wasm : "webassembly",
+	TargetOs.wasi : "wasi",
+];
+
+immutable string[5] osName = [
+	TargetOs.windows : "windows",
+	TargetOs.linux : "linux",
+	TargetOs.macos : "macos",
+	TargetOs.wasm : "wasm",
+	TargetOs.wasi : "wasi",
+];
+
+immutable string[5] osExeExt = [
+	TargetOs.windows : ".exe",
+	TargetOs.linux : "",
+	TargetOs.macos : "",
+	TargetOs.wasm : ".wasm",
+	TargetOs.wasi : ".wasm",
+];
+
+immutable string[5] osObjExt = [
+	TargetOs.windows : ".obj",
+	TargetOs.linux : ".o",
+	TargetOs.macos : ".o",
+	TargetOs.wasm : ".o",
+	TargetOs.wasi : ".o",
+];
+
+immutable string[5] osStaticLibExt = [
+	TargetOs.windows : ".lib",
+	TargetOs.linux : ".a",
+	TargetOs.macos : ".a",
+	TargetOs.wasm : ".a",
+	TargetOs.wasi : ".a",
+];
+
+immutable string[5] osSharedLibExt = [
+	TargetOs.windows : ".dll",
+	TargetOs.linux : ".so",
+	TargetOs.macos : ".dylib",
+	TargetOs.wasm : ".wasm",
+	TargetOs.wasi : ".wasm",
+];
+
+immutable string[5] osDebugInfoExt = [
+	TargetOs.windows : ".pdb",
+	TargetOs.linux : "",
+	TargetOs.macos : "",
+	TargetOs.wasm : "",
+	TargetOs.wasi : "",
+];
+
+immutable string[5] osExecutableEntry = [
+	TargetOs.windows : "exe_main",
+	TargetOs.linux : "exe_main",
+	TargetOs.macos : "exe_main",
+	TargetOs.wasm : "_entry",
+	TargetOs.wasi : "_entry",
+];
+
+immutable string[5] osSharedLibEntry = [
+	TargetOs.windows : "DllMain",
+	TargetOs.linux : "shared_main",
+	TargetOs.macos : "shared_main",
+	TargetOs.wasm : "shared_main",
+	TargetOs.wasi : "shared_main",
+];
+
+
+enum TargetArch : ubyte {
+	x64,
+	arm64,
+	wasm32,
+}
+
+immutable string[3] archName = [
+	TargetArch.x64 : "x64",
+	TargetArch.arm64 : "arm64",
+	TargetArch.wasm32 : "wasm32",
+];
+
+version(X86_64) {
+	enum TargetArch hostArch = TargetArch.x64;
+} else version(AArch64) {
+	enum TargetArch hostArch = TargetArch.arm64;
+} else version(WebAssembly) {
+	enum TargetArch hostArch = TargetArch.wasm32;
+} else static assert(false, "Unsupported architecture");
+
+immutable string[3] archTripleName = [
+	TargetArch.x64 : "x86_64",
+	TargetArch.arm64 : "aarch64",
+	TargetArch.wasm32 : "wasm32",
+];
+
+string makeTargetTripleFlag(in GlobalSettings gs) {
+	import std.conv : text;
+	if (gs.targetArch == TargetArch.x64 && gs.targetOs == hostOs) return "-m64";
+	return text("-mtriple=", archTripleName[gs.targetArch], "-", osTripleName[gs.targetOs]);
 }

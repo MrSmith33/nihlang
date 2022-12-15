@@ -3,6 +3,4 @@
 /// Authors: Andrey Penechko
 module nih.all;
 
-public:
-
-import vox.all;
+public import vox.all;

@@ -18,3 +18,5 @@ alias i16 = short;
 alias i32 = int;
 alias i64 = long;
 alias isize = typeof(cast(void*)0 - cast(void*)0);
+alias f32 = float;
+alias f64 = double;

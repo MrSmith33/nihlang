@@ -5,18 +5,11 @@ import vox.all;
 
 extern(C) export:
 
-version (D_BetterC) {} else {
-	version(Windows) {
-		import core.sys.windows.dll;
-		mixin SimpleDllMain;
-	}
-}
-
 struct VbeState {
 	ubyte dummy;
 }
 
-alias AllocCallback = extern(C) void* function(size_t size);
+alias AllocCallback = extern(C) void* function(usize size);
 alias FreeCallback = extern(C) void function(void* ptr);
 
 VbeState* vbe_init(AllocCallback alloc) {
