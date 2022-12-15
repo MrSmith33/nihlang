@@ -16,8 +16,8 @@ defaults:
     shell: bash
 
 jobs:
-  build:
-    name: Build
+  build_vanilla_d:
+    name: Build vanilla D
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -33,6 +33,46 @@ jobs:
         run: |
           ./build/setup.sh
           ./build/builder --action=pack --remove-build --build=${{matrix.build}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --verbose-callees --pretty
+  build_no_deps:
+    name: Build no deps
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build: [debug-fast, release-fast]
+        config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared]
+        include:
+          - os: ubuntu-latest
+            config: nih-cli
+            no_deps: 
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ env.DC }}
+      - name: Build
+        run: |
+          ./build/setup.sh
+          ./build/builder --action=pack --remove-build --no-deps --build=${{matrix.build}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --verbose-callees --pretty
+      - uses: actions/upload-artifact@v3
+        with:
+          path: bin/
+  build_wasm:
+    name: Build WASM
+    strategy:
+      matrix:
+        target: [wasm32, wasm32-wasi]
+        build: [debug-fast, release-fast]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ env.DC }}
+      - name: Build
+        run: |
+          ./build/setup.sh
+          ./build/builder --action=pack --remove-build --no-deps --build=${{matrix.build}} --target=${{matrix.target}} --config=all --compiler=ldc2 --print-commands --print-callees --verbose-callees --pretty
       - uses: actions/upload-artifact@v3
         with:
           path: bin/
@@ -40,7 +80,7 @@ jobs:
     name: Upload build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build_vanilla_d, build_no_deps, build_wasm]
     steps:
       # Cloning is needed for `gh release create` to work. It looks repository up in .git folder
       - uses: actions/checkout@v2
