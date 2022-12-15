@@ -757,7 +757,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				if (gs.compiler == Compiler.dmd)
 					flags ~= "-O";
 				else {
-					flags ~= ["-O3", "-boundscheck=off", "-enable-inlining", "-flto=full", "-linkonce-templates"];
+					flags ~= ["-O3", "-boundscheck=off", "-enable-inlining", "-flto=full"]; // "-linkonce-templates"
 					if (gs.targetArch == TargetArch.x64) {
 						flags ~= "-mcpu=x86-64-v3";
 					}
