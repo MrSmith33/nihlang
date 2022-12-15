@@ -612,7 +612,11 @@ string makeBuildTypeSuffix(in CompileParams params) {
 
 Flags selectFlags(in GlobalSettings g, in CompileParams params)
 {
-	Flags flags = Flags.f_warn_info | Flags.f_msg_columns | Flags.f_msg_gnu | Flags.f_msg_context | Flags.f_link_internally | Flags.f_compile_imported;
+	Flags flags = Flags.f_warn_info | Flags.f_msg_columns | Flags.f_msg_gnu | Flags.f_msg_context | Flags.f_compile_imported;
+
+	if (g.isCrossCompiling) {
+		flags |= Flags.f_link_internally;
+	}
 
 	if (g.verboseCallees) flags |= Flags.f_verbose;
 	if (g.betterc) flags |= Flags.f_better_c;
