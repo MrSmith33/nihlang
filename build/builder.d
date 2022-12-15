@@ -761,8 +761,10 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 					if (gs.targetArch == TargetArch.x64) {
 						flags ~= "-mcpu=x86-64-v3";
 					}
-					if ((bits & Flags.f_better_c) == 0) {
-						flags ~= "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto";
+					if (gs.targetOs == TargetOs.windows) {
+						if ((bits & Flags.f_better_c) == 0) {
+							flags ~= "-defaultlib=phobos2-ldc-lto,druntime-ldc-lto";
+						}
 					}
 				}
 				break;
