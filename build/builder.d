@@ -5,6 +5,11 @@
 // Notes:
 // DMD does not produce .lib and .exp files if program contains no symbols marked as `export`
 // When previous build was done with different compiler, .pdb files can confuse linker making it exit with an error.
+// macos
+//   -platform_version <platform> <target_version> <sdk_version>
+//   platform = macos
+//   target_version = macos
+//   sdk_version = macos
 module builder;
 
 import std.algorithm : filter, joiner, canFind, map, filter;
@@ -793,8 +798,8 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				linkerFlags ~= "x86_64";
 				linkerFlags ~= "-platform_version";
 				linkerFlags ~= "macos";
-				linkerFlags ~= "10.9";
-				linkerFlags ~= "11.0";
+				linkerFlags ~= "11.0.0";
+				linkerFlags ~= "11.7";
 			}
 			break;
 		}
