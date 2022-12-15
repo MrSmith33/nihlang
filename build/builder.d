@@ -794,6 +794,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				linkerFlags ~= "-platform_version";
 				linkerFlags ~= "macos";
 				linkerFlags ~= "10.9";
+				linkerFlags ~= "11.0";
 			}
 			break;
 		}
