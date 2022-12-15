@@ -793,8 +793,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				linkerFlags ~= "x86_64";
 				linkerFlags ~= "-platform_version";
 				linkerFlags ~= "macos";
-				linkerFlags ~= "10.0";
-				linkerFlags ~= "11.0";
+				linkerFlags ~= "10.9";
 			}
 			break;
 		}
