@@ -431,7 +431,6 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	}
 
 	string mainFile = buildPath(params.srcDir, params.rootFile);
-	string objectFile = buildPath(params.srcDir, "druntime", "object.d");
 
 	string imports = text("-I=", params.srcDir);
 
@@ -443,7 +442,7 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	args ~= mainFile;
 
 	if (gs.customobject) {
-		args ~= objectFile;
+		args ~= buildPath(params.srcDir, "custom_object.d");
 	}
 
 	Job job = {
