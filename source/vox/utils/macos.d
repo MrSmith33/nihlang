@@ -9,10 +9,10 @@ import vox.utils.posix;
 import vox.utils.types;
 
 void writeString(const(char)[] str) @nogc nothrow {
-	syscall(4, 1, cast(usize)str.ptr, str.length);
+	syscall(0x2000004, 1, cast(usize)str.ptr, str.length);
 }
 
 noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
-	syscall(1, exitCode);
+	syscall(0x2000001, exitCode);
 	assert(0);
 }
