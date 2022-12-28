@@ -3,9 +3,9 @@
 /// Authors: Andrey Penechko
 module vox.utils.stacktrace;
 
-import vox.utils;
-
 version(Windows) @nogc nothrow:
+
+import vox.utils;
 
 
 void initDbgHelp() @nogc nothrow

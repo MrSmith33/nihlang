@@ -5,11 +5,16 @@
 // Notes:
 // DMD does not produce .lib and .exp files if program contains no symbols marked as `export`
 // When previous build was done with different compiler, .pdb files can confuse linker making it exit with an error.
+//
 // macos
 //   -platform_version <platform> <target_version> <sdk_version>
 //   platform = macos
 //   target_version = macos
 //   sdk_version = macos
+//
+// if -defaultlib=phobos2-ldc-lto,druntime-ldc-lto fails with /usr/bin/ld: /tmp/lto-llvm-42ff39.o:(.data._D3etc1c4curl12__ModuleInfoZ+0x10): undefined reference to `_D3std6socket12__ModuleInfoZ'
+// one needs to use another linker, such as gold, via -linker=gold flag
+// https://github.com/ldc-developers/ldc/issues/4289
 module builder;
 
 import std.algorithm : filter, joiner, canFind, map, filter;

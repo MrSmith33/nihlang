@@ -1,13 +1,13 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module utils.windows.windows;
+module vox.utils.system.windows;
 
-version(Windows):
+version(Windows) version(X86_64) @nogc nothrow @system:
 
 import vox.utils.types;
 
-void writeString(const(char)[] str) @nogc nothrow {
+void writeString(const(char)[] str) {
 	void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	//SetConsoleOutputCP(65001);
 	u32 numWritten;
@@ -20,7 +20,7 @@ void writeString(const(char)[] str) @nogc nothrow {
 }
 
 
-extern(Windows) @nogc nothrow @system:
+extern(Windows):
 
 
 alias HANDLE = void*;

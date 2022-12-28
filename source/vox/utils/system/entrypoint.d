@@ -1,7 +1,9 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.utils.entrypoint;
+///
+/// Entry points for executable and shared library targets
+module vox.utils.system.entrypoint;
 
 import vox.all;
 
@@ -32,9 +34,20 @@ version(EXECUTABLE) {
 			vox_exit_process(ret);
 		}
 
-		version(WebAssembly) export extern(C)
-		void _start() {
-			vox_main(null);
+		version(WebAssembly) {
+			version(WASI) {
+				export extern(C)
+				void _start() {
+					i32 ret = vox_main(null);
+					proc_exit(ret);
+				}
+			} else {
+				export extern(C)
+				void _start() {
+					i32 ret = vox_main(null);
+				}
+			}
+
 		}
 	}
 
@@ -47,5 +60,25 @@ version(EXECUTABLE) {
 version(SHARED_LIB) {
 	version(Windows) extern(System) bool DllMain(void* instance, u32 reason, void* reserved) {
 		return true;
+	}
+}
+
+version(Windows)
+noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
+	ExitProcess(exitCode);
+}
+
+version(WebAssembly) {
+	pragma(LDC_intrinsic, "llvm.trap")
+	noreturn vox_llvm_trap() @nogc nothrow;
+
+	version(WASI) {
+		noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
+			proc_exit(exitCode);
+		}
+	} else {
+		noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
+			vox_llvm_trap();
+		}
 	}
 }

@@ -5,6 +5,19 @@ version(Windows) {
 	extern (C) __gshared int _tls_index;
 }
 
+version(WebAssembly) {
+	import ldc.intrinsics : llvm_memcpy, llvm_memset;
+	extern(C) void* memcpy(void* dest, const void* src, size_t len) {
+		llvm_memcpy!size_t(dest, src, len);
+		return dest;
+	}
+
+	extern(C) void* memset(void* dest, ubyte val, size_t len) {
+		llvm_memset!size_t(dest, val, len);
+		return dest;
+	}
+}
+
 extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t srclen, size_t elemsz)
 {
 	version (LDC) {
