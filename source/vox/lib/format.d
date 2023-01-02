@@ -1,25 +1,14 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.utils.format;
+module vox.lib.format;
 
-import vox.utils;
+import vox.lib;
 
 @nogc nothrow:
 
+
 alias SinkDelegate = void delegate(scope const(char)[]) @nogc nothrow;
-
-void writefln(Args...)(string fmt, Args args) {
-	writef(fmt, args);
-	writeString("\n");
-}
-
-void writef(Args...)(string fmt, Args args) {
-	void sink(scope const(char)[] str) @nogc nothrow {
-		writeString(str);
-	}
-	formattedWrite(&sink, fmt, args);
-}
 
 void formattedWrite(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 	u32 cursor = 0;
@@ -78,25 +67,6 @@ void formattedWrite(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 		selectFormatter!(Args[i])(sink, arg, spec);
 	}
 	writeLiteral(sink, fmt, cursor);
-}
-
-void writeln(Args...)(Args args) {
-	void sink(scope const(char)[] str) @nogc nothrow {
-		writeString(str);
-	}
-	foreach(i, arg; args) {
-		selectFormatter!(Args[i])(&sink, arg, "s");
-	}
-	writeString("\n");
-}
-
-void write(Args...)(Args args) {
-	void sink(scope const(char)[] str) {
-		writeString(str);
-	}
-	foreach(i, arg; args) {
-		selectFormatter!(Args[i])(&sink, arg, "s");
-	}
 }
 
 void formatValue(T)(scope SinkDelegate sink, auto ref T val, string fmt) {
@@ -169,29 +139,6 @@ void formatArray(T : E[], E)(scope SinkDelegate sink, T val, string fmt) {
 	sink("]");
 }
 
-u32 encode_utf8(ref char[4] buf, dchar c) {
-	if (c < 0x80) {
-		buf[0] = cast(u8)c;
-		return 1;
-	} else if (c < 0x800) {
-		buf[0] = 0xC0 | cast(u8)(c >> 6);
-		buf[1] = 0x80 | (c & 0x3f);
-		return 2;
-	} else if (c < 0x10000) {
-		buf[0] = 0xE0 | cast(u8)(c >> 12);
-		buf[1] = 0x80 | ((c >> 6) & 0x3F);
-		buf[2] = 0x80 | (c & 0x3f);
-		return 3;
-	} else if (c < 0x110000) {
-		buf[0] = 0xF0 | cast(u8)(c >> 18);
-		buf[1] = 0x80 | ((c >> 12) & 0x3F);
-		buf[2] = 0x80 | ((c >> 6) & 0x3F);
-		buf[3] = 0x80 | (c & 0x3f);
-		return 4;
-	}
-	panic("Invalid code point");
-}
-
 void formatStruct(T)(scope SinkDelegate sink, ref T val, string fmt)
 	if(is(T == struct) && __traits(hasMember, T, "toString"))
 {
@@ -216,6 +163,7 @@ if(is(T == struct) && !__traits(hasMember, T, "toString"))
 void formatNull(scope SinkDelegate sink, typeof(null) val, string fmt) {
 	sink("null");
 }
+
 void formatBool(scope SinkDelegate sink, bool val, string fmt) {
 	if (val) sink("true");
 	else sink("false");
@@ -345,72 +293,4 @@ u32 formatFloat(ref char[FLT_BUF_SIZE] buf, f64 originalFloat) {
 	}
 
 	return numDigits;
-}
-
-
-void testWrite() @nogc nothrow {
-	char[512] buf = void;
-	u32 cursor;
-	void testSink(scope const(char)[] str) @nogc nothrow {
-		buf[cursor..cursor+str.length] = str;
-		cursor += str.length;
-	}
-	void test(Args...)(string expected, string fmt, Args args, string file = __FILE__, int line = __LINE__) {
-		cursor = 0;
-		formattedWrite(&testSink, fmt, args);
-		if (expected != buf[0..cursor]) {
-			writefln("\033[1;31m[FAIL]\033[0m %s:%s", file, line);
-			writefln("Got:      %s", buf[0 .. cursor]);
-			writefln("Expected: %s", expected);
-			panic("panic");
-		}
-	}
-
-	scope(exit) writeln("\033[1;32m[SUCCESS]\033[0m");
-
-	test("c", "%s", 'c');
-	test("\xFF", "%s", '\xFF');
-	test("\U0000FFFF", "%s", '\U0000FFFF');
-
-	test("hello", "%s", "hello");
-	test("18446744073709551615", "%s", u64(-1));
-	test("0", "%s", u64(0));
-	test("18446744073709551615", "%s", u64(0xFFFF_FFFF_FFFF_FFFF));
-
-	test("-9223372036854775808", "%s", i64(-9223372036854775808));
-	test("-1", "%s", i64(-1));
-	test("0", "%s", i64(0));
-	test("9223372036854775807", "%s", i64(9223372036854775807));
-
-	test("ffffffffffffffff", "%x", u64(0xFFFF_FFFF_FFFF_FFFF));
-	test("FFFFFFFFFFFFFFFF", "%X", u64(0xFFFF_FFFF_FFFF_FFFF));
-
-	test("4.5", "%s", 4.5);
-	test("1.200000", "%s", 1.2f);
-
-	int* b = cast(int*)0x0F0F_F0FF_F0FF_FFF0;
-	test("0xF0FF0FFF0FFFFF0", "%s", b);
-
-	test("true", "%s", true);
-	test("false", "%s", false);
-	test("null", "%s", null);
-
-	static int[] arr = [1, 2];
-	test("[1, 2]", "%s", arr);
-
-	static int[2] arr2 = [1, 2];
-	test("[1, 2]", "%s", arr2);
-
-	static struct A {
-		i32 a = 42;
-		i32 b = 60;
-	}
-
-	static struct B	{
-		void toString(scope SinkDelegate sink) @nogc nothrow const {
-			sink("it's B");
-		}
-	}
-	test("A(a : 42, b : 60)", "%s", A());
-	test("it's B", "%s", B());
 }

@@ -1,11 +1,11 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.utils.system.wasi;
+module vox.lib.system.wasi;
 
 version(WASI) @nogc nothrow @system:
 
-import vox.utils.types;
+import vox.lib.types;
 import ldc.attributes;
 
 void writeString(const(char)[] str) {

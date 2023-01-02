@@ -1,12 +1,12 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.utils.system.syscall.x64;
+module vox.lib.system.syscall.x64;
 
 version(X86_64):
 
-version(linux) public import vox.utils.system.syscall.x64.linux;
-else version(OSX) public import vox.utils.system.syscall.x64.macos;
+version(linux) public import vox.lib.system.syscall.x64.linux;
+else version(OSX) public import vox.lib.system.syscall.x64.macos;
 
 version(Posix) version(D_InlineAsm_X86_64) @nogc nothrow @system:
 

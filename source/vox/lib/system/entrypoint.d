@@ -3,7 +3,7 @@
 /// Authors: Andrey Penechko
 ///
 /// Entry points for executable and shared library targets
-module vox.utils.system.entrypoint;
+module vox.lib.system.entrypoint;
 
 import vox.all;
 

@@ -1,11 +1,11 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.utils.system.windows;
+module vox.lib.system.windows;
 
 version(Windows) version(X86_64) @nogc nothrow @system:
 
-import vox.utils.types;
+import vox.lib.types;
 
 void writeString(const(char)[] str) {
 	void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
