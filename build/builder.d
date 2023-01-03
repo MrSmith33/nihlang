@@ -17,7 +17,8 @@
 // https://github.com/ldc-developers/ldc/issues/4289
 module builder;
 
-import std.algorithm : filter, joiner, canFind, map, filter;
+import core.time : MonoTime, Duration;
+import std.algorithm : filter, joiner, canFind, map, filter, move;
 import std.range : empty, array, chain;
 import std.file : thisExePath;
 import std.path : dirName, buildPath, setExtension;
@@ -52,6 +53,9 @@ int main(string[] args)
 
 int runSelectedConfigs(in GlobalSettings gs, in Config[] configs)
 {
+	MonoTime startTime = currTime;
+	scope(exit) gs.printTime("- All configs: %ss", currTime - startTime);
+
 	foreach(configName; gs.configNames)
 	{
 		Config config = configs.findConfig(configName);
@@ -66,6 +70,11 @@ int runSelectedConfigs(in GlobalSettings gs, in Config[] configs)
 		if (status != 0) return status;
 	}
 	return 0;
+}
+
+void printTime(in GlobalSettings gs, string fmt, Duration duration) {
+	if (!gs.printTotalTime) return;
+	stderr.writefln(fmt, scaledNumberFmt(duration));
 }
 
 int runConfig(in GlobalSettings gs, in Config config)
@@ -93,9 +102,11 @@ int runConfig(in GlobalSettings gs, in Config config)
 			gs.deletePdbArtifacts(compileJob);
 			stderr.writeln("Retrying");
 			JobResult retryRes = gs.runJob(compileJob);
-			res1.status = retryRes.status;
+			move(/*src*/ retryRes, /*dst*/ res1);
 		}
 	}
+
+	gs.printTime("- Build: %ss", res1.duration);
 
 	if (res1.status != 0) return res1.status;
 
@@ -107,12 +118,14 @@ int runConfig(in GlobalSettings gs, in Config config)
 		case Action.run:
 			Job runJob = gs.makeRunJob(res1);
 			JobResult res2 = gs.runJob(runJob);
+			gs.printTime("- Run: %ss", res2.duration);
 			if (res2.status != 0) return res2.status;
 			break;
 
 		case Action.pack:
 			Job packageJob = gs.makePackageJob(res1);
 			JobResult res2 = gs.runJob(packageJob);
+			gs.printTime("- Run: %ss", res2.duration);
 			if (res2.status != 0) return res2.status;
 
 			break;
@@ -197,6 +210,7 @@ struct GlobalSettings
 	bool prettyPrint;
 	bool printCallees;
 	bool verboseCallees;
+	bool printTotalTime;
 
 	bool isCrossCompiling() const {
 		return targetOs != hostOs || targetArch != hostArch;
@@ -220,6 +234,7 @@ void printOptions() {
 	stderr.writeln("   --pretty           Enable pretty printing of the commands");
 	stderr.writeln("   --print-callees    Print output of callee programs");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
+	stderr.writeln("   --print-total-time Print time of all run commands");
 	stderr.writeln("   --no-deps          --betterc + --no-libc + --customobject");
 	stderr.writeln("     --betterc        Compile in betterC mode");
 	stderr.writeln("     --no-libc        Compile without libc dependency");
@@ -269,6 +284,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"pretty", "", &settings.prettyPrint,
 			"print-callees", "", &settings.printCallees,
 			"verbose-callees", "", &settings.verboseCallees,
+			"print-total-time", "", &settings.printTotalTime,
 			"no-deps", "", &settings.nodeps,
 			"betterc", "", &settings.betterc,
 			"no-libc", "", &settings.nolibc,
@@ -506,6 +522,7 @@ struct JobResult {
 	const Job job;
 	int status;
 	string output;
+	Duration duration;
 }
 
 JobResult runJob(in GlobalSettings gs, in Job job) {
@@ -526,8 +543,10 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 
 	if (gs.dryRun) return JobResult(job, 0);
 
+	MonoTime startTime = currTime;
 	import std.process : execute, Config;
 	auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
+	MonoTime endTime = currTime;
 
 	void printCalleeOutput() {
 		auto stripped = result.output.strip;
@@ -540,10 +559,9 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	} else {
 		if (!gs.printCommands) printCommand; // print command on error if we didn't print it yet
 		printCalleeOutput; // always print on error
-		return JobResult(job, result.status, result.output);
 	}
 
-	return JobResult(job, 0);
+	return JobResult(job, result.status, result.output.strip, endTime - startTime);
 }
 
 void deleteArtifacts(in GlobalSettings gs, in string[] artifacts) {
@@ -1012,4 +1030,147 @@ string makeTargetTripleFlag(in GlobalSettings gs) {
 	import std.conv : text;
 	if (gs.targetArch == TargetArch.x64 && gs.targetOs == hostOs) return "-m64";
 	return text("-mtriple=", archTripleName[gs.targetArch], "-", osTripleName[gs.targetOs]);
+}
+
+
+
+MonoTime currTime() { return MonoTime.currTime(); }
+
+/// Use 'i' format char to get binary prefixes (like Ki, instead of K), only for integers
+/// Use '#' flag to get greek letter in the output (not compatible with 'i')
+struct ScaledNumberFmt(T) {
+	import std.algorithm : min, max;
+	import std.format : formattedWrite, FormatSpec;
+	T value;
+	void toString(scope void delegate(const(char)[]) sink, const ref FormatSpec!char fmt) const {
+		if (fmt.spec == 'i') {
+			// Use binary prefixes instead of decimal prefixes
+			long intVal = cast(long)value;
+			int scale = calcScale2(intVal);
+			double scaledValue = scaled2(value, scale);
+			int digits = numDigitsInNumber10(scaledValue);
+			string prefix = scalePrefixesAscii[scaleToScaleIndex2(scale)]; // length is 1 or 0
+			int width = max(fmt.width - (cast(int)prefix.length * 2), 0); // account for 'i' prefix
+			int precision = max(min(3-digits, fmt.precision), 0); // gives 0 or 1
+			string fmtString = (scale == 0) ? "%*.*f%s" : "%*.*f%si";
+			sink.formattedWrite(fmtString, width, precision, scaledValue, prefix);
+		} else {
+			int scale = calcScale10(value);
+			auto scaledValue = scaled10(value, -scale);
+			int digits = numDigitsInNumber10(scaledValue);
+			immutable string[] prefixes = (fmt.flHash) ? scalePrefixesGreek : scalePrefixesAscii;
+			string prefix = prefixes[scaleToScaleIndex10(scale)]; // length is 1 or 0
+			int width = max(fmt.width - cast(int)prefix.length, 0);
+			int precision = max(min(3-digits, fmt.precision), 0); // gives 0 or 1
+			sink.formattedWrite("%*.*f%s", width, precision, scaledValue, prefix);
+		}
+	}
+}
+
+auto scaledNumberFmt(T)(T value) {
+	return ScaledNumberFmt!T(value);
+}
+
+auto scaledNumberFmt(Duration value, double scale = 1) {
+	double seconds = value.total!"nsecs" / 1_000_000_000.0;
+	return ScaledNumberFmt!double(seconds * scale);
+}
+
+// -30 .. 30, with step of 3. Or -10 to 10 with step of 1
+immutable string[] scalePrefixesAscii = ["q","r","y","z","a","f","p","n","u","m","","K","M","G","T","P","E","Z","Y","R","Q"];
+immutable string[] scalePrefixesGreek = ["q","r","y","z","a","f","p","n","µ","m","","K","M","G","T","P","E","Z","Y","R","Q"];
+enum NUM_SCALE_PREFIXES = 10;
+enum MIN_SCALE_PREFIX = -30;
+enum MAX_SCALE_PREFIX = 30;
+
+
+int numDigitsInNumber10(Num)(const Num val) {
+	import std.math: abs, round;
+	ulong absVal = cast(ulong)val.abs.round;
+	int numDigits = 1;
+
+	while (absVal >= 10) {
+		absVal /= 10;
+		++numDigits;
+	}
+
+	return numDigits;
+}
+
+private int signum(T)(const T x) pure nothrow {
+	return (x > 0) - (x < 0);
+}
+
+/// Returns number in range of [-30; 30]
+int calcScale10(Num)(Num val) {
+	import std.math: abs, round, log10;
+
+	// cast to double is necessary in case of long.min, which overflows integral abs
+	auto lg = log10(abs(cast(double)val));
+
+	// handle very small values and zero
+	if (lg == -double.infinity) return 0;
+
+	double absLog = abs(lg);
+	int scale = cast(int)(round(absLog/3.0))*3;
+
+	int logSign = signum(lg);
+	int clampedScale = scale * logSign;
+
+	// we want
+	//  0.9994 to be formatted as 999m
+	//  0.9995 to be formatted as 1.0
+	//  0.9996 to be formatted as 1.0
+	if (abs(scaled10(val, -clampedScale)) < 0.9995) clampedScale -= 3;
+
+	if (clampedScale < MIN_SCALE_PREFIX)
+		clampedScale = 0; // prevent zero, or values smaller that min scale to display with min scale
+	else if (clampedScale > MAX_SCALE_PREFIX)
+		clampedScale = MAX_SCALE_PREFIX;
+
+	return clampedScale;
+}
+
+/// Returns number in range of [0; 100]
+int calcScale2(Num)(Num val) {
+	import std.math: abs, round, log2;
+
+	auto lg = log2(abs(val));
+	double absLog = abs(lg);
+
+	int scale = cast(int)(round(absLog/10.0))*10;
+
+	int logSign = signum(lg);
+	int clampedScale = scale * logSign;
+
+	// we want
+	//  0.9994 to be formatted as 999m
+	//  0.9995 to be formatted as 1.0
+	//  0.9996 to be formatted as 1.0
+	if (abs(scaled2(val, clampedScale)) < 0.9995) clampedScale -= 10;
+
+	if (clampedScale < 0)
+		clampedScale = 0; // negative scale should not happen for binary numbers
+	else if (clampedScale > MAX_SCALE_PREFIX)
+		clampedScale = MAX_SCALE_PREFIX;
+
+	return clampedScale;
+}
+
+int scaleToScaleIndex10(int scale) {
+	return scale / 3 + NUM_SCALE_PREFIXES; // -30...30 -> -10...10 -> 0...20
+}
+
+int scaleToScaleIndex2(int scale) {
+	return scale / 10 + NUM_SCALE_PREFIXES; // -100...100 -> -10...10 -> 0...20
+}
+
+double scaled10(Num)(Num num, int scale) {
+	import std.math: pow;
+	return num * pow(10.0, scale);
+}
+
+double scaled2(Num)(Num num, int scale) {
+	double divisor = 1 << scale;
+	return num / divisor;
 }
