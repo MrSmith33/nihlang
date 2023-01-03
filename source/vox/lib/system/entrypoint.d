@@ -13,7 +13,7 @@ version(EXECUTABLE) {
 	pragma(mangle, "vox_main") i32 vox_main(string[] args);
 
 	version(NO_DEPS) {
-		version(Windows) export extern(System)
+		version(Windows) extern(System)
 		noreturn exe_main(void* hInstance, void* hPrevInstance,
 		                  char* lpCmdLine, i32 nCmdShow)
 		{
