@@ -4,8 +4,6 @@
 module vox.lib.hash;
 
 import vox.lib;
-//import vox.lib : write, writef, writeln, isPowerOfTwo, format, swap, formattedWrite;
-//import vox.lib : isPowerOfTwo, max, writefln, ArrayArena;
 
 enum StoreValues : bool { no = false, yes = true }
 

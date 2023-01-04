@@ -17,8 +17,16 @@ public import vox.lib.system.entrypoint;
 public import vox.lib.system.stacktrace;
 
      version(Windows)     public import vox.lib.system.windows;
-else version(linux)       public import vox.lib.system.linux;
-else version(OSX)         public import vox.lib.system.macos;
-// WASI must be checked before WebAssembly, because WASI is defined together with WebAssembly
-else version(WASI)        public import vox.lib.system.wasi;
-else version(WebAssembly) public import vox.lib.system.wasm;
+else version(Posix) {
+	public import vox.lib.system.posix;
+	version(linux)        public import vox.lib.system.linux;
+	else version(OSX)     public import vox.lib.system.macos;
+}
+else version(WebAssembly) {
+	public import vox.lib.system.wasm_all;
+	version(WASI) {
+		public import vox.lib.system.wasm_wasi;
+	} else {
+		public import vox.lib.system.wasm_pure;
+	}
+} else static assert(false, "Unsupported OS");

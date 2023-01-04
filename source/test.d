@@ -10,7 +10,7 @@ import nih.all;
 pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
 {
-	writefln("hello Vox");
+	writeln("hello Vox");
 	//testDemangler;
 	//testStackTrace;
 	//panic("Test panic message %s", 42);

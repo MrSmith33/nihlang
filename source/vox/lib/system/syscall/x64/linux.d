@@ -4,5 +4,9 @@
 module vox.lib.system.syscall.x64.linux;
 version(linux):
 
+enum READ = 0;
 enum WRITE = 1;
+enum MMAP = 9;
+enum MPROTECT = 10;
+enum MUNMAP = 11;
 enum EXIT = 60;

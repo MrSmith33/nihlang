@@ -17,6 +17,18 @@ noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line 
 	vox_exit_process(1);
 }
 
+T enforce(T, Args...)(T value, string fmt, Args args, string file = __FILE__, int line = __LINE__)
+	if (is(typeof(() { if (!value) { } } )))
+{
+	if (value) return value;
+
+	writefln("Enforce: %s:%s", file, line);
+	writef(fmt, args);
+	writeString("\n");
+	version(Windows) simpleNamedStackTrace(3,2);
+	vox_exit_process(1);
+}
+
 version(D_BetterC) {
 	extern(C) void _assert(const(char)* msg, const(char)* file, uint line) {
 		writef("%s:%s Assert: ", file.fromStringz, line);
