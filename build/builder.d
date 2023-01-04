@@ -15,6 +15,10 @@
 // if -defaultlib=phobos2-ldc-lto,druntime-ldc-lto fails with /usr/bin/ld: /tmp/lto-llvm-42ff39.o:(.data._D3etc1c4curl12__ModuleInfoZ+0x10): undefined reference to `_D3std6socket12__ModuleInfoZ'
 // one needs to use another linker, such as gold, via -linker=gold flag
 // https://github.com/ldc-developers/ldc/issues/4289
+//
+// https://wiki.dlang.org/Generating_WebAssembly_with_LDC
+// https://webassembly.org/roadmap/
+// ldc2 -mtriple=wasm32-wasi -mattr=help
 module builder;
 
 import core.time : MonoTime, Duration;
@@ -511,7 +515,24 @@ Job makeGitTagJob(in GlobalSettings gs, JobResult res) {
 }
 
 Job makeRunJob(in GlobalSettings gs, JobResult compileRes) {
+	final switch(gs.targetOs) with(TargetOs) {
+		case windows, linux, macos: return makeRunNativeExecutableJob(gs, compileRes);
+		case wasi: return makeRunWasmWasiJob(gs, compileRes);
+		case wasm: assert(false, "Cannot run artifact of wasm target");
+	}
+}
+
+Job makeRunNativeExecutableJob(in GlobalSettings gs, JobResult compileRes) {
 	string[] args;
+	args ~= compileRes.job.artifacts[0];
+	string workDir = compileRes.job.params.artifactDir;
+	Job job = { args : args, workDir : workDir, printOutput : true };
+	return job;
+}
+
+Job makeRunWasmWasiJob(in GlobalSettings gs, JobResult compileRes) {
+	string[] args;
+	args ~= "wasmtime";
 	args ~= compileRes.job.artifacts[0];
 	string workDir = compileRes.job.params.artifactDir;
 	Job job = { args : args, workDir : workDir, printOutput : true };
@@ -569,7 +590,7 @@ void deleteArtifacts(in GlobalSettings gs, in string[] artifacts) {
 	foreach(art; artifacts)
 		if (exists(art)) {
 			if (gs.printCommands) stderr.writeln("> remove ", art);
-			remove(art);
+			if (!gs.dryRun) remove(art);
 		}
 }
 
@@ -580,7 +601,7 @@ void deletePdbArtifacts(in GlobalSettings gs, in Job job) {
 		if (art.extension == ".pdb")
 			if (exists(art)) {
 				if (gs.printCommands) stderr.writeln("> remove ", art);
-				remove(art);
+				if (!gs.dryRun) remove(art);
 			}
 }
 
@@ -839,6 +860,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 		case x64, arm64: break;
 		case wasm32: {
 			linkerFlags ~= "-allow-undefined";
+			flags ~= "-mattr=+bulk-memory";
 			flags ~= "-fvisibility=hidden";
 			break;
 		}
