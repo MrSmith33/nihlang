@@ -6,11 +6,12 @@ module test;
 @nogc nothrow:
 
 import nih.all;
+import vox.vm;
 
 pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
 {
-	writeln("hello Vox");
+	testVM();
 	//testDemangler;
 	//testStackTrace;
 	//panic("Test panic message %s", 42);

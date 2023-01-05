@@ -19,6 +19,8 @@
 // https://wiki.dlang.org/Generating_WebAssembly_with_LDC
 // https://webassembly.org/roadmap/
 // ldc2 -mtriple=wasm32-wasi -mattr=help
+//
+// source ~/dlang/ldc-1.30.0/activate
 module builder;
 
 import core.time : MonoTime, Duration;
@@ -580,6 +582,7 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	} else {
 		if (!gs.printCommands) printCommand; // print command on error if we didn't print it yet
 		printCalleeOutput; // always print on error
+		stderr.writeln("Command exited with ", result.status);
 	}
 
 	return JobResult(job, result.status, result.output.strip, endTime - startTime);

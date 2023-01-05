@@ -1,7 +1,7 @@
 /// Copyright: Copyright (c) 2017-2023 Andrey Penechko.
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
 /// Authors: Andrey Penechko.
-module vox.lib.hash;
+module vox.lib.mem.hashtable;
 
 import vox.lib;
 
@@ -14,7 +14,9 @@ struct HashMap(Key, Value, Key emptyKey) {
 /// Uses special key value to mark empty buckets
 struct KeyBucket(Key, Key emptyKey)
 {
-	static assert(isPowerOfTwo(Key.sizeof), format("%s == %s NPOT", Key.stringof, Key.sizeof));
+	@nogc nothrow:
+
+	static assert(isPowerOfTwo(Key.sizeof), Key.stringof ~ "is not POT");
 	Key key = emptyKey;
 
 	bool empty() const { return key == emptyKey; }
@@ -30,6 +32,7 @@ struct KeyBucket(Key, Key emptyKey)
 // Compiler doesn't optimize `index % _capacity` into `index & (_capacity - 1)`
 mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 {
+	@nogc nothrow:
 
 	private uint _length; // num of used buckets
 	private uint _capacity; // capacity. Always power of two
@@ -50,7 +53,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 	}
 
 	/// Returns false if no value was deleted, true otherwise
-	bool remove(ref ArrayArena arena, Key key) {
+	bool remove(ref VoxAllocator allocator, Key key) {
 		if (_length == 0) return false;
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t searched_dib = 0;
@@ -102,17 +105,17 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		}
 	}
 
-	void free(ref ArrayArena arena) {
+	void free(ref VoxAllocator allocator) {
 		static if (SINGLE_ALLOC) {
-			size_t size = max(ArrayArena.MIN_BLOCK_BYTES, Bucket_size * _capacity);
-			arena.freeBlock((cast(ubyte*)keyBuckets)[0..size]);
+			size_t size = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * _capacity);
+			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..size]);
 			//values = null; // not needed, because values ptr is derived from keys
 		} else {
-			size_t keySize = max(ArrayArena.MIN_BLOCK_BYTES, KeyBucketT.sizeof * _capacity);
-			arena.freeBlock((cast(ubyte*)keyBuckets)[0..keySize]);
+			size_t keySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * _capacity);
+			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..keySize]);
 			static if (store_values) {
-				size_t valSize = max(ArrayArena.MIN_BLOCK_BYTES, Value.sizeof * _capacity);
-				arena.freeBlock((cast(ubyte*)values)[0..valSize]);
+				size_t valSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * _capacity);
+				allocator.freeBlock((cast(ubyte*)values)[0..valSize]);
 			}
 			values = null;
 		}
@@ -126,7 +129,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		_length = 0;
 	}
 
-	private void extend(ref ArrayArena arena)
+	private void extend(ref VoxAllocator allocator)
 	{
 		uint newCapacity = _capacity ? _capacity * 2 : MIN_CAPACITY;
 		auto oldKeyBuckets = keyBuckets;
@@ -138,17 +141,17 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		auto oldCapacity = _capacity;
 
 		static if (SINGLE_ALLOC) {
-			size_t newSize = max(ArrayArena.MIN_BLOCK_BYTES, Bucket_size * newCapacity);
-			ubyte[] newBlock = arena.allocBlock(newSize);
+			size_t newSize = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * newCapacity);
+			ubyte[] newBlock = allocator.allocBlock(newSize);
 			keyBuckets = cast(KeyBucketT*)(newBlock.ptr);
 			// values is based on keyBuckets ptr
 		} else {
-			size_t newKeySize = max(ArrayArena.MIN_BLOCK_BYTES, KeyBucketT.sizeof * newCapacity);
-			ubyte[] newKeysBlock = arena.allocBlock(newKeySize);
+			size_t newKeySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * newCapacity);
+			ubyte[] newKeysBlock = allocator.allocBlock(newKeySize);
 			keyBuckets = cast(KeyBucketT*)(newKeysBlock.ptr);
 			static if (store_values) {
-				size_t newValSize = max(ArrayArena.MIN_BLOCK_BYTES, Value.sizeof * newCapacity);
-				ubyte[] newValuesBlock = arena.allocBlock(newValSize);
+				size_t newValSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * newCapacity);
+				ubyte[] newValuesBlock = allocator.allocBlock(newValSize);
 				values = cast(Value*)newValuesBlock.ptr;
 			}
 		}
@@ -160,20 +163,20 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 			_length = 0; // needed because `put` will increment per item
 			foreach (i, ref bucket; oldKeyBuckets[0..oldCapacity]) {
 				if (bucket.used) {
-					static if (store_values) put(arena, bucket.key, oldValues[i]);
-					else put(arena, bucket.key);
+					static if (store_values) put(allocator, bucket.key, oldValues[i]);
+					else put(allocator, bucket.key);
 				}
 			}
 
 			static if (SINGLE_ALLOC) {
-				size_t oldSize = max(ArrayArena.MIN_BLOCK_BYTES, Bucket_size * oldCapacity);
-				arena.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldSize]);
+				size_t oldSize = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * oldCapacity);
+				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldSize]);
 			} else {
-				size_t oldKeySize = max(ArrayArena.MIN_BLOCK_BYTES, KeyBucketT.sizeof * oldCapacity);
-				arena.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldKeySize]);
+				size_t oldKeySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * oldCapacity);
+				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldKeySize]);
 				static if (store_values) {
-					size_t oldValSize = max(ArrayArena.MIN_BLOCK_BYTES, Value.sizeof * oldCapacity);
-					arena.freeBlock((cast(ubyte*)oldValues)[0..oldValSize]);
+					size_t oldValSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * oldCapacity);
+					allocator.freeBlock((cast(ubyte*)oldValues)[0..oldValSize]);
 				}
 			}
 		}
@@ -185,6 +188,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 // DIB - distance to initial bucket
 mixin template HashMapImpl()
 {
+	@nogc nothrow:
 	private enum bool SINGLE_ALLOC = Key.sizeof == Value.sizeof;
 
 	static assert(isPowerOfTwo(Value.sizeof));
@@ -202,10 +206,10 @@ mixin template HashMapImpl()
 	alias KeyT = Key;
 	alias ValueT = Value;
 
-	Value* put(ref ArrayArena arena, Key key, Value value)
+	Value* put(ref VoxAllocator allocator, Key key, Value value)
 	{
 		assert(KeyBucketT.isValidKey(key), "Invalid key");
-		if (_length == maxLength) extend(arena);
+		if (_length == maxLength) extend(allocator);
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;
 		while (true) {
@@ -233,14 +237,14 @@ mixin template HashMapImpl()
 		}
 	}
 
-	Value* getOrCreate(ref ArrayArena arena, Key key, out bool wasCreated, Value default_value = Value.init)
+	Value* getOrCreate(ref VoxAllocator allocator, Key key, out bool wasCreated, Value default_value = Value.init)
 	{
 		if (_length == 0) {
 			wasCreated = true;
-			return put(arena, key, default_value);
+			return put(allocator, key, default_value);
 		}
 
-		if (_length == maxLength) extend(arena);
+		if (_length == maxLength) extend(allocator);
 		auto index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;
 		Value value;
@@ -295,7 +299,7 @@ mixin template HashMapImpl()
 				inserted_dib = current_dib;
 			}
 			++inserted_dib;
-			assert(numIters < _capacity, format("bug %s %s %s", _capacity, numIters, _length));
+			enforce(numIters < _capacity, "bug %s %s %s", _capacity, numIters, _length);
 			++numIters;
 			index = (index + 1) & (_capacity - 1); // % capacity
 		}
@@ -319,7 +323,7 @@ mixin template HashMapImpl()
 		return values[index];
 	}
 
-	int opApply(scope int delegate(ref Value) del) {
+	int opApply(scope int delegate(ref Value) @nogc nothrow del) {
 		foreach (i, ref bucket; keyBuckets[0.._capacity])
 			if (bucket.used)
 				if (int ret = del(values[i]))
@@ -327,7 +331,7 @@ mixin template HashMapImpl()
 		return 0;
 	}
 
-	int opApply(scope int delegate(in Key, ref Value) del) {
+	int opApply(scope int delegate(const Key, ref Value) @nogc nothrow del) {
 		foreach (i, ref bucket; keyBuckets[0.._capacity])
 			if (bucket.used)
 				if (int ret = del(bucket.key, values[i]))
@@ -335,10 +339,18 @@ mixin template HashMapImpl()
 		return 0;
 	}
 
-	void toString()(scope void delegate(const(char)[]) sink) {
+	int opApply(scope int delegate(const Key, const ref Value) @nogc nothrow del) const {
+		foreach (i, ref bucket; keyBuckets[0.._capacity])
+			if (bucket.used)
+				if (int ret = del(bucket.key, values[i]))
+					return ret;
+		return 0;
+	}
+
+	void toString(scope SinkDelegate sink) const {
 		sink.formattedWrite("[",);
 		size_t index;
-		foreach(key, value; this) {
+		foreach(const key, const ref value; this) {
 			if (index > 0) sink(", ");
 			sink.formattedWrite("%s:%s", key, value);
 			++index;

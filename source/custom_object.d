@@ -17,10 +17,19 @@ extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t s
 	}
 }
 
+extern(C) void* _memset32(void* dest, uint val, size_t len) {
+	for (size_t size = len; size > 0; --size) {
+		*cast(uint*)dest = val;
+		dest += 4;
+	}
+	return dest;
+}
+
+
 alias size_t = typeof(int.sizeof);
 alias ptrdiff_t = typeof(cast(void*)0 - cast(void*)0);
 alias string = immutable(char)[];
-
+alias noreturn = typeof(*null);
 
 extern(C) int _fltused = 0x9875;
 

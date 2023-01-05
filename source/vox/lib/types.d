@@ -3,11 +3,6 @@
 /// Authors: Andrey Penechko
 module vox.lib.types;
 
-version(D_BetterC) {
-	alias noreturn = typeof(*null);
-	alias string = immutable(char)[];
-}
-
 alias u8 = ubyte;
 alias u16 = ushort;
 alias u32 = uint;

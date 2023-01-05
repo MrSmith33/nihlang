@@ -12,18 +12,12 @@ void writeString(const(char)[] str) {
 	syscall(WRITE, 1, cast(usize)str.ptr, str.length);
 }
 
-noreturn vox_exit_process(u32 exitCode) {
-	import vox.lib.system.syscall : syscall, EXIT;
-	syscall(EXIT, exitCode);
-	assert(0);
-}
-
 void* mmap(void* addr, size_t len, int prot, int flags, int fd, long off) {
 	import vox.lib.system.syscall : syscall, MMAP;
 	return cast(void*)syscall(MMAP, cast(ulong)addr, len, prot, flags, fd, off);
 }
 
-int mprotect(void *addr, size_t len, int prot) {
+int mprotect(void* addr, size_t len, int prot) {
 	import vox.lib.system.syscall : syscall, MPROTECT;
 	return cast(int)syscall(MPROTECT, cast(ulong)addr, len, prot);
 }

@@ -213,7 +213,7 @@ void format_f64(scope SinkDelegate sink, f64 f, string fmt) {
 	sink(buf[$-numDigits..$]);
 }
 
-void formatPointer(scope SinkDelegate sink, void* ptr, string fmt) {
+void formatPointer(scope SinkDelegate sink, in void* ptr, string fmt) {
 	sink("0x");
 	char[INT_BUF_SIZE] buf = void;
 	u32 numDigits = formatHex(buf, cast(u64)ptr, hexDigitsUpper);

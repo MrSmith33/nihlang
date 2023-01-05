@@ -6,12 +6,15 @@ module vox.lib;
 public import vox.lib.algo;
 public import vox.lib.error;
 public import vox.lib.format;
-public import vox.lib.hash;
 public import vox.lib.io;
 public import vox.lib.log;
 public import vox.lib.math;
 public import vox.lib.string;
 public import vox.lib.types;
+
+public import vox.lib.mem.allocator;
+public import vox.lib.mem.array;
+public import vox.lib.mem.hashtable;
 
 public import vox.lib.system.entrypoint;
 public import vox.lib.system.stacktrace;

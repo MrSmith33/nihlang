@@ -24,6 +24,9 @@ version(EXECUTABLE) {
 
 		version(Posix) export extern(C)
 		noreturn exe_main() {
+			asm @nogc nothrow {
+				sub RSP, 8;
+			}
 			i32 ret = vox_main(null);
 			vox_exit_process(ret);
 		}
@@ -66,6 +69,13 @@ version(SHARED_LIB) {
 version(Windows)
 noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
 	ExitProcess(exitCode);
+}
+
+version(Posix)
+noreturn vox_exit_process(u32 exitCode) {
+	import vox.lib.system.syscall : syscall, EXIT;
+	syscall(EXIT, exitCode);
+	assert(0);
 }
 
 version(WebAssembly) {
