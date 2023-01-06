@@ -37,6 +37,9 @@ T enforce(T, Args...)(T value, string fmt, Args args, string file = __FILE__, in
 }
 
 version(D_BetterC) {
+	version(WebAssembly) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
+		_assert(msg, file, line);
+	}
 	extern(C) void _assert(const(char)* msg, const(char)* file, uint line) {
 		import vox.lib.io : writefln, writef, writeln;
 		import vox.lib.system.entrypoint : vox_exit_process;
