@@ -29,12 +29,12 @@ void testVM() {
 
 	AllocationId funcId = vm.addFunction(func);
 
-	disasm(code[]);
+	//disasm(code[]);
 
 	vm.pushRegisters(1); // result register
 	vm.pushRegister_u64(42); // argument
 	vm.call(funcId);
-	vm.run();
+	vm.runVerbose();
 	writefln("result %s", vm.getRegister(0).as_u64);
 }
 
@@ -97,6 +97,18 @@ struct VmState {
 		while(frames.length) step();
 	}
 
+	void runVerbose() {
+		writeln("---");
+		printRegs();
+		while(frames.length) {
+			u32 ipCopy = frames.back.ip;
+			disasmOne(frames.back.func.code[], ipCopy);
+			step();
+			printRegs();
+		}
+		writeln("---");
+	}
+
 	void step() {
 		if(frames.length == 0) panic("step: Frame stack is empty");
 		VmFrame* frame = &frames.back();
@@ -114,6 +126,20 @@ struct VmState {
 				registers[frame.firstRegister + dst] = registers[frame.firstRegister + src];
 				return;
 		}
+	}
+
+	void printRegs() {
+		write("     [");
+		foreach(i, reg; registers) {
+			if (i > 0) write(", ");
+			write("r", i, " ");
+			printReg(reg);
+		}
+		writeln("]");
+	}
+
+	void printReg(Register reg) {
+		write(reg.as_u64);
 	}
 }
 
@@ -169,18 +195,22 @@ struct AllocationId {
 void disasm(u8[] code) {
 	u32 ip;
 	while(ip < code.length) {
-		auto addr = ip++;
-		VmOpcode op = cast(VmOpcode)code[addr];
-		final switch(op) with(VmOpcode) {
-			case ret:
-				writefln("%04x ret", addr);
-				break;
-			case mov:
-				u32 dst = code[ip++];
-				u32 src = code[ip++];
-				writefln("%04x mov r%s, r%s", addr, dst, src);
-				break;
-		}
+		disasmOne(code, ip);
+	}
+}
+
+void disasmOne(u8[] code, ref u32 ip) {
+	auto addr = ip++;
+	VmOpcode op = cast(VmOpcode)code[addr];
+	final switch(op) with(VmOpcode) {
+		case ret:
+			writefln("%04x ret", addr);
+			break;
+		case mov:
+			u32 dst = code[ip++];
+			u32 src = code[ip++];
+			writefln("%04x mov r%s, r%s", addr, dst, src);
+			break;
 	}
 }
 
