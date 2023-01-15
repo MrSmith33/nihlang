@@ -69,7 +69,7 @@ void simpleNamedStackTrace(u32 bottomFramesToSkip = 0, u32 topFramesToSkip = 0) 
 				writefln("- %s", Demangler(symbol.Name.ptr[0..symbol.NameLen]));
 			}
 		} else {
-			writefln("0x%X", pc);
+			writefln("%X", pc);
 		}
 	}
 }
