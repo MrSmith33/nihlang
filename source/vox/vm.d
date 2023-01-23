@@ -54,93 +54,6 @@ void testVM() {
 	writefln("result %s", vm.getRegister(0));
 }
 
-struct CodeBuilder {
-	@nogc nothrow:
-
-	VoxAllocator* allocator;
-	Array!u8 code;
-
-	void emit_ret() {
-		code.put(*allocator, VmOpcode.ret);
-	}
-
-	void emit_const_s8(u8 dst, i8 val) {
-		code.put(*allocator, VmOpcode.const_s8);
-		code.put(*allocator, dst);
-		code.put(*allocator, val);
-	}
-
-	void emit_add_i64(u8 dst, u8 src0, u8 src1) {
-		code.put(*allocator, VmOpcode.add_i64);
-		code.put(*allocator, dst);
-		code.put(*allocator, src0);
-		code.put(*allocator, src1);
-	}
-
-	void emit_mov(u8 dst, u8 src) {
-		code.put(*allocator, VmOpcode.mov);
-		code.put(*allocator, dst);
-		code.put(*allocator, src);
-	}
-
-	void emit_load_m64(u8 dst, u8 src) {
-		code.put(*allocator, VmOpcode.load_m64);
-		code.put(*allocator, dst);
-		code.put(*allocator, src);
-	}
-
-	void emit_store_m64(u8 dst, u8 src) {
-		code.put(*allocator, VmOpcode.store_m64);
-		code.put(*allocator, dst);
-		code.put(*allocator, src);
-	}
-}
-
-struct VmFunction {
-	@nogc nothrow:
-
-	Array!u8 code;
-	// result registers followed by argument registers
-	u8 numCallerRegisters;
-	u8 numLocalRegisters;
-}
-
-struct VmFrame {
-	@nogc nothrow:
-
-	VmFunction* func;
-	u32 ip;
-	// index of the first register
-	u32 firstRegister;
-}
-
-struct SizeAndAlign {
-	@nogc nothrow:
-
-	u32 size;
-	u32 alignment;
-}
-
-struct Memory {
-	@nogc nothrow:
-
-	Array!Allocation allocations;
-	Array!u8 memory;
-	Array!u8 bitmap;
-	u32 bytesUsed;
-
-	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
-		u32 index = allocations.length;
-		u32 offset = bytesUsed;
-		bytesUsed += sizeAlign.size;
-		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
-		memory.voidPut(allocator, sizeAlign.size);
-		allocations.put(allocator, Allocation(offset, sizeAlign.size));
-		u32 generation = 0;
-		return AllocationId(index, generation, allocKind);
-	}
-}
-
 struct VmState {
 	@nogc nothrow:
 
@@ -340,6 +253,129 @@ struct VmState {
 	}
 }
 
+struct CodeBuilder {
+	@nogc nothrow:
+
+	VoxAllocator* allocator;
+	Array!u8 code;
+
+	void emit_ret() {
+		code.put(*allocator, VmOpcode.ret);
+	}
+
+	void emit_const_s8(u8 dst, i8 val) {
+		code.put(*allocator, VmOpcode.const_s8);
+		code.put(*allocator, dst);
+		code.put(*allocator, val);
+	}
+
+	void emit_add_i64(u8 dst, u8 src0, u8 src1) {
+		code.put(*allocator, VmOpcode.add_i64);
+		code.put(*allocator, dst);
+		code.put(*allocator, src0);
+		code.put(*allocator, src1);
+	}
+
+	void emit_mov(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.mov);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_load_m64(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.load_m64);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_store_m64(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.store_m64);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+}
+
+void disasm(u8[] code) {
+	u32 ip;
+	while(ip < code.length) {
+		disasmOne(code, ip);
+	}
+}
+
+void disasmOne(u8[] code, ref u32 ip) {
+	auto addr = ip++;
+	VmOpcode op = cast(VmOpcode)code[addr];
+	final switch(op) with(VmOpcode) {
+		case ret:
+			writefln("%04x ret", addr);
+			break;
+
+		case mov:
+			u8 dst = code[ip++];
+			u8 src = code[ip++];
+			writefln("%04x mov r%s, r%s", addr, dst, src);
+			break;
+
+		case add_i64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			writefln("%04x add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case const_s8:
+			u8 dst = code[ip++];
+			i8 src = code[ip++];
+			writefln("%04x const.s8 r%s, %s", addr, dst, src);
+			break;
+
+		case load_m8:
+		case load_m16:
+		case load_m32:
+		case load_m64:
+			u32 size_bits = (1 << (op - load_m8)) * 8;
+			u8 dst = code[ip++];
+			i8 src = code[ip++];
+			writefln("%04x load.m%s r%s, [r%s]", addr, size_bits, dst, src);
+			break;
+
+		case store_m8:
+		case store_m16:
+		case store_m32:
+		case store_m64:
+			u32 size_bits = (1 << (op - store_m8)) * 8;
+			u8 dst = code[ip++];
+			i8 src = code[ip++];
+			writefln("%04x store.m%s [r%s], r%s", addr, size_bits, dst, src);
+			break;
+	}
+}
+
+struct VmFunction {
+	@nogc nothrow:
+
+	Array!u8 code;
+	// result registers followed by argument registers
+	u8 numCallerRegisters;
+	u8 numLocalRegisters;
+}
+
+struct VmFrame {
+	@nogc nothrow:
+
+	VmFunction* func;
+	u32 ip;
+	// index of the first register
+	u32 firstRegister;
+}
+
+struct SizeAndAlign {
+	@nogc nothrow:
+
+	u32 size;
+	u32 alignment;
+}
+
 // Register can contain 0 or 1 pointer, so instead of storing a hashmap of relocations
 // we store a single AllocationId
 // vector registers are forbidden to store pointers
@@ -416,59 +452,23 @@ struct Allocation {
 	HashMap!(u32, AllocationId, u32.max) relocations;
 }
 
-void disasm(u8[] code) {
-	u32 ip;
-	while(ip < code.length) {
-		disasmOne(code, ip);
-	}
-}
+struct Memory {
+	@nogc nothrow:
 
-void disasmOne(u8[] code, ref u32 ip) {
-	auto addr = ip++;
-	VmOpcode op = cast(VmOpcode)code[addr];
-	final switch(op) with(VmOpcode) {
-		case ret:
-			writefln("%04x ret", addr);
-			break;
+	Array!Allocation allocations;
+	Array!u8 memory;
+	Array!u8 bitmap;
+	u32 bytesUsed;
 
-		case mov:
-			u8 dst = code[ip++];
-			u8 src = code[ip++];
-			writefln("%04x mov r%s, r%s", addr, dst, src);
-			break;
-
-		case add_i64:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			writefln("%04x add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case const_s8:
-			u8 dst = code[ip++];
-			i8 src = code[ip++];
-			writefln("%04x const.s8 r%s, %s", addr, dst, src);
-			break;
-
-		case load_m8:
-		case load_m16:
-		case load_m32:
-		case load_m64:
-			u32 size_bits = (1 << (op - load_m8)) * 8;
-			u8 dst = code[ip++];
-			i8 src = code[ip++];
-			writefln("%04x load.m%s r%s, [r%s]", addr, size_bits, dst, src);
-			break;
-
-		case store_m8:
-		case store_m16:
-		case store_m32:
-		case store_m64:
-			u32 size_bits = (1 << (op - store_m8)) * 8;
-			u8 dst = code[ip++];
-			i8 src = code[ip++];
-			writefln("%04x store.m%s [r%s], r%s", addr, size_bits, dst, src);
-			break;
+	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
+		u32 index = allocations.length;
+		u32 offset = bytesUsed;
+		bytesUsed += sizeAlign.size;
+		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
+		memory.voidPut(allocator, sizeAlign.size);
+		allocations.put(allocator, Allocation(offset, sizeAlign.size));
+		u32 generation = 0;
+		return AllocationId(index, generation, allocKind);
 	}
 }
 
@@ -531,4 +531,3 @@ enum VmOpcode : u8 {
 	store_m32,
 	store_m64,
 }
-
