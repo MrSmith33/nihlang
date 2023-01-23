@@ -25,7 +25,7 @@ jobs:
         config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -46,7 +46,7 @@ jobs:
             no_deps:
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -68,7 +68,7 @@ jobs:
             config: nih-cli
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -90,7 +90,7 @@ jobs:
             no_deps:
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -105,7 +105,7 @@ jobs:
     needs: [build_no_deps, build_wasm]
     steps:
       # Cloning is needed for `gh release create` to work. It looks repository up in .git folder
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Download build artifacts of other jobs
       - uses: actions/download-artifact@v3
         with:
