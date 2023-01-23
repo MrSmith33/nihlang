@@ -17,12 +17,26 @@ extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t s
 	}
 }
 
-extern(C) void* _memset32(void* dest, uint val, size_t len) {
-	for (size_t size = len; size > 0; --size) {
-		*cast(uint*)dest = val;
-		dest += 4;
+version(DigitalMars)
+extern(C) void* _memset32(void* dst, uint val, size_t len) {
+	void* dstCopy = dst;
+	for (; len > 0; --len) {
+		*cast(uint*)dst = val;
+		dst += 4;
 	}
-	return dest;
+	return dstCopy;
+}
+
+version(DigitalMars)
+extern(C) void* _memsetn(void* dst, void* val, int len, size_t elemsz) {
+	void* dstCopy = dst;
+	for (; len; --len) {
+		void* src = val;
+		for (size_t size = elemsz; size > 0; --size) {
+			*cast(ubyte*)dst++ = *cast(ubyte*)src++;
+		}
+	}
+	return dstCopy;
 }
 
 

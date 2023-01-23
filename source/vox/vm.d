@@ -27,27 +27,28 @@ void testVM() {
 
 	VmState vm = {
 		allocator : &allocator,
-		canStoreToStaticMem : true,
+		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
 		ptrSize : 8,
 	};
 
-	vm.staticMemory.voidPut(allocator, 64*1024);
-	vm.heapMemory.voidPut(allocator, 64*1024);
-	vm.stackMemory.voidPut(allocator, 64*1024);
-	vm.heapAllocations.voidPut(allocator, 1); // skip null pointer
+	// Reserve 64K for heap, static and stack
+	vm.memories[MemoryKind.static_mem].memory.voidPut(allocator, 64*1024);
+	vm.memories[MemoryKind.heap_mem].memory.voidPut(allocator, 64*1024);
+	vm.memories[MemoryKind.heap_mem].allocations.voidPut(allocator, 1); // skip null pointer
+	vm.memories[MemoryKind.stack_mem].memory.voidPut(allocator, 64*1024);
 
 	AllocationId funcId   = vm.addFunction(func);
-	AllocationId staticId = vm.addStaticAllocation(8, 1);
-	AllocationId heapId   = vm.addHeapAllocation(8, 1);
-	AllocationId stackId  = vm.addStackAllocation(8, 1);
+	AllocationId staticId = vm.memories[MemoryKind.static_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.static_mem);
+	AllocationId heapId   = vm.memories[MemoryKind.heap_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.heap_mem);
+	AllocationId stackId  = vm.memories[MemoryKind.stack_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.stack_mem);
 
 	disasm(func.code[]);
 
-	vm.pushRegisters(1); // result register
-	vm.pushRegister(VmRegister.makePtr(0, funcId));   // argument
-	vm.pushRegister(VmRegister.makePtr(0, staticId)); // argument
-	vm.pushRegister(VmRegister.makePtr(0, heapId));   // argument
-	vm.pushRegister(VmRegister.makePtr(0, stackId));  // argument
+	vm.pushRegisters(1);                              // 0: result register
+	vm.pushRegister(VmRegister.makePtr(0, funcId));   // 1: argument function pointer
+	vm.pushRegister(VmRegister.makePtr(0, staticId)); // 2: argument static pointer
+	vm.pushRegister(VmRegister.makePtr(0, heapId));   // 3: argument heap pointer
+	vm.pushRegister(VmRegister.makePtr(0, stackId));  // 4: argument stack pointer
 	vm.call(funcId);
 	vm.runVerbose();
 	writefln("result %s", vm.getRegister(0));
@@ -55,6 +56,7 @@ void testVM() {
 
 struct CodeBuilder {
 	@nogc nothrow:
+
 	VoxAllocator* allocator;
 	Array!u8 code;
 
@@ -96,6 +98,7 @@ struct CodeBuilder {
 
 struct VmFunction {
 	@nogc nothrow:
+
 	Array!u8 code;
 	// result registers followed by argument registers
 	u8 numCallerRegisters;
@@ -103,10 +106,39 @@ struct VmFunction {
 }
 
 struct VmFrame {
+	@nogc nothrow:
+
 	VmFunction* func;
 	u32 ip;
 	// index of the first register
 	u32 firstRegister;
+}
+
+struct SizeAndAlign {
+	@nogc nothrow:
+
+	u32 size;
+	u32 alignment;
+}
+
+struct Memory {
+	@nogc nothrow:
+
+	Array!Allocation allocations;
+	Array!u8 memory;
+	Array!u8 bitmap;
+	u32 bytesUsed;
+
+	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
+		u32 index = allocations.length;
+		u32 offset = bytesUsed;
+		bytesUsed += sizeAlign.size;
+		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
+		memory.voidPut(allocator, sizeAlign.size);
+		allocations.put(allocator, Allocation(offset, sizeAlign.size));
+		u32 generation = 0;
+		return AllocationId(index, generation, allocKind);
+	}
 }
 
 struct VmState {
@@ -116,62 +148,28 @@ struct VmState {
 	bool isTrap; // must be checked on return
 
 	u8 ptrSize; // 4 or 8
-	bool canStoreToStaticMem;
-
+	u8 readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RO;
 
 	VoxAllocator* allocator;
-	Array!Allocation staticAllocations;
-	Array!Allocation heapAllocations;
-	Array!Allocation stackAllocations;
-	Array!u8 staticMemory;
-	Array!u8 heapMemory;
-	Array!u8 stackMemory;
-	u32 staticMemUsed;
-	u32 heapMemUsed;
-	u32 stackMemUsed;
+	Memory[3] memories;
+
 	Array!VmFunction functions;
 	Array!VmFrame frames;
 	Array!VmRegister registers;
 
+	bool isReadableMemory(MemoryKind kind) {
+		return cast(bool)(readWriteMask & (1 << kind));
+	}
+
+	bool isWritableMemory(MemoryKind kind) {
+		return cast(bool)(readWriteMask & (1 << (kind + 4)));
+	}
 
 	AllocationId addFunction(VmFunction func) {
 		u32 index = functions.length;
 		functions.put(*allocator, func);
 		u32 generation = 0;
-		return AllocationId(index, generation, AllocationKind.func_id);
-	}
-
-	AllocationId addStaticAllocation(u32 size, u32 alignment) {
-		u32 index = staticAllocations.length;
-		u32 offset = staticMemUsed;
-		staticMemUsed += size;
-		if (staticMemUsed >= staticMemory.length) panic("Out of static memory");
-		staticMemory.voidPut(*allocator, size);
-		staticAllocations.put(*allocator, Allocation(offset, size));
-		u32 generation = 0;
-		return AllocationId(index, generation, AllocationKind.static_mem);
-	}
-
-	AllocationId addHeapAllocation(u32 size, u32 alignment) {
-		u32 index = heapAllocations.length;
-		u32 offset = heapMemUsed;
-		heapMemUsed += size;
-		if (heapMemUsed >= heapMemory.length) panic("Out of heap memory");
-		heapMemory.voidPut(*allocator, size);
-		heapAllocations.put(*allocator, Allocation(offset, size));
-		u32 generation = 0;
-		return AllocationId(index, generation, AllocationKind.heap_mem);
-	}
-
-	AllocationId addStackAllocation(u32 size, u32 alignment) {
-		u32 index = stackAllocations.length;
-		u32 offset = stackMemUsed;
-		stackMemUsed += size;
-		if (stackMemUsed >= stackMemory.length) panic("Out of stack memory");
-		stackMemory.voidPut(*allocator, size);
-		stackAllocations.put(*allocator, Allocation(offset, size));
-		u32 generation = 0;
-		return AllocationId(index, generation, AllocationKind.stack_mem);
+		return AllocationId(index, generation, MemoryKind.func_id);
 	}
 
 	void pushRegisters(u32 numRegisters) {
@@ -193,7 +191,7 @@ struct VmState {
 
 	void call(AllocationId funcId) {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
-		if(funcId.kind != AllocationKind.func_id) panic("Invalid AllocationId kind, expected func_id, got %s", allocationKindString[funcId.kind]);
+		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocationId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
 		VmFunction* func = &functions[funcId.index];
 		VmFrame frame = {
 			func : func,
@@ -245,13 +243,16 @@ struct VmState {
 				VmRegister* src1 = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				dst.as_u64 = src0.as_u64 + src1.as_u64;
 				dst.pointer = src0.pointer;
-				if (src1.pointer.isDefined) panic("add.i64 can only contain pointers in the first argument. (%s) Instr %s", *src1, frame.ip-3);
+				if (src1.pointer.isDefined) {
+					panic("add.i64 can only contain pointers in the first argument. (%s) Instr %s", *src1, frame.ip-3);
+				}
 				return;
 
 			case const_s8:
 				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				i8 src = frame.func.code[frame.ip++];
 				dst.as_s64 = src;
+				dst.pointer = AllocationId();
 				return;
 
 			case load_m8:
@@ -262,27 +263,32 @@ struct VmState {
 
 				VmRegister* dst = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				VmRegister* src = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
-				if (src.pointer.isUndefined) panic("Reading from non-pointer value");
 
-				Allocation* alloc;
-				u8* memory;
-				pointerMemoryLoad(src, alloc, memory);
+				if (src.pointer.isUndefined) panic("Reading from non-pointer value");
+				if (!isReadableMemory(src.pointer.kind)) panic("Cannot read from %s", *src);
+
+				Memory* mem = &memories[src.pointer.kind];
+				Allocation* alloc = &mem.allocations[src.pointer.index];
+				u8* memory = mem.memory[].ptr;
 
 				u64 offset = src.as_u64;
-				if (offset + size > alloc.size)
-					panic("Reading past the end of the allocation. offset %s, size %s", offset, alloc.size);
+				if (offset + size > alloc.size) {
+					panic("Reading past the end of the allocation. Reading %s bytes at offset %s, from allocation of %s bytes", size, offset, alloc.size);
+				}
 
 				switch(op) {
-					case load_m8:  dst.as_u64 = *cast( u8*)(memory+alloc.offset+offset); break;
-					case load_m16: dst.as_u64 = *cast(u16*)(memory+alloc.offset+offset); break;
-					case load_m32: dst.as_u64 = *cast(u32*)(memory+alloc.offset+offset); break;
-					case load_m64: dst.as_u64 = *cast(u64*)(memory+alloc.offset+offset); break;
+					case load_m8:  dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset); break;
+					case load_m16: dst.as_u64 = *cast(u16*)(memory + alloc.offset + offset); break;
+					case load_m32: dst.as_u64 = *cast(u32*)(memory + alloc.offset + offset); break;
+					case load_m64: dst.as_u64 = *cast(u64*)(memory + alloc.offset + offset); break;
 					default: assert(false);
 				}
 
 				if (ptrSize == size) {
 					// this can be a pointer load
 					dst.pointer = alloc.relocations.get(cast(u32)offset);
+				} else {
+					dst.pointer = AllocationId();
 				}
 				break;
 
@@ -294,14 +300,16 @@ struct VmState {
 
 				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				VmRegister* src  = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
-				if (dst.pointer.isUndefined) panic("Writing to non-pointer value %s", *dst);
 
-				Allocation* alloc;
-				u8* memory;
-				pointerMemoryStore(dst, alloc, memory);
+				if (dst.pointer.isUndefined) panic("Writing to non-pointer value %s", *dst);
+				if (!isWritableMemory(dst.pointer.kind)) panic("Cannot write to %s", *dst);
+
+				Memory* mem = &memories[dst.pointer.kind];
+				Allocation* alloc = &mem.allocations[dst.pointer.index];
+				u8* memory = mem.memory[].ptr;
 
 				u64 offset = dst.as_u64;
-				if (offset + 8 > alloc.size) panic("Writing past the end of the allocation.");
+				if (offset + size > alloc.size) panic("Writing past the end of the allocation.");
 
 				switch(op) {
 					case store_m8:  *cast( u8*)(memory+alloc.offset+offset) = src.as_u8; break;
@@ -319,43 +327,6 @@ struct VmState {
 						alloc.relocations.remove(*allocator, cast(u32)offset);
 				}
 				break;
-		}
-	}
-
-	void pointerMemoryLoad(VmRegister* src, ref Allocation* alloc, ref u8* memory) {
-		final switch(src.pointer.kind) with(AllocationKind) {
-			case heap_mem:
-				alloc = &heapAllocations[src.pointer.index];
-				memory = heapMemory[].ptr;
-				break;
-			case static_mem:
-				alloc = &staticAllocations[src.pointer.index];
-				memory = staticMemory[].ptr;
-				break;
-			case stack_mem:
-				alloc = &stackAllocations[src.pointer.index];
-				memory = stackMemory[].ptr;
-				break;
-			case func_id: panic("Cannot read from function pointer %s", *src);
-		}
-	}
-
-	void pointerMemoryStore(VmRegister* dst, ref Allocation* alloc, ref u8* memory) {
-		final switch(dst.pointer.kind) with(AllocationKind) {
-			case heap_mem:
-				alloc = &heapAllocations[dst.pointer.index];
-				memory = heapMemory[].ptr;
-				break;
-			case static_mem:
-				alloc = &staticAllocations[dst.pointer.index];
-				memory = staticMemory[].ptr;
-				if (!canStoreToStaticMem) panic("Writing to static memory is disabled");
-				break;
-			case stack_mem:
-				alloc = &stackAllocations[dst.pointer.index];
-				memory = stackMemory[].ptr;
-				break;
-			case func_id: panic("Cannot store to function pointer %s", *dst);
 		}
 	}
 
@@ -391,7 +362,7 @@ struct VmRegister {
 
 	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 		if (pointer.isDefined) {
-			sink.formattedWrite("%s%s+%s", allocKindStrings[pointer.kind], pointer.index, as_u64);
+			sink.formattedWrite("%s%s+%s", memoryKindLetter[pointer.kind], pointer.index, as_u64);
 		} else {
 			sink.formatValue(as_u64);
 		}
@@ -409,7 +380,7 @@ struct VmRegister {
 //import std.bitmanip : bitfields;
 struct AllocationId {
 	@nogc nothrow:
-	this(u32 index, u32 generation, AllocationKind kind) {
+	this(u32 index, u32 generation, MemoryKind kind) {
 		this.index = index;
 		this._generation = (generation & ((1 << 30) - 1)) | (kind << 30);
 	}
@@ -423,7 +394,7 @@ struct AllocationId {
 	}
 	//mixin(bitfields!(
 	//	u32,           "generation", 30,
-	//	AllocationKind,      "kind",  2,
+	//	MemoryKind,      "kind",  2,
 	//));
 
 	u32 generation() const {
@@ -431,17 +402,13 @@ struct AllocationId {
 	}
 
 	// kind: heap, static, function, stack
-	AllocationKind kind() const {
-		return cast(AllocationKind)(_generation >> 30);
+	MemoryKind kind() const {
+		return cast(MemoryKind)(_generation >> 30);
 	}
 
 	bool isDefined() const { return payload != 0; }
 	bool isUndefined() const { return payload == 0; }
 }
-
-immutable string[4] allocKindStrings = [
-	"h", "g", "f", "s"
-];
 
 struct Allocation {
 	u32 offset;
@@ -505,19 +472,35 @@ void disasmOne(u8[] code, ref u32 ip) {
 	}
 }
 
-enum AllocationKind : u8 {
+enum MemoryKind : u8 {
+	// heap must be 0, because we reserve 0th allocation and null pointer is a heap pointer with all zeroes
 	heap_mem,
+	stack_mem,
 	static_mem,
 	func_id,
-	stack_mem,
 }
 
-string[4] allocationKindString = [
+immutable string[4] memoryKindString = [
 	"heap",
+	"stack",
 	"static",
 	"function",
-	"stack",
 ];
+
+immutable string[4] memoryKindLetter = [
+	"h", "s", "g", "f"
+];
+
+// Low 4 bits are for reading, high 4 bits are for writing
+// Bit position is eaual to MemoryKind
+enum MemFlags : u8 {
+	heap_RO   = 0b_0000_0001,
+	stack_RO  = 0b_0000_0010,
+	static_RO = 0b_0000_0100,
+	heap_RW   = 0b_0001_0001,
+	stack_RW  = 0b_0010_0010,
+	static_RW = 0b_0100_0100,
+}
 
 // m - anything
 // v - simd vectors
@@ -525,6 +508,7 @@ string[4] allocationKindString = [
 // i - signed or unsigned int
 // u - unsigned int
 // s - signed int
+// p - pointer
 
 enum VmOpcode : u8 {
 	ret,
@@ -533,8 +517,10 @@ enum VmOpcode : u8 {
 
 	add_i64,
 
+	// sign-extended to i64
 	const_s8,
 
+	// zero-extended to u64
 	load_m8,
 	load_m16,
 	load_m32,
