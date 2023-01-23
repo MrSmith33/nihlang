@@ -107,7 +107,7 @@ void formattedWrite(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 	writeLiteral(sink, fmt, cursor);
 }
 
-void formatValue(T)(scope SinkDelegate sink, const auto ref T val, FormatSpec spec) {
+void formatValue(T)(scope SinkDelegate sink, const auto ref T val, FormatSpec spec = FormatSpec()) {
 	selectFormatter!T(sink, val, spec);
 }
 
@@ -172,7 +172,7 @@ void formatArray(T : E[], E)(scope SinkDelegate sink, scope const T val, FormatS
 	foreach (i, const ref e; val)
 	{
 		if (i > 0) sink(", ");
-		formatValue(sink, e, FormatSpec());
+		formatValue(sink, e);
 	}
 	sink("]");
 }
@@ -180,7 +180,7 @@ void formatArray(T : E[], E)(scope SinkDelegate sink, scope const T val, FormatS
 void formatStruct(T)(scope SinkDelegate sink, scope const ref T val, FormatSpec spec)
 	if(is(T == struct) && __traits(hasMember, T, "toString"))
 {
-	val.toString(sink);
+	val.toString(sink, spec);
 }
 
 void formatStruct(T)(scope SinkDelegate sink, scope const ref T val, FormatSpec spec)
@@ -193,7 +193,7 @@ if(is(T == struct) && !__traits(hasMember, T, "toString"))
 		if (i > 0) sink(", ");
 		sink(__traits(identifier, T.tupleof[i]));
 		sink(" : ");
-		formatValue(sink, member, FormatSpec());
+		formatValue(sink, member);
 	}
 	sink(")");
 }
@@ -442,7 +442,7 @@ void testFormatting() @nogc nothrow {
 	}
 
 	static struct B	{
-		void toString(scope SinkDelegate sink) @nogc nothrow const {
+		void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 			sink("it's B");
 		}
 	}

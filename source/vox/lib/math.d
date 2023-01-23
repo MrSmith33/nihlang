@@ -56,3 +56,13 @@ T roundUp(T)(T value, T multiple) {
 T paddingSize(T)(T address, T alignment) {
 	return cast(T)(alignValue(address, alignment) - address);
 }
+
+// [16 21f0aaad 15 d35a2d97 15] https://github.com/skeeto/hash-prospector
+u32 int32_hash(u32 x) {
+    x ^= x >> 16;
+    x *= 0x21f0aaad;
+    x ^= x >> 15;
+    x *= 0xd35a2d97;
+    x ^= x >> 15;
+    return x;
+}

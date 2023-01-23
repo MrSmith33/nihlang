@@ -83,7 +83,7 @@ struct Result(T) {
 struct Demangler
 {
 	const(char)[] name;
-	void toString(scope SinkDelegate sink) @nogc nothrow const {
+	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 		u32 cursor = 0;
 		u32 end = cast(u32)name.length;
 		u32 idIndex = 0;

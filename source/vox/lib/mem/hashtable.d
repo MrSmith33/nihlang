@@ -84,8 +84,11 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 	pragma(inline, true)
 	private static size_t getHash(Key key) {
 		import std.traits : isIntegral;
-		static if (isIntegral!Key) return cast(size_t)key;
-		else return hashOf(key);
+		static if (Key.sizeof == 4) {
+			return int32_hash(key);
+		} else static if (isIntegral!Key) {
+			return cast(size_t)key;
+		} else return hashOf(key);
 	}
 
 	private size_t findIndex(Key key) inout
@@ -347,7 +350,7 @@ mixin template HashMapImpl()
 		return 0;
 	}
 
-	void toString(scope SinkDelegate sink) const {
+	void toString(scope SinkDelegate sink, FormatSpec spec) const {
 		sink.formattedWrite("[",);
 		size_t index;
 		foreach(const key, const ref value; this) {

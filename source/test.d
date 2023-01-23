@@ -12,6 +12,7 @@ pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
 {
 	testVM();
+	//testFormatting;
 	//testDemangler;
 	//testStackTrace;
 	//panic("Test panic message %s", 42);

@@ -10,15 +10,15 @@ struct Array(T)
 {
 	@nogc nothrow:
 	import vox.lib.math : isPowerOfTwo, nextPOT, max;
-	import vox.lib.format : SinkDelegate, formattedWrite;
+	import vox.lib.format : SinkDelegate, FormatSpec, formattedWrite;
 	import vox.lib.error : enforce;
 	import vox.lib.algo : memmove;
 	import vox.lib.mem.allocator : VoxAllocator;
 
 	// Can be 0
 	enum uint NUM_INLINE_BYTES = size_t.sizeof;
-	enum uint NUM_INLINE_ITEMS = 0; //size_t.sizeof / T.sizeof;
-	enum uint MIN_EXTERNAL_BYTES = VoxAllocator.MIN_BLOCK_BYTES;//max(VoxAllocator.MIN_BLOCK_BYTES, nextPOT((size_t.sizeof / T.sizeof + 1) * T.sizeof));
+	enum uint NUM_INLINE_ITEMS = NUM_INLINE_BYTES / T.sizeof;
+	enum uint MIN_EXTERNAL_BYTES = max(VoxAllocator.MIN_BLOCK_BYTES, nextPOT((size_t.sizeof / T.sizeof + 1) * T.sizeof));
 
 	private uint _length;
 	private uint _capacity = NUM_INLINE_ITEMS;
@@ -229,7 +229,7 @@ struct Array(T)
 		_length -= numToRemove;
 	}
 
-	void toString(scope SinkDelegate sink) const {
+	void toString(scope SinkDelegate sink, FormatSpec spec) const {
 		sink("[");
 		size_t i;
 		foreach(const ref T item; opSlice()) {
