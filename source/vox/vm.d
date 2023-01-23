@@ -9,14 +9,21 @@ import vox.lib;
 
 
 void testVM() {
+	enum static_bytes = 64*1024;
+	enum heap_bytes = 64*1024;
+	enum stack_bytes = 64*1024;
+	enum PTR_SIZE = 4;
 	VoxAllocator allocator;
 
 	CodeBuilder b = CodeBuilder(&allocator);
 
-	b.emit_store_m64(2, 1);
-	b.emit_store_m64(3, 2);
-	b.emit_store_m64(4, 3);
-	b.emit_load_m64(0, 4);
+	VmOpcode load_op = PTR_SIZE == 4 ? VmOpcode.load_m32 : VmOpcode.load_m64;
+	VmOpcode store_op = PTR_SIZE == 4 ? VmOpcode.store_m32 : VmOpcode.store_m64;
+
+	b.emit_binop(store_op, 2, 1);
+	b.emit_binop(store_op, 3, 2);
+	b.emit_binop(store_op, 4, 3);
+	b.emit_binop(load_op, 0, 4);
 	b.emit_ret();
 
 	VmFunction func = {
@@ -28,21 +35,17 @@ void testVM() {
 	VmState vm = {
 		allocator : &allocator,
 		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
-		ptrSize : 8,
+		ptrSize : PTR_SIZE,
 	};
 
-	// Reserve 64K for heap, static and stack
-	vm.memories[MemoryKind.static_mem].memory.voidPut(allocator, 64*1024);
-	vm.memories[MemoryKind.heap_mem].memory.voidPut(allocator, 64*1024);
-	vm.memories[MemoryKind.heap_mem].allocations.voidPut(allocator, 1); // skip null pointer
-	vm.memories[MemoryKind.stack_mem].memory.voidPut(allocator, 64*1024);
+	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
 	AllocationId funcId   = vm.addFunction(func);
-	AllocationId staticId = vm.memories[MemoryKind.static_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.static_mem);
-	AllocationId heapId   = vm.memories[MemoryKind.heap_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.heap_mem);
-	AllocationId stackId  = vm.memories[MemoryKind.stack_mem].allocate(allocator, SizeAndAlign(8, 1), MemoryKind.stack_mem);
+	AllocationId staticId = vm.memories[MemoryKind.static_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.static_mem);
+	AllocationId heapId   = vm.memories[MemoryKind.heap_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.heap_mem);
+	AllocationId stackId  = vm.memories[MemoryKind.stack_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.stack_mem);
 
-	disasm(func.code[]);
+	// disasm(func.code[]);
 
 	vm.pushRegisters(1);                              // 0: result register
 	vm.pushRegister(VmRegister.makePtr(0, funcId));   // 1: argument function pointer
@@ -69,6 +72,14 @@ struct VmState {
 	Array!VmFunction functions;
 	Array!VmFrame frames;
 	Array!VmRegister registers;
+
+	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
+		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
+		memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes, ptrSize);
+		memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes, ptrSize);
+		// skip one allocation for null pointer
+		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+	}
 
 	bool isReadableMemory(MemoryKind kind) {
 		return cast(bool)(readWriteMask & (1 << kind));
@@ -293,6 +304,12 @@ struct CodeBuilder {
 		code.put(*allocator, dst);
 		code.put(*allocator, src);
 	}
+
+	void emit_binop(VmOpcode op, u8 dst, u8 src) {
+		code.put(*allocator, op);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
 }
 
 void disasm(u8[] code) {
@@ -459,6 +476,16 @@ struct Memory {
 	Array!u8 memory;
 	Array!u8 bitmap;
 	u32 bytesUsed;
+
+	// ptrSize is 4 or 8
+	void reserve(ref VoxAllocator allocator, u32 size, u32 ptrSize) {
+		assert(ptrSize == 4 || ptrSize == 8, "Invalid ptr size");
+		memory.voidPut(allocator, size);
+		// 1 bit per pointer slot
+		// pointers must be aligned in memory
+		// each allocation is aligned at least to a pointer size
+		bitmap.voidPut(allocator, size / (ptrSize * 8));
+	}
 
 	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
 		u32 index = allocations.length;
