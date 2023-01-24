@@ -15,11 +15,10 @@ void testVM() {
 	enum PTR_SIZE = 4;
 	VoxAllocator allocator;
 
-	CodeBuilder b = CodeBuilder(&allocator);
-
 	VmOpcode load_op = PTR_SIZE == 4 ? VmOpcode.load_m32 : VmOpcode.load_m64;
 	VmOpcode store_op = PTR_SIZE == 4 ? VmOpcode.store_m32 : VmOpcode.store_m64;
 
+	CodeBuilder b = CodeBuilder(&allocator);
 	b.emit_binop(store_op, 2, 1);
 	b.emit_binop(store_op, 3, 2);
 	b.emit_binop(store_op, 4, 3);
@@ -45,7 +44,7 @@ void testVM() {
 	AllocationId heapId   = vm.memories[MemoryKind.heap_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.heap_mem);
 	AllocationId stackId  = vm.memories[MemoryKind.stack_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.stack_mem);
 
-	// disasm(func.code[]);
+	// disasm(stdoutSink, func.code[]);
 
 	vm.pushRegisters(1);                              // 0: result register
 	vm.pushRegister(VmRegister.makePtr(0, funcId));   // 1: argument function pointer
@@ -53,18 +52,22 @@ void testVM() {
 	vm.pushRegister(VmRegister.makePtr(0, heapId));   // 3: argument heap pointer
 	vm.pushRegister(VmRegister.makePtr(0, stackId));  // 4: argument stack pointer
 	vm.call(funcId);
-	vm.runVerbose();
+	vm.runVerbose(stdoutSink);
 	writefln("result %s", vm.getRegister(0));
 }
 
 struct VmState {
 	@nogc nothrow:
 
-	bool isRunning = true;
-	bool isTrap; // must be checked on return
-
-	u8 ptrSize; // 4 or 8
+	// 4 or 8
+	u8 ptrSize;
 	u8 readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RO;
+
+	bool isRunning = true;
+
+	// must be checked on return
+	VmStatus status;
+	VmError error;
 
 	VoxAllocator* allocator;
 	Memory[3] memories;
@@ -125,17 +128,35 @@ struct VmState {
 		registers.voidPut(*allocator, func.numLocalRegisters);
 	}
 
-	void run() {
+	void run(scope SinkDelegate sink) {
+		isRunning = true;
+		status = VmStatus.OK;
+
 		while(isRunning) step();
+
+		if (status != VmStatus.OK) {
+			u32 ipCopy = error.ip;
+			disasmOne(sink, frames.back.func.code[], ipCopy);
+			sink("Error: ");
+			format_vm_error(sink);
+		}
 	}
 
-	void runVerbose() {
+	void runVerbose(scope SinkDelegate sink) {
+		isRunning = true;
+		status = VmStatus.OK;
+
 		writeln("---");
 		printRegs();
 		while(isRunning) {
 			u32 ipCopy = frames.back.ip;
-			disasmOne(frames.back.func.code[], ipCopy);
+			disasmOne(sink, frames.back.func.code[], ipCopy);
 			step();
+			if (status != VmStatus.OK) {
+				sink("Error: ");
+				format_vm_error(sink);
+				break;
+			}
 			printRegs();
 		}
 		writeln("---");
@@ -152,7 +173,9 @@ struct VmState {
 				registers.unput(frame.func.numLocalRegisters);
 				frames.unput(1);
 
-				if (frames.length == 0) isRunning = false;
+				if (frames.length == 0) {
+					isRunning = false;
+				}
 				return;
 
 			case mov:
@@ -167,9 +190,7 @@ struct VmState {
 				VmRegister* src1 = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				dst.as_u64 = src0.as_u64 + src1.as_u64;
 				dst.pointer = src0.pointer;
-				if (src1.pointer.isDefined) {
-					panic("add.i64 can only contain pointers in the first argument. (%s) Instr %s", *src1, frame.ip-3);
-				}
+				if (src1.pointer.isDefined) return setTrap(VmStatus.ERR_PTR_PLUS_PTR, frame.ip-4);
 				return;
 
 			case const_s8:
@@ -188,7 +209,7 @@ struct VmState {
 				VmRegister* dst = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 				VmRegister* src = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 
-				if (src.pointer.isUndefined) panic("Reading from non-pointer value");
+				if (src.pointer.isUndefined) return setTrap(VmStatus.ERR_LOAD_NOT_PTR, frame.ip-3);
 				if (!isReadableMemory(src.pointer.kind)) panic("Cannot read from %s", *src);
 
 				Memory* mem = &memories[src.pointer.kind];
@@ -196,9 +217,7 @@ struct VmState {
 				u8* memory = mem.memory[].ptr;
 
 				u64 offset = src.as_u64;
-				if (offset + size > alloc.size) {
-					panic("Reading past the end of the allocation. Reading %s bytes at offset %s, from allocation of %s bytes", size, offset, alloc.size);
-				}
+				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_LOAD_OOB, frame.ip-3);
 
 				switch(op) {
 					case load_m8:  dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset); break;
@@ -226,7 +245,7 @@ struct VmState {
 				VmRegister* src  = &registers[frame.firstRegister + frame.func.code[frame.ip++]];
 
 				if (dst.pointer.isUndefined) panic("Writing to non-pointer value %s", *dst);
-				if (!isWritableMemory(dst.pointer.kind)) panic("Cannot write to %s", *dst);
+				if (!isWritableMemory(dst.pointer.kind)) return setTrap(VmStatus.ERR_STORE_TO_RO, frame.ip-3);
 
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
@@ -254,6 +273,12 @@ struct VmState {
 		}
 	}
 
+	private void setTrap(VmStatus status, u32 ip) {
+		isRunning = false;
+		this.status = status;
+		error.ip = ip;
+	}
+
 	void printRegs() {
 		write("     [");
 		foreach(i, reg; registers) {
@@ -262,6 +287,73 @@ struct VmState {
 		}
 		writeln("]");
 	}
+
+	void format_vm_error(scope SinkDelegate sink) {
+		if (status == VmStatus.OK) return;
+
+		VmFrame* frame = &frames.back();
+		u8[] code = frame.func.code[];
+		u32 firstReg = frame.firstRegister;
+
+		final switch(status) with(VmStatus) {
+			case OK:
+				sink("ok");
+				break;
+
+			case ERR_PTR_PLUS_PTR:
+				VmRegister* dst  = &registers[firstReg + code[error.ip+1]];
+				VmRegister* src0 = &registers[firstReg + code[error.ip+2]];
+				VmRegister* src1 = &registers[firstReg + code[error.ip+3]];
+
+				sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s\n",
+					code[error.ip+1], *dst,
+					code[error.ip+2], *src0,
+					code[error.ip+3], *src1);
+				break;
+
+			case ERR_STORE_TO_RO:
+				VmRegister* dst = &registers[firstReg + code[error.ip+1]];
+				VmRegister* src = &registers[firstReg + code[error.ip+2]];
+
+				sink.formattedWrite("Cannot store to read-only memory.\n  r%s: %s\n  r%s: %s\n",
+					code[error.ip+1], *dst,
+					code[error.ip+2], *src);
+				break;
+
+			case ERR_LOAD_NOT_PTR:
+				VmRegister* src = &registers[firstReg + code[error.ip+2]];
+				sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[error.ip+2], *src);
+				break;
+
+			case ERR_LOAD_OOB:
+				u8 op = code[error.ip+0];
+				u32 size = 1 << (op - VmOpcode.load_m8);
+				VmRegister* src = &registers[firstReg + code[error.ip+2]];
+				Memory* mem = &memories[src.pointer.kind];
+				Allocation* alloc = &mem.allocations[src.pointer.index];
+
+				u64 offset = src.as_u64;
+
+				sink.formattedWrite("Reading past the end of the allocation (r%s:%s).\nReading %s bytes at offset %s, from allocation of %s bytes\n",
+					code[error.ip+2], *src,
+					size,
+					offset,
+					alloc.size);
+				break;
+		}
+	}
+}
+
+enum VmStatus : u8 {
+	OK,
+	ERR_PTR_PLUS_PTR,
+	ERR_STORE_TO_RO,
+	ERR_LOAD_NOT_PTR,
+	ERR_LOAD_OOB,
+}
+
+struct VmError {
+	u32 ip; // start of instruction in a function
 }
 
 struct CodeBuilder {
@@ -312,16 +404,16 @@ struct CodeBuilder {
 	}
 }
 
-void disasm(u8[] code) {
+void disasm(scope SinkDelegate sink, u8[] code, u32 offset = 0) {
 	u32 ip;
 	while(ip < code.length) {
-		disasmOne(code, ip);
+		disasmOne(sink, code, ip, offset);
 	}
 }
 
-void disasmOne(u8[] code, ref u32 ip) {
-	auto addr = ip++;
-	VmOpcode op = cast(VmOpcode)code[addr];
+void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
+	auto addr = ip + offset;
+	VmOpcode op = cast(VmOpcode)code[ip++];
 	final switch(op) with(VmOpcode) {
 		case ret:
 			writefln("%04x ret", addr);

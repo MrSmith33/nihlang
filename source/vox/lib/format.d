@@ -10,6 +10,11 @@ import vox.lib;
 
 alias SinkDelegate = void delegate(scope const(char)[]) @nogc nothrow;
 
+void formattedWriteln(Args...)(scope SinkDelegate sink, string fmt, Args args) {
+	formattedWrite(sink, fmt, args);
+	sink("\n");
+}
+
 void formattedWrite(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 	u32 cursor = 0;
 	static void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) @nogc nothrow

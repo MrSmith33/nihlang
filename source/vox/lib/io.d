@@ -12,36 +12,28 @@ enum u32 stdin  = 0;
 enum u32 stdout = 1;
 enum u32 stderr = 2;
 
+immutable SinkDelegate stdoutSink = delegate void(scope const(char)[] str) @nogc nothrow {
+	writeString(str);
+};
+
 void writefln(Args...)(string fmt, Args args) {
-	void sink(scope const(char)[] str) @nogc nothrow {
-		writeString(str);
-	}
-	formattedWrite(&sink, fmt, args);
+	formattedWrite(stdoutSink, fmt, args);
 	writeString("\n");
 }
 
 void writef(Args...)(string fmt, Args args) {
-	void sink(scope const(char)[] str) @nogc nothrow {
-		writeString(str);
-	}
-	formattedWrite(&sink, fmt, args);
+	formattedWrite(stdoutSink, fmt, args);
 }
 
 void writeln(Args...)(Args args) {
-	void sink(scope const(char)[] str) @nogc nothrow {
-		writeString(str);
-	}
 	foreach(i, arg; args) {
-		selectFormatter!(Args[i])(&sink, arg, FormatSpec());
+		selectFormatter!(Args[i])(stdoutSink, arg, FormatSpec());
 	}
 	writeString("\n");
 }
 
 void write(Args...)(Args args) {
-	void sink(scope const(char)[] str) {
-		writeString(str);
-	}
 	foreach(i, arg; args) {
-		selectFormatter!(Args[i])(&sink, arg, FormatSpec());
+		selectFormatter!(Args[i])(stdoutSink, arg, FormatSpec());
 	}
 }
