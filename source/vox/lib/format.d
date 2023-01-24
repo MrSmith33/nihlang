@@ -236,6 +236,9 @@ void format_i64_impl(scope SinkDelegate sink, u64 i, FormatSpec spec, bool signe
 		buf[$-1] = '0';
 		numDigits = 1;
 	} else switch (spec.spec) {
+		case 'b':
+			numDigits = formatBinary(buf, i);
+			break;
 		case 'x':
 			numDigits = formatHex(buf, i, hexDigitsLower);
 			break;
@@ -291,10 +294,21 @@ u32 formatHex(ref char[INT_BUF_SIZE] sink, u64 i, ref immutable(char)[16] chars)
 	return numDigits;
 }
 
+// nonzero
+u32 formatBinary(ref char[INT_BUF_SIZE] sink, u64 u) {
+	u32 numDigits = 0;
+	do {
+		char c = cast(char)('0' + (u & 1));
+		sink[INT_BUF_SIZE - ++numDigits] = c;
+		u >>= 1;
+	} while (u != 0);
+	return numDigits;
+}
+
 u32 formatDecimalUnsigned(ref char[INT_BUF_SIZE] sink, u64 u) {
 	u32 numDigits = 0;
 	do {
-		char c = cast(char)('0' + u % 10);
+		char c = cast(char)('0' + (u % 10));
 		sink[INT_BUF_SIZE - ++numDigits] = c;
 		u /= 10;
 	} while (u != 0);
@@ -306,7 +320,7 @@ u32 formatDecimal(ref char[INT_BUF_SIZE] sink, i64 i, bool signed) {
 	u64 u = i;
 	if (signed && i < 0) { u = -i; }
 	do {
-		char c = cast(char)('0' + u % 10);
+		char c = cast(char)('0' + (u % 10));
 		sink[INT_BUF_SIZE - ++numDigits] = c;
 		u /= 10;
 	} while (u != 0);
@@ -401,6 +415,10 @@ void testFormatting() @nogc nothrow {
 	test("0010", "%04x", u64(16));
 	test("  10", "% 4x", u64(16));
 	test("  10", "%4x",  u64(16));
+
+	test("0011", "%04b", u64(3));
+	test("  11", "% 4b", u64(3));
+	test("  11", "%4b",  u64(3));
 
 
 	test("c", "%s", 'c');
