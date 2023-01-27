@@ -1,60 +1,12 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.vm;
+module vox.vm.vm;
 
 import vox.lib;
 
 @nogc nothrow:
 
-
-void testVM() {
-	enum static_bytes = 64*1024;
-	enum heap_bytes = 64*1024;
-	enum stack_bytes = 64*1024;
-	enum PTR_SIZE = 4;
-	VoxAllocator allocator;
-
-	VmOpcode load_op = PTR_SIZE == 4 ? VmOpcode.load_m32 : VmOpcode.load_m64;
-	VmOpcode store_op = PTR_SIZE == 4 ? VmOpcode.store_m32 : VmOpcode.store_m64;
-
-	CodeBuilder b = CodeBuilder(&allocator);
-	b.emit_binop(store_op, 2, 1);
-	b.emit_binop(store_op, 3, 2);
-	b.emit_binop(store_op, 4, 3);
-	b.emit_binop(load_op, 0, 4);
-	b.emit_ret();
-
-	VmFunction func = {
-		code : b.code,
-		numCallerRegisters : 2,
-		numLocalRegisters : 0,
-	};
-
-	VmState vm = {
-		allocator : &allocator,
-		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
-		ptrSize : PTR_SIZE,
-	};
-
-	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
-
-	AllocationId funcId   = vm.addFunction(func);
-	AllocationId staticId = vm.memories[MemoryKind.static_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.static_mem);
-	AllocationId heapId   = vm.memories[MemoryKind.heap_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.heap_mem);
-	AllocationId stackId  = vm.memories[MemoryKind.stack_mem].allocate(allocator, SizeAndAlign(PTR_SIZE, 1), MemoryKind.stack_mem);
-
-	// disasm(stdoutSink, func.code[]);
-
-	vm.pushRegisters(1);                              // 0: result register
-	vm.pushRegister(VmRegister.makePtr(0, funcId));   // 1: argument function pointer
-	vm.pushRegister(VmRegister.makePtr(0, staticId)); // 2: argument static pointer
-	vm.pushRegister(VmRegister.makePtr(0, heapId));   // 3: argument heap pointer
-	vm.pushRegister(VmRegister.makePtr(0, stackId));  // 4: argument stack pointer
-	vm.call(funcId);
-	vm.runVerbose(stdoutSink);
-	writefln("result %s", vm.getRegister(0));
-}
 
 struct VmState {
 	@nogc nothrow:
@@ -83,6 +35,15 @@ struct VmState {
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 	}
 
+	void reset() {
+		functions.clear;
+		frames.clear;
+		registers.clear;
+		foreach(ref mem; memories)
+			mem.clear;
+		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+	}
+
 	bool isReadableMemory(MemoryKind kind) {
 		return cast(bool)(readWriteMask & (1 << kind));
 	}
@@ -91,15 +52,21 @@ struct VmState {
 		return cast(bool)(readWriteMask & (1 << (kind + 4)));
 	}
 
-	AllocationId addFunction(VmFunction func) {
+	AllocationId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
 		u32 index = functions.length;
-		functions.put(*allocator, func);
+		functions.put(*allocator, VmFunction(code, numResults, numParameters, numLocalRegisters));
 		u32 generation = 0;
 		return AllocationId(index, generation, MemoryKind.func_id);
 	}
 
 	void pushRegisters(u32 numRegisters) {
 		registers.voidPut(*allocator, numRegisters);
+	}
+
+	void pushRegisters(VmRegister[] regs) {
+		foreach(ref reg; regs) {
+			registers.put(*allocator, reg);
+		}
 	}
 
 	void pushRegister_u64(u64 val) {
@@ -115,7 +82,8 @@ struct VmState {
 		return registers[index];
 	}
 
-	void call(AllocationId funcId) {
+	// Assumes result and parameter registers to be setup
+	void beginCall(AllocationId funcId) {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
 		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocationId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
 		VmFunction* func = &functions[funcId.index];
@@ -169,7 +137,7 @@ struct VmState {
 
 		final switch(op) with(VmOpcode) {
 			case ret:
-				registers.unput(frame.func.numLocalRegisters);
+				registers.unput(frame.func.numParameters + frame.func.numLocalRegisters);
 				frames.unput(1);
 
 				if (frames.length == 0) {
@@ -500,8 +468,8 @@ struct VmFunction {
 	@nogc nothrow:
 
 	Array!u8 code;
-	// result registers followed by argument registers
-	u8 numCallerRegisters;
+	u8 numResults;
+	u8 numParameters;
 	u8 numLocalRegisters;
 }
 
@@ -543,7 +511,10 @@ struct VmRegister {
 
 	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 		if (pointer.isDefined) {
-			sink.formattedWrite("%s%s+%s", memoryKindLetter[pointer.kind], pointer.index, as_u64);
+			sink.formattedWrite("%s%s", memoryKindLetter[pointer.kind], pointer.index);
+			if (as_u64 != 0) {
+				sink.formattedWrite("+%s", as_u64);
+			}
 		} else {
 			sink.formatValue(as_u64);
 		}
@@ -556,6 +527,10 @@ struct VmRegister {
 		};
 		return r;
 	}
+}
+
+VmRegister vmRegPtr(AllocationId allocId) {
+	return VmRegister.makePtr(0, allocId);
 }
 
 //import std.bitmanip : bitfields;
@@ -615,12 +590,16 @@ struct Memory {
 		bitmap.voidPut(allocator, size / (ptrSize * 8));
 	}
 
+	void clear() {
+		allocations.clear;
+		bytesUsed = 0;
+	}
+
 	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		bytesUsed += sizeAlign.size;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
-		memory.voidPut(allocator, sizeAlign.size);
 		allocations.put(allocator, Allocation(offset, sizeAlign.size));
 		u32 generation = 0;
 		return AllocationId(index, generation, allocKind);

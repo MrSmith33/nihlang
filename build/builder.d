@@ -42,9 +42,9 @@ int main(string[] args)
 	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe");
 	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.sharedLibrary, "vbe");
 	auto testone = Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable);
-	auto test    = Config("test",         "test.d", artifactDir, srcDir, TargetType.executable);
+	auto testsuite = Config("testsuite", "testsuite.d", artifactDir, srcDir, TargetType.executable);
 
-	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, testone, test];
+	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, testone, testsuite];
 
 	bool needsHelp;
 	GlobalSettings gs = args.parseSettings(needsHelp, configs);
@@ -259,7 +259,7 @@ void printConfigs() {
 	stderr.writeln("            vbe-static  Backend static library");
 	stderr.writeln("            vbe-shared  Backend dynamic library");
 	stderr.writeln("            testone     Single test executable");
-	stderr.writeln("            test        Full test suite executable");
+	stderr.writeln("            testsuite   Full test suite executable");
 }
 
 GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] configs) {
