@@ -6,7 +6,7 @@
 module vox.vm.tests.infra.test;
 
 import vox.lib;
-import vox.vm.vm;
+import vox.vm;
 
 struct VmTestContext {
 	@nogc nothrow:

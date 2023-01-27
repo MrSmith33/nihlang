@@ -4,7 +4,7 @@
 module vox.vm.tests.tests;
 
 import vox.lib;
-import vox.vm.vm;
+import vox.vm;
 import vox.vm.tests.infra.test;
 
 @nogc nothrow:

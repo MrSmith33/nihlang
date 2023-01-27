@@ -6,7 +6,7 @@
 module vox.vm.tests.infra.runner;
 
 import vox.lib;
-import vox.vm.vm;
+import vox.vm;
 import vox.vm.tests.infra.test;
 import vox.vm.tests.tests;
 
