@@ -12,35 +12,50 @@ struct VmTestContext {
 	@nogc nothrow:
 	VmState* vm;
 
-	VmRegister[] call(scope SinkDelegate sink, AllocationId funcId, VmRegister[] params...) {
-		if(funcId.index >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, vm.functions.length);
-		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocationId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
+	VmRegister[] call(scope SinkDelegate sink, AllocId funcId, VmRegister[] params...) {
+		if(funcId.index >= vm.functions.length) {
+			panic("Invalid function index (%s), only %s functions exist",
+				funcId.index, vm.functions.length);
+		}
+		if(funcId.kind != MemoryKind.func_id) {
+			panic("Invalid AllocId kind, expected func_id, got %s",
+				memoryKindString[funcId.kind]);
+		}
 		VmFunction* func = &vm.functions[funcId.index];
-		if(func.numParameters != params.length) panic("Invalid number of parameters provided, expected %s, got %s", func.numParameters, params.length);
+		if(func.numParameters != params.length) {
+			panic("Invalid number of parameters provided, expected %s, got %s",
+				func.numParameters, params.length);
+		}
 
 		vm.pushRegisters(func.numResults);
 		vm.pushRegisters(params);
 
 		vm.beginCall(funcId);
 
-		vm.run(sink);
+		vm.run();
 
-		if (vm.status != VmStatus.OK) panic("Function expected to finish successfully");
+		if (vm.status != VmStatus.OK) {
+			u32 ipCopy = vm.frames.back.ip;
+			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
+			sink("Error: ");
+			vm.format_vm_error(sink);
+			panic("Function expected to finish successfully");
+		}
 
 		if(vm.registers.length != func.numResults) panic("Function with %s results returned %s results.", func.numResults, vm.registers.length);
 
 		return vm.registers[];
 	}
 
-	AllocationId staticAlloc(SizeAndAlign sizeAlign) {
+	AllocId staticAlloc(SizeAndAlign sizeAlign) {
 		return vm.memories[MemoryKind.static_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.static_mem);
 	}
 
-	AllocationId heapAlloc(SizeAndAlign sizeAlign) {
+	AllocId heapAlloc(SizeAndAlign sizeAlign) {
 		return vm.memories[MemoryKind.heap_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.heap_mem);
 	}
 
-	AllocationId stackAlloc(SizeAndAlign sizeAlign) {
+	AllocId stackAlloc(SizeAndAlign sizeAlign) {
 		return vm.memories[MemoryKind.stack_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.stack_mem);
 	}
 }

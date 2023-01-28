@@ -53,11 +53,11 @@ struct VmState {
 		return cast(bool)(readWriteMask & (1 << (kind + 4)));
 	}
 
-	AllocationId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
+	AllocId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
 		u32 index = functions.length;
 		functions.put(*allocator, VmFunction(code, numResults, numParameters, numLocalRegisters));
 		u32 generation = 0;
-		return AllocationId(index, generation, MemoryKind.func_id);
+		return AllocId(index, generation, MemoryKind.func_id);
 	}
 
 	void pushRegisters(u32 numRegisters) {
@@ -84,9 +84,9 @@ struct VmState {
 	}
 
 	// Assumes result and parameter registers to be setup
-	void beginCall(AllocationId funcId) {
+	void beginCall(AllocId funcId) {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
-		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocationId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
+		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
 		VmFunction* func = &functions[funcId.index];
 		VmFrame frame = {
 			func : func,
@@ -96,18 +96,11 @@ struct VmState {
 		registers.voidPut(*allocator, func.numLocalRegisters);
 	}
 
-	void run(scope SinkDelegate sink) {
+	void run() {
 		isRunning = true;
 		status = VmStatus.OK;
 
 		while(isRunning) step();
-
-		if (status != VmStatus.OK) {
-			u32 ipCopy = frames.back.ip;
-			disasmOne(sink, frames.back.func.code[], ipCopy);
-			sink("Error: ");
-			format_vm_error(sink);
-		}
 	}
 
 	void runVerbose(scope SinkDelegate sink) {
@@ -167,7 +160,7 @@ struct VmState {
 				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
 				i8 src = frame.func.code[frame.ip++];
 				dst.as_s64 = src;
-				dst.pointer = AllocationId();
+				dst.pointer = AllocId();
 				frame.ip += 2;
 				return;
 
@@ -202,7 +195,7 @@ struct VmState {
 					// this can be a pointer load
 					dst.pointer = alloc.relocations.get(cast(u32)offset);
 				} else {
-					dst.pointer = AllocationId();
+					dst.pointer = AllocId();
 				}
 				frame.ip += 3;
 				return;

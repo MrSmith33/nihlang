@@ -8,7 +8,7 @@ import vox.lib;
 @nogc nothrow:
 
 //import std.bitmanip : bitfields;
-struct AllocationId {
+struct AllocId {
 	@nogc nothrow:
 	this(u32 index, u32 generation, MemoryKind kind) {
 		this.index = index;
@@ -43,7 +43,7 @@ struct AllocationId {
 struct Allocation {
 	u32 offset;
 	u32 size;
-	HashMap!(u32, AllocationId, u32.max) relocations;
+	HashMap!(u32, AllocId, u32.max) relocations;
 }
 
 struct Memory {
@@ -69,14 +69,14 @@ struct Memory {
 		bytesUsed = 0;
 	}
 
-	AllocationId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
+	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		bytesUsed += sizeAlign.size;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign.size));
 		u32 generation = 0;
-		return AllocationId(index, generation, allocKind);
+		return AllocId(index, generation, allocKind);
 	}
 }
 

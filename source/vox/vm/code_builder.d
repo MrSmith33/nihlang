@@ -49,6 +49,20 @@ struct CodeBuilder {
 		code.put(*allocator, src);
 	}
 
+	void emit_load_ptr(u8 ptrSize, u8 dst, u8 src) {
+		VmOpcode load_op = ptrSize == 4 ? VmOpcode.load_m32 : VmOpcode.load_m64;
+		code.put(*allocator, load_op);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_store_ptr(u8 ptrSize, u8 dst, u8 src) {
+		VmOpcode store_op = ptrSize == 4 ? VmOpcode.store_m32 : VmOpcode.store_m64;
+		code.put(*allocator, store_op);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
 	void emit_binop(VmOpcode op, u8 dst, u8 src) {
 		code.put(*allocator, op);
 		code.put(*allocator, dst);

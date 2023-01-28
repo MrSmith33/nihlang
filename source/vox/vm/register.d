@@ -10,7 +10,7 @@ import vox.vm.memory;
 
 
 // Register can contain 0 or 1 pointer, so instead of storing a hashmap of relocations
-// we store a single AllocationId
+// we store a single AllocId
 // vector registers are forbidden to store pointers
 align(16)
 struct VmRegister {
@@ -27,7 +27,7 @@ struct VmRegister {
 		f32 as_f32;
 		f64 as_f64;
 	}
-	AllocationId pointer;
+	AllocId pointer;
 
 	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 		if (pointer.isDefined) {
@@ -40,7 +40,7 @@ struct VmRegister {
 		}
 	}
 
-	static VmRegister makePtr(u64 offset, AllocationId alloc) {
+	static VmRegister makePtr(u64 offset, AllocId alloc) {
 		VmRegister r = {
 			as_u64 : offset,
 			pointer : alloc,
@@ -49,6 +49,6 @@ struct VmRegister {
 	}
 }
 
-VmRegister vmRegPtr(AllocationId allocId) {
+VmRegister vmRegPtr(AllocId allocId) {
 	return VmRegister.makePtr(0, allocId);
 }
