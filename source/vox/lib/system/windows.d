@@ -47,6 +47,9 @@ bool VirtualProtect(void* lpAddress, size_t dwSize, uint flNewProtect, uint* lpf
 bool FlushInstructionCache(void* hProcess, void* lpBaseAddress, size_t dwSize);
 uint GetLastError() @trusted;
 
+bool QueryPerformanceCounter(long* lpPerformanceCount);
+void QueryPerformanceFrequency(long* frequency);
+
 enum : uint {
 	PAGE_NOACCESS          = 0x0001,
 	PAGE_READONLY          = 0x0002,

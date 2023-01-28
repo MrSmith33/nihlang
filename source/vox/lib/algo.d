@@ -49,6 +49,16 @@ extern(C) void memmove(void* dst, const(void)* src, size_t len)
 	}
 }
 
+version(NO_DEPS)
+extern(C) int memcmp(const(void)* buf1, const(void)* buf2, size_t len) {
+	if(!len) return 0;
+	while(--len && *cast(ubyte*)buf1 == *cast(ubyte*)buf2) {
+		++buf1;
+		++buf2;
+	}
+	return *cast(ubyte*)buf1 - *cast(ubyte*)buf2;
+}
+
 /*void testMemmove() {
 	ubyte[8] buf;
 

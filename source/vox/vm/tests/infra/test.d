@@ -8,6 +8,29 @@ module vox.vm.tests.infra.test;
 import vox.lib;
 import vox.vm;
 
+// attribute
+enum VmTest;
+
+void collectTests(alias M)(ref VoxAllocator allocator, ref Array!Test tests) {
+	import std.traits : hasUDA;
+	foreach(m; __traits(allMembers, M))
+	{
+		alias member = __traits(getMember, M, m);
+		static if (hasUDA!(member, VmTest)) {
+			tests.put(allocator, makeTest!member);
+		}
+	}
+}
+
+Test makeTest(alias test)() {
+	return Test(&test);
+}
+
+struct Test {
+	@nogc nothrow:
+	void function(ref VmTestContext) tester;
+}
+
 struct VmTestContext {
 	@nogc nothrow:
 	VmState* vm;

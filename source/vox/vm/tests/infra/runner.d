@@ -12,7 +12,7 @@ import vox.vm.tests.tests;
 
 @nogc nothrow:
 
-void runVmTests() {
+i32 runVmTests() {
 	VoxAllocator allocator;
 
 	enum static_bytes = 64*1024;
@@ -30,5 +30,20 @@ void runVmTests() {
 
 	auto ctx = VmTestContext(&vm);
 
-	testVM(ctx);
+	Array!Test tests;
+	vox.vm.tests.tests.vmTests(allocator, tests);
+
+	writefln("Running %s tests", tests.length);
+
+	MonoTime start = currTime;
+
+	foreach(ref test; tests) {
+		test.tester(ctx);
+	}
+
+	MonoTime end = currTime;
+
+	writefln("Done %s tests in %s", tests.length, end - start);
+
+	return 0;
 }

@@ -19,11 +19,15 @@ T max(T)(T a, T b) pure {
 	return b;
 }
 
-T divCeil(T)(T a, T b) {
+i32 signum(T)(const T x) pure {
+	return (x > 0) - (x < 0);
+}
+
+T divCeil(T)(T a, T b) pure {
 	return a / b + (a % b > 0);
 }
 
-T nextPOT(T)(T x) {
+T nextPOT(T)(T x) pure {
 	--x;
 	x |= x >> 1;  // handle 2 bit numbers
 	x |= x >> 2;  // handle 4 bit numbers

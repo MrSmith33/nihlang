@@ -138,6 +138,9 @@ template selectFormatter(T) {
 	else static if (is(immutable T : immutable U*, U)) {
 		alias selectFormatter = formatPointer;
 	}
+	else static if (is(typeof(*T) == function)) {
+		alias selectFormatter = formatPointer;
+	}
 	else static if (is(immutable T : immutable E[], E)) {
 		alias selectFormatter = formatArray!T;
 	}

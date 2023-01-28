@@ -10,6 +10,7 @@ public import vox.lib.io;
 public import vox.lib.log;
 public import vox.lib.math;
 public import vox.lib.string;
+public import vox.lib.time;
 public import vox.lib.types;
 
 public import vox.lib.mem.allocator;
@@ -32,4 +33,4 @@ else version(WebAssembly) {
 	} else {
 		public import vox.lib.system.wasm_pure;
 	}
-} else static assert(false, "Unsupported OS");
+} else static assert(false, "Unsupported platform");

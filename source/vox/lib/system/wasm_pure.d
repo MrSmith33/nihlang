@@ -13,3 +13,4 @@ extern(C) @llvmAttr("wasm-import-module", "env"):
 
 
 void writeString(const(char)[] str);
+long getTimeNs();

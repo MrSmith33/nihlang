@@ -10,3 +10,5 @@ enum MMAP = 9;
 enum MPROTECT = 10;
 enum MUNMAP = 11;
 enum EXIT = 60;
+enum sys_clock_gettime = 228;
+enum sys_clock_getres = 229;

@@ -9,9 +9,19 @@ import vox.vm.tests.infra.test;
 
 @nogc nothrow:
 
-// Test[] vmTests() { return collectTests!(vox.vm.tests.tests)(); }
+void vmTests(ref VoxAllocator allocator, ref Array!Test tests) { return collectTests!(vox.vm.tests.tests)(allocator, tests); }
 
-void testVM(ref VmTestContext c) {
+@VmTest
+void test0(ref VmTestContext c) {
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId   = c.vm.addFunction(b.code, 0, 0, 0);
+	VmRegister[] res = c.call(stdoutSink, funcId);
+	assert(res.length == 0);
+}
+
+@VmTest
+void test1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 2, 1);
 	b.emit_store_ptr(c.vm.ptrSize, 3, 2);
