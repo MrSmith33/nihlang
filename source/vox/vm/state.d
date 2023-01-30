@@ -20,6 +20,7 @@ struct VmState {
 
 	// must be checked on return
 	VmStatus status;
+	u64 errData;
 
 	VoxAllocator* allocator;
 	Memory[3] memories;
@@ -37,6 +38,7 @@ struct VmState {
 	}
 
 	void reset() {
+		errData = 0;
 		foreach(ref func; functions)
 			func.free(*allocator);
 		functions.clear;
@@ -143,16 +145,24 @@ struct VmState {
 				return setTrap(VmStatus.ERR_TRAP);
 
 			case mov:
-				u8 dst = frame.func.code[frame.ip+1];
-				u8 src = frame.func.code[frame.ip+2];
-				registers[frame.firstRegister + dst] = registers[frame.firstRegister + src];
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
+				registers[dstIndex] = registers[srcIndex];
 				frame.ip += 3;
 				return;
 
 			case add_i64:
-				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmReg* src0 = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
-				VmReg* src1 = &registers[frame.firstRegister + frame.func.code[frame.ip+3]];
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+				u32 src0Index = frame.firstRegister + frame.func.code[frame.ip+2];
+				if (src0Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
+				VmReg* src0 = &registers[src0Index];
+				u32 src1Index = frame.firstRegister + frame.func.code[frame.ip+3];
+				if (src1Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
+				VmReg* src1 = &registers[src1Index];
 				dst.as_u64 = src0.as_u64 + src1.as_u64;
 				dst.pointer = src0.pointer;
 				if (src1.pointer.isDefined) return setTrap(VmStatus.ERR_PTR_SRC1);
@@ -160,9 +170,11 @@ struct VmState {
 				return;
 
 			case const_s8:
-				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				i8 src = frame.func.code[frame.ip+2];
-				dst.as_s64 = src;
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+				i8 imm = frame.func.code[frame.ip+2];
+				dst.as_s64 = imm;
 				dst.pointer = AllocId();
 				frame.ip += 3;
 				return;
@@ -173,8 +185,13 @@ struct VmState {
 			case load_m64:
 				u32 size = 1 << (op - load_m8);
 
-				VmReg* dst = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmReg* src = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+
+				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
+				VmReg* src = &registers[srcIndex];
 
 				if (src.pointer.isUndefined) return setTrap(VmStatus.ERR_LOAD_NOT_PTR);
 				if (!isReadableMemory(src.pointer.kind)) return setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
@@ -215,8 +232,13 @@ struct VmState {
 			case store_m64:
 				u32 size = 1 << (op - store_m8);
 
-				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmReg* src  = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+
+				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
+				VmReg* src = &registers[srcIndex];
 
 				if (dst.pointer.isUndefined) return setTrap(VmStatus.ERR_STORE_NOT_PTR);
 				if (!isWritableMemory(dst.pointer.kind)) return setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
@@ -257,9 +279,30 @@ struct VmState {
 		}
 	}
 
-	private void setTrap(VmStatus status) {
+	// For VM users
+	void memWrite(T)(AllocId allocId, u32 offset, T value)
+		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
+	{
+		Memory* mem = &memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		u8* memory = mem.memory[].ptr;
+		*cast(T*)(memory+alloc.offset+offset) = value;
+	}
+
+	// For VM users
+	T memRead(T)(AllocId allocId, u32 offset)
+		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
+	{
+		Memory* mem = &memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		u8* memory = mem.memory[].ptr;
+		return *cast(T*)(memory+alloc.offset+offset);
+	}
+
+	private void setTrap(VmStatus status, u64 data = 0) {
 		isRunning = false;
 		this.status = status;
+		this.errData = data;
 	}
 
 	void printRegs() {
@@ -285,6 +328,11 @@ struct VmState {
 
 			case ERR_TRAP:
 				sink("trap instruction reached.");
+				break;
+
+			case ERR_REGISTER_OOB:
+				sink.formattedWrite("Trying to access register out of bounds of register stack.\n  Num frame registers: %s\n  Invalid register: r%s\n",
+					registers.length - firstReg, errData - firstReg);
 				break;
 
 			case ERR_PTR_SRC1:
@@ -368,6 +416,7 @@ struct VmState {
 enum VmStatus : u8 {
 	OK,
 	ERR_TRAP,
+	ERR_REGISTER_OOB,
 	ERR_PTR_SRC1,
 	ERR_STORE_NO_WRITE_PERMISSION,
 	ERR_LOAD_NO_READ_PERMISSION,

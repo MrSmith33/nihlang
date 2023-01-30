@@ -27,7 +27,7 @@ i32 runVmTests() {
 
 	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
-	auto ctx = VmTestContext(&vm, stdoutSink);
+	auto context = VmTestContext(&vm, stdoutSink);
 
 	Array!Test tests;
 	vox.vm.tests.tests.vmTests(allocator, tests);
@@ -35,18 +35,17 @@ i32 runVmTests() {
 	writefln("Running %s tests", tests.length);
 
 	// Warmup (first run does all the allocations and memory faults)
-	vm.reset;
-	tests[0].test_handler(ctx);
-	vm.reset;
-	tests[0].test_handler(ctx);
+	if (tests.length) {
+		runSingleTest(context, tests[0]);
+		runSingleTest(context, tests[0]);
+		runSingleTest(context, tests[0]);
+	}
 	// End warmup
 
 	MonoTime start = currTime;
 
 	foreach(ref test; tests) {
-		vm.ptrSize = test.ptrSize;
-		vm.reset;
-		test.test_handler(ctx);
+		runSingleTest(context, test);
 	}
 
 	MonoTime end = currTime;
@@ -54,4 +53,17 @@ i32 runVmTests() {
 	writefln("Done %s tests in %s", tests.length, end - start);
 
 	return 0;
+}
+
+void runSingleTest(ref VmTestContext c, ref Test test) {
+	c.vm.reset;
+	c.test = test;
+	c.vm.ptrSize = test.ptrSize;
+	c.vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
+	//writef("-- test");
+	//foreach(ref param; test.parameters) {
+	//	writef(" (%s %s)", param.id, param.value);
+	//}
+	//writeln;
+	test.test_handler(c);
 }

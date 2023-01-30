@@ -41,8 +41,44 @@ struct CodeBuilder {
 		code.put(*allocator, src);
 	}
 
+	void emit_load_m8(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.load_m8);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_load_m16(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.load_m16);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_load_m32(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.load_m32);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
 	void emit_load_m64(u8 dst, u8 src) {
 		code.put(*allocator, VmOpcode.load_m64);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_store_m8(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.store_m8);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_store_m16(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.store_m16);
+		code.put(*allocator, dst);
+		code.put(*allocator, src);
+	}
+
+	void emit_store_m32(u8 dst, u8 src) {
+		code.put(*allocator, VmOpcode.store_m32);
 		code.put(*allocator, dst);
 		code.put(*allocator, src);
 	}

@@ -156,6 +156,9 @@ template selectFormatter(T) {
 	else static if (is(T == struct)) {
 		alias selectFormatter = formatStruct!T;
 	}
+	else static if (is(T U == enum)) {
+		alias selectFormatter = selectFormatter!U;
+	}
 	else {
 		static assert(false, "selectFormatter: " ~ T.stringof);
 	}
