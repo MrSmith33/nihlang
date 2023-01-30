@@ -148,7 +148,7 @@ void test_add_i64_0(ref VmTestContext c) {
 
 @VmTest
 void test_add_i64_1(ref VmTestContext c) {
-	// Test add_i64 number + ptr
+	// Test add_i64 ptr + number
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 1, 2);
 	b.emit_ret();
@@ -156,6 +156,29 @@ void test_add_i64_1(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId, VmReg(funcId, 10), VmReg(20));
 	assert(res[0] == VmReg(funcId, 30));
 }
+
+@VmTest
+void test_add_i64_2(ref VmTestContext c) {
+	// Test add_i64 ptr + ptr
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_add_i64(0, 1, 2);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	c.callFail(funcId, VmReg(funcId, 10), VmReg(funcId, 20));
+	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
+}
+
+@VmTest
+void test_add_i64_3(ref VmTestContext c) {
+	// Test add_i64 num + ptr
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_add_i64(0, 1, 2);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
+	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
+}
+
 
 
 @VmTest

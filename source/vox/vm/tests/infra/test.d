@@ -94,7 +94,7 @@ struct VmTestContext {
 	VmState* vm;
 	SinkDelegate sink;
 
-	VmReg[] call(AllocId funcId, VmReg[] params...) {
+	private VmFunction* setupCall(AllocId funcId, VmReg[] params) {
 		if(funcId.index >= vm.functions.length) {
 			panic("Invalid function index (%s), only %s functions exist",
 				funcId.index, vm.functions.length);
@@ -114,6 +114,11 @@ struct VmTestContext {
 
 		vm.beginCall(funcId);
 
+		return func;
+	}
+
+	VmReg[] call(AllocId funcId, VmReg[] params...) {
+		VmFunction* func = setupCall(funcId, params);
 		vm.run();
 		// vm.runVerbose(sink);
 
@@ -128,6 +133,14 @@ struct VmTestContext {
 		if(vm.registers.length != func.numResults) panic("Function with %s results returned %s results.", func.numResults, vm.registers.length);
 
 		return vm.registers[];
+	}
+
+	void callFail(AllocId funcId, VmReg[] params...) {
+		setupCall(funcId, params);
+		vm.run();
+		if (vm.status == VmStatus.OK) {
+			panic("Function expected to trap");
+		}
 	}
 
 	AllocId staticAlloc(SizeAndAlign sizeAlign) {
