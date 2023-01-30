@@ -18,6 +18,7 @@ import vox.lib;
 enum VmOpcode : u8 {
 	// u8 op
 	ret,
+	trap,
 
 	// u8 op, u8 dst, u8 src
 	// reg[u8.dst] = reg[u8.src]

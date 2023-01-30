@@ -18,6 +18,10 @@ struct CodeBuilder {
 		code.put(*allocator, VmOpcode.ret);
 	}
 
+	void emit_trap() {
+		code.put(*allocator, VmOpcode.trap);
+	}
+
 	void emit_const_s8(u8 dst, i8 val) {
 		code.put(*allocator, VmOpcode.const_s8);
 		code.put(*allocator, dst);

@@ -23,6 +23,10 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			writefln("%04x ret", addr);
 			break;
 
+		case trap:
+			writefln("%04x trap", addr);
+			break;
+
 		case mov:
 			u8 dst = code[ip++];
 			u8 src = code[ip++];

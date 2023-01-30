@@ -139,6 +139,9 @@ struct VmState {
 				}
 				return;
 
+			case trap:
+				return setTrap(VmStatus.ERR_TRAP);
+
 			case mov:
 				u8 dst = frame.func.code[frame.ip+1];
 				u8 src = frame.func.code[frame.ip+2];
@@ -158,10 +161,10 @@ struct VmState {
 
 			case const_s8:
 				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				i8 src = frame.func.code[frame.ip++];
+				i8 src = frame.func.code[frame.ip+2];
 				dst.as_s64 = src;
 				dst.pointer = AllocId();
-				frame.ip += 2;
+				frame.ip += 3;
 				return;
 
 			case load_m8:
@@ -180,7 +183,8 @@ struct VmState {
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 				u8* memory = mem.memory[].ptr;
 
-				u64 offset = src.as_u64;
+				i64 offset = src.as_s64;
+				if (offset < 0) return setTrap(VmStatus.ERR_LOAD_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_LOAD_OOB);
 
 				switch(op) {
@@ -191,6 +195,7 @@ struct VmState {
 					default: assert(false);
 				}
 
+				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 				if (ptrSize == size) {
 					// this can be a pointer load
 					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
@@ -220,7 +225,8 @@ struct VmState {
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 				u8* memory = mem.memory[].ptr;
 
-				u64 offset = dst.as_u64;
+				i64 offset = dst.as_s64;
+				if (offset < 0) return setTrap(VmStatus.ERR_LOAD_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_STORE_OOB);
 
 				switch(op) {
@@ -231,6 +237,7 @@ struct VmState {
 					default: assert(false);
 				}
 
+				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 				if (ptrSize == size) {
 					// this can be a pointer store
 					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
@@ -274,6 +281,10 @@ struct VmState {
 		final switch(status) with(VmStatus) {
 			case OK:
 				sink("ok");
+				break;
+
+			case ERR_TRAP:
+				sink("trap instruction reached.");
 				break;
 
 			case ERR_PTR_SRC1:
@@ -356,6 +367,7 @@ struct VmState {
 
 enum VmStatus : u8 {
 	OK,
+	ERR_TRAP,
 	ERR_PTR_SRC1,
 	ERR_STORE_NO_WRITE_PERMISSION,
 	ERR_LOAD_NO_READ_PERMISSION,

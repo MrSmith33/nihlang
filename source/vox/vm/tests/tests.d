@@ -91,6 +91,17 @@ void test_ret_3(ref VmTestContext c) {
 
 
 @VmTest
+void test_trap_0(ref VmTestContext c) {
+	// Test trap
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 0);
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_TRAP);
+}
+
+
+@VmTest
 void test_mov_0(ref VmTestContext c) {
 	// Test mov of non-pointer from parameter to result
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -162,7 +173,7 @@ void test_add_i64_2(ref VmTestContext c) {
 	// Test add_i64 ptr + ptr
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 1, 2);
-	b.emit_ret();
+	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
 	c.callFail(funcId, VmReg(funcId, 10), VmReg(funcId, 20));
 	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
@@ -173,12 +184,25 @@ void test_add_i64_3(ref VmTestContext c) {
 	// Test add_i64 num + ptr
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 1, 2);
-	b.emit_ret();
+	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
 	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
 	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
 }
 
+
+@VmTest
+void test_const_s8_0(ref VmTestContext c) {
+	// Test const_s8
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(0, -1);
+	b.emit_const_s8(1,  1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 2, 0, 0);
+	VmReg[] res = c.call(funcId);
+	assert(res[0] == VmReg(-1));
+	assert(res[1] == VmReg( 1));
+}
 
 
 @VmTest
