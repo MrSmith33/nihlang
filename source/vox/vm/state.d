@@ -26,7 +26,7 @@ struct VmState {
 
 	Array!VmFunction functions;
 	Array!VmFrame frames;
-	Array!VmRegister registers;
+	Array!VmReg registers;
 
 	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
 		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
@@ -37,11 +37,13 @@ struct VmState {
 	}
 
 	void reset() {
+		foreach(ref func; functions)
+			func.free(*allocator);
 		functions.clear;
 		frames.clear;
 		registers.clear;
 		foreach(ref mem; memories)
-			mem.clear;
+			mem.clear(*allocator);
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 	}
 
@@ -64,21 +66,19 @@ struct VmState {
 		registers.voidPut(*allocator, numRegisters);
 	}
 
-	void pushRegisters(VmRegister[] regs) {
-		foreach(ref reg; regs) {
-			registers.put(*allocator, reg);
-		}
+	void pushRegisters(VmReg[] regs) {
+		registers.put(*allocator, regs);
 	}
 
 	void pushRegister_u64(u64 val) {
-		registers.put(*allocator, VmRegister(val));
+		registers.put(*allocator, VmReg(val));
 	}
 
-	void pushRegister(VmRegister val) {
+	void pushRegister(VmReg val) {
 		registers.put(*allocator, val);
 	}
 
-	VmRegister getRegister(u32 index) {
+	VmReg getRegister(u32 index) {
 		if(index >= registers.length) panic("Invalid register index (%s), only %s registers exist", index, registers.length);
 		return registers[index];
 	}
@@ -147,17 +147,17 @@ struct VmState {
 				return;
 
 			case add_i64:
-				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmRegister* src0 = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
-				VmRegister* src1 = &registers[frame.firstRegister + frame.func.code[frame.ip+3]];
+				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
+				VmReg* src0 = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
+				VmReg* src1 = &registers[frame.firstRegister + frame.func.code[frame.ip+3]];
 				dst.as_u64 = src0.as_u64 + src1.as_u64;
 				dst.pointer = src0.pointer;
-				if (src1.pointer.isDefined) return setTrap(VmStatus.ERR_PTR_PLUS_PTR);
+				if (src1.pointer.isDefined) return setTrap(VmStatus.ERR_PTR_SRC1);
 				frame.ip += 4;
 				return;
 
 			case const_s8:
-				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
+				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
 				i8 src = frame.func.code[frame.ip++];
 				dst.as_s64 = src;
 				dst.pointer = AllocId();
@@ -170,8 +170,8 @@ struct VmState {
 			case load_m64:
 				u32 size = 1 << (op - load_m8);
 
-				VmRegister* dst = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmRegister* src = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
+				VmReg* dst = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
+				VmReg* src = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
 
 				if (src.pointer.isUndefined) return setTrap(VmStatus.ERR_LOAD_NOT_PTR);
 				if (!isReadableMemory(src.pointer.kind)) return setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
@@ -193,7 +193,11 @@ struct VmState {
 
 				if (ptrSize == size) {
 					// this can be a pointer load
-					dst.pointer = alloc.relocations.get(cast(u32)offset);
+					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+						dst.pointer = alloc.relocations.get(cast(u32)offset);
+					} else {
+						dst.pointer = mem.relocations.get(cast(u32)(alloc.offset + offset));
+					}
 				} else {
 					dst.pointer = AllocId();
 				}
@@ -206,8 +210,8 @@ struct VmState {
 			case store_m64:
 				u32 size = 1 << (op - store_m8);
 
-				VmRegister* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
-				VmRegister* src  = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
+				VmReg* dst  = &registers[frame.firstRegister + frame.func.code[frame.ip+1]];
+				VmReg* src  = &registers[frame.firstRegister + frame.func.code[frame.ip+2]];
 
 				if (dst.pointer.isUndefined) return setTrap(VmStatus.ERR_STORE_NOT_PTR);
 				if (!isWritableMemory(dst.pointer.kind)) return setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
@@ -229,10 +233,17 @@ struct VmState {
 
 				if (ptrSize == size) {
 					// this can be a pointer store
-					if (src.pointer.isDefined)
-						alloc.relocations.put(*allocator, cast(u32)offset, src.pointer);
-					else
-						alloc.relocations.remove(*allocator, cast(u32)offset);
+					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+						if (src.pointer.isDefined)
+							alloc.relocations.put(*allocator, cast(u32)offset, src.pointer);
+						else
+							alloc.relocations.remove(*allocator, cast(u32)offset);
+					} else {
+						if (src.pointer.isDefined)
+							mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), src.pointer);
+						else
+							mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset));
+					}
 				}
 				frame.ip += 3;
 				return;
@@ -265,10 +276,10 @@ struct VmState {
 				sink("ok");
 				break;
 
-			case ERR_PTR_PLUS_PTR:
-				VmRegister* dst  = &registers[firstReg + code[frame.ip+1]];
-				VmRegister* src0 = &registers[firstReg + code[frame.ip+2]];
-				VmRegister* src1 = &registers[firstReg + code[frame.ip+3]];
+			case ERR_PTR_SRC1:
+				VmReg* dst  = &registers[firstReg + code[frame.ip+1]];
+				VmReg* src0 = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src1 = &registers[firstReg + code[frame.ip+3]];
 
 				sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s\n",
 					code[frame.ip+1], *dst,
@@ -277,8 +288,8 @@ struct VmState {
 				break;
 
 			case ERR_STORE_NO_WRITE_PERMISSION:
-				VmRegister* dst = &registers[firstReg + code[frame.ip+1]];
-				VmRegister* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 
 				sink.formattedWrite("Writing to %s pointer is disabled.\n  r%s: %s\n  r%s: %s\n",
 					memoryKindString[dst.pointer.kind],
@@ -287,8 +298,8 @@ struct VmState {
 				break;
 
 			case ERR_LOAD_NO_READ_PERMISSION:
-				VmRegister* dst = &registers[firstReg + code[frame.ip+1]];
-				VmRegister* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 
 				sink.formattedWrite("Reading from %s pointer is disabled.\n  r%s: %s\n  r%s: %s\n",
 					memoryKindString[src.pointer.kind],
@@ -297,13 +308,13 @@ struct VmState {
 				break;
 
 			case ERR_STORE_NOT_PTR:
-				VmRegister* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 
 				sink.formattedWrite("Writing to non-pointer value (r%s:%s)", code[frame.ip+1], *dst);
 				break;
 
 			case ERR_LOAD_NOT_PTR:
-				VmRegister* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 
 				sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[frame.ip+2], *src);
 				break;
@@ -311,7 +322,7 @@ struct VmState {
 			case ERR_STORE_OOB:
 				u8 op = code[frame.ip+0];
 				u32 size = 1 << (op - VmOpcode.load_m8);
-				VmRegister* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 
@@ -327,7 +338,7 @@ struct VmState {
 			case ERR_LOAD_OOB:
 				u8 op = code[frame.ip+0];
 				u32 size = 1 << (op - VmOpcode.load_m8);
-				VmRegister* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 
@@ -345,7 +356,7 @@ struct VmState {
 
 enum VmStatus : u8 {
 	OK,
-	ERR_PTR_PLUS_PTR,
+	ERR_PTR_SRC1,
 	ERR_STORE_NO_WRITE_PERMISSION,
 	ERR_LOAD_NO_READ_PERMISSION,
 	ERR_STORE_NOT_PTR,
@@ -361,6 +372,10 @@ struct VmFunction {
 	u8 numResults;
 	u8 numParameters;
 	u8 numLocalRegisters;
+
+	void free(ref VoxAllocator allocator) {
+		code.free(allocator);
+	}
 }
 
 struct VmFrame {

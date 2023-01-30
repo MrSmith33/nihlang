@@ -2,7 +2,7 @@ module object;
 
 version(Windows) {
 	// druntime/src/core/sys/windows/threadaux.d
-	extern (C) __gshared int _tls_index;
+	extern(C) __gshared int _tls_index;
 }
 
 extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t srclen, size_t elemsz)
@@ -45,7 +45,12 @@ alias ptrdiff_t = typeof(cast(void*)0 - cast(void*)0);
 alias string = immutable(char)[];
 alias noreturn = typeof(*null);
 
-extern(C) int _fltused = 0x9875;
+// If this is present with LDC release build we get
+// lld-link: error: undefined symbol: _fltused
+// >>> referenced by nihlang\bin\testsuite.exe.lto.obj
+// https://stackoverflow.com/questions/1583196/building-visual-c-app-that-doesnt-use-crt-functions-still-references-some/1583220#1583220
+version(DigitalMars)
+extern(C) __gshared int _fltused = 0;
 
 
 

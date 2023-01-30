@@ -18,27 +18,35 @@ i32 runVmTests() {
 	enum static_bytes = 64*1024;
 	enum heap_bytes = 64*1024;
 	enum stack_bytes = 64*1024;
-	enum PTR_SIZE = 4;
 
 	VmState vm = {
 		allocator : &allocator,
 		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
-		ptrSize : PTR_SIZE,
+		ptrSize : 4,
 	};
 
 	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
-	auto ctx = VmTestContext(&vm);
+	auto ctx = VmTestContext(&vm, stdoutSink);
 
 	Array!Test tests;
 	vox.vm.tests.tests.vmTests(allocator, tests);
 
 	writefln("Running %s tests", tests.length);
 
+	// Warmup (first run does all the allocations and memory faults)
+	vm.reset;
+	tests[0].test_handler(ctx);
+	vm.reset;
+	tests[0].test_handler(ctx);
+	// End warmup
+
 	MonoTime start = currTime;
 
 	foreach(ref test; tests) {
-		test.tester(ctx);
+		vm.ptrSize = test.ptrSize;
+		vm.reset;
+		test.test_handler(ctx);
 	}
 
 	MonoTime end = currTime;

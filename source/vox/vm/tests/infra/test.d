@@ -17,25 +17,84 @@ void collectTests(alias M)(ref VoxAllocator allocator, ref Array!Test tests) {
 	{
 		alias member = __traits(getMember, M, m);
 		static if (hasUDA!(member, VmTest)) {
-			tests.put(allocator, makeTest!member);
+			makeTest!member(allocator, tests);
 		}
 	}
 }
 
-Test makeTest(alias test)() {
-	return Test(&test);
+void makeTest(alias test)(ref VoxAllocator allocator, ref Array!Test tests) {
+	Test res;
+
+	u8 ptrSizeFlags;
+	u8 flags;
+	bool attrPtrSize32;
+	bool attrPtrSize64;
+
+	foreach (attr; __traits(getAttributes, test)) {
+		static if (is(typeof(attr) == TestAtrib)) {
+			final switch(attr) with(TestAtrib) {
+				case ptrSize32:
+					attrPtrSize32 = true;
+					ptrSizeFlags |= TestFlags.ptrSize32;
+					break;
+				case ptrSize64:
+					attrPtrSize64 = true;
+					ptrSizeFlags |= TestFlags.ptrSize64;
+					break;
+			}
+		}
+	}
+
+	if (attrPtrSize32 == attrPtrSize64) {
+		// test both if nothing is specified or both specified
+		Test t1 = {
+			test_handler : &test,
+			flags : flags | TestFlags.ptrSize32,
+		};
+		tests.put(allocator, t1);
+
+		Test t2 = {
+			test_handler : &test,
+			flags : flags | TestFlags.ptrSize64,
+		};
+		tests.put(allocator, t2);
+	} else {
+		Test t = {
+			test_handler : &test,
+			flags : flags | ptrSizeFlags,
+		};
+		tests.put(allocator, t);
+	}
 }
 
 struct Test {
 	@nogc nothrow:
-	void function(ref VmTestContext) tester;
+	void function(ref VmTestContext) test_handler;
+	u8 flags; // set of TestFlags
+
+	u8 ptrSize() {
+		if (flags & TestFlags.ptrSize32) return 4;
+		return 8;
+	}
+}
+
+enum TestAtrib : u8 {
+	ptrSize32 = 1,
+	ptrSize64 = 2,
+}
+
+// Can be an attribute on the test case
+enum TestFlags : u8 {
+	ptrSize32 = 1 << 0,
+	ptrSize64 = 1 << 1,
 }
 
 struct VmTestContext {
 	@nogc nothrow:
 	VmState* vm;
+	SinkDelegate sink;
 
-	VmRegister[] call(scope SinkDelegate sink, AllocId funcId, VmRegister[] params...) {
+	VmReg[] call(AllocId funcId, VmReg[] params...) {
 		if(funcId.index >= vm.functions.length) {
 			panic("Invalid function index (%s), only %s functions exist",
 				funcId.index, vm.functions.length);
@@ -56,6 +115,7 @@ struct VmTestContext {
 		vm.beginCall(funcId);
 
 		vm.run();
+		// vm.runVerbose(sink);
 
 		if (vm.status != VmStatus.OK) {
 			u32 ipCopy = vm.frames.back.ip;

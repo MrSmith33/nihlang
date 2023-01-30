@@ -12,8 +12,10 @@ import vox.vm.memory;
 // Register can contain 0 or 1 pointer, so instead of storing a hashmap of relocations
 // we store a single AllocId
 // vector registers are forbidden to store pointers
+//
+// 1) What if we read uninitialized register?
 align(16)
-struct VmRegister {
+struct VmReg {
 	@nogc nothrow:
 	union {
 		u64 as_u64; // init union to 0
@@ -40,15 +42,12 @@ struct VmRegister {
 		}
 	}
 
-	static VmRegister makePtr(u64 offset, AllocId alloc) {
-		VmRegister r = {
-			as_u64 : offset,
-			pointer : alloc,
-		};
-		return r;
+	this(u64 num) {
+		this.as_u64 = num;
 	}
-}
 
-VmRegister vmRegPtr(AllocId allocId) {
-	return VmRegister.makePtr(0, allocId);
+	this(AllocId ptr, u64 offset = 0) {
+		this.as_u64 = offset;
+		this.pointer = ptr;
+	}
 }

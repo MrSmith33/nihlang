@@ -9,19 +9,157 @@ import vox.vm.tests.infra.test;
 
 @nogc nothrow:
 
-void vmTests(ref VoxAllocator allocator, ref Array!Test tests) { return collectTests!(vox.vm.tests.tests)(allocator, tests); }
+void vmTests(ref VoxAllocator allocator, ref Array!Test tests) {
+	return collectTests!(vox.vm.tests.tests)(allocator, tests);
+}
+
+
+@VmTest @(TestAtrib.ptrSize64)
+void test_warmup(ref VmTestContext c) {
+	// Big code to warmup the memory and caches
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 2);
+	c.call(funcId);
+}
+
+
+@VmTest @(TestAtrib.ptrSize32)
+void test_runner_32bit_ptr(ref VmTestContext c) {
+	assert(c.vm.ptrSize == 4);
+}
+
+@VmTest @(TestAtrib.ptrSize64)
+void test_runner_64bit_ptr(ref VmTestContext c) {
+	assert(c.vm.ptrSize == 8);
+}
+
 
 @VmTest
-void test0(ref VmTestContext c) {
+void test_ret_0(ref VmTestContext c) {
+	// Test return with 0 results 0 parameters and 0 locals
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId   = c.vm.addFunction(b.code, 0, 0, 0);
-	VmRegister[] res = c.call(stdoutSink, funcId);
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 0);
+	VmReg[] res = c.call(funcId);
 	assert(res.length == 0);
 }
 
 @VmTest
-void test1(ref VmTestContext c) {
+void test_ret_1(ref VmTestContext c) {
+	// Test return with 0 results 0 parameters and 1 local
+	// Check that local is removed from the stack by the ret handler
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 1);
+	VmReg[] res = c.call(funcId);
+	assert(res.length == 0);
+	assert(c.vm.registers.length == 0);
+}
+
+@VmTest
+void test_ret_2(ref VmTestContext c) {
+	// Test return with 0 results 2 parameters and 0 locals
+	// Check that parameters are removed from the stack by the ret handler
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
+	assert(res.length == 0);
+	assert(c.vm.registers.length == 0);
+}
+
+@VmTest
+void test_ret_3(ref VmTestContext c) {
+	// Test return with 0 results 2 parameters and 2 locals
+	// Check that locals and parameters are removed from the stack by the ret handler
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 2);
+	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
+	assert(res.length == 0);
+	assert(c.vm.registers.length == 0);
+}
+
+
+@VmTest
+void test_mov_0(ref VmTestContext c) {
+	// Test mov of non-pointer from parameter to result
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+	VmReg[] res = c.call(funcId, VmReg(42));
+	assert(res[0] == VmReg(42));
+}
+
+@VmTest
+void test_mov_1(ref VmTestContext c) {
+	// Test mov of pointer from parameter to result
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+	VmReg[] res = c.call(funcId, VmReg(funcId));
+	assert(res[0] == VmReg(funcId));
+}
+
+@VmTest
+void test_mov_2(ref VmTestContext c) {
+	// Test mov of pointer with offset from parameter to result
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+	VmReg[] res = c.call(funcId, VmReg(funcId, 42));
+	assert(res[0] == VmReg(funcId, 42));
+}
+
+@VmTest
+void test_mov_3(ref VmTestContext c) {
+	// Test mov of non-pointer from uninitialized local to result
+	// TODO: This may be either catched during validation, or we could have a bit per register and check it
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 0, 1);
+	VmReg[] res = c.call(funcId);
+}
+
+
+@VmTest
+void test_add_i64_0(ref VmTestContext c) {
+	// Test add_i64 number addition
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_add_i64(0, 1, 2);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(30));
+}
+
+@VmTest
+void test_add_i64_1(ref VmTestContext c) {
+	// Test add_i64 number + ptr
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_add_i64(0, 1, 2);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res = c.call(funcId, VmReg(funcId, 10), VmReg(20));
+	assert(res[0] == VmReg(funcId, 30));
+}
+
+
+@VmTest
+void test100(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 2, 1);
 	b.emit_store_ptr(c.vm.ptrSize, 3, 2);
@@ -34,6 +172,6 @@ void test1(ref VmTestContext c) {
 	AllocId heapId   = c.heapAlloc(SizeAndAlign(c.vm.ptrSize, 1));
 	AllocId stackId  = c.stackAlloc(SizeAndAlign(c.vm.ptrSize, 1));
 
-	VmRegister[] res = c.call(stdoutSink, funcId, vmRegPtr(funcId), vmRegPtr(staticId), vmRegPtr(heapId), vmRegPtr(stackId));
-	assert(res[0] == vmRegPtr(heapId));
+	VmReg[] res = c.call(funcId, VmReg(funcId), VmReg(staticId), VmReg(heapId), VmReg(stackId));
+	assert(res[0] == VmReg(heapId));
 }

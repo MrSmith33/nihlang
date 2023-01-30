@@ -7,33 +7,24 @@ import vox.lib;
 
 @nogc nothrow:
 
-//import std.bitmanip : bitfields;
+enum MEMORY_RELOCATIONS_PER_ALLOCATION = true;
+enum MEMORY_RELOCATIONS_PER_MEMORY = !MEMORY_RELOCATIONS_PER_ALLOCATION;
+
 struct AllocId {
 	@nogc nothrow:
 	this(u32 index, u32 generation, MemoryKind kind) {
-		this.index = index;
-		this._generation = (generation & ((1 << 30) - 1)) | (kind << 30);
+		this.payload = (index & ((1 << 30) - 1)) | (kind << 30);
 	}
 
-	union {
-		u64 payload;
-		struct {
-			u32 index;
-			private u32 _generation;
-		}
-	}
-	//mixin(bitfields!(
-	//	u32,           "generation", 30,
-	//	MemoryKind,      "kind",  2,
-	//));
+	private u32 payload;
 
-	u32 generation() const {
-		return cast(u32)(_generation & ((1 << 30) - 1));
+	u32 index() const {
+		return cast(u32)(payload & ((1 << 30) - 1));
 	}
 
 	// kind: heap, static, function, stack
 	MemoryKind kind() const {
-		return cast(MemoryKind)(_generation >> 30);
+		return cast(MemoryKind)(payload >> 30);
 	}
 
 	bool isDefined() const { return payload != 0; }
@@ -43,7 +34,9 @@ struct AllocId {
 struct Allocation {
 	u32 offset;
 	u32 size;
-	HashMap!(u32, AllocId, u32.max) relocations;
+	static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+		HashMap!(u32, AllocId, u32.max) relocations;
+	}
 }
 
 struct Memory {
@@ -51,7 +44,10 @@ struct Memory {
 
 	Array!Allocation allocations;
 	Array!u8 memory;
-	Array!u8 bitmap;
+	Array!u8 pointerBitmap;
+	static if (MEMORY_RELOCATIONS_PER_MEMORY) {
+		HashMap!(u32, AllocId, u32.max) relocations;
+	}
 	u32 bytesUsed;
 
 	// ptrSize is 4 or 8
@@ -61,10 +57,16 @@ struct Memory {
 		// 1 bit per pointer slot
 		// pointers must be aligned in memory
 		// each allocation is aligned at least to a pointer size
-		bitmap.voidPut(allocator, size / (ptrSize * 8));
+		pointerBitmap.voidPut(allocator, size / (ptrSize * 8));
 	}
 
-	void clear() {
+	void clear(ref VoxAllocator allocator) {
+		static if (MEMORY_RELOCATIONS_PER_MEMORY) {
+			relocations.clear;
+		} else {
+			foreach(ref alloc; allocations)
+				alloc.relocations.free(allocator);
+		}
 		allocations.clear;
 		bytesUsed = 0;
 	}
