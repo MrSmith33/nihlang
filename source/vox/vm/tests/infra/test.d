@@ -7,11 +7,14 @@ module vox.vm.tests.infra.test;
 
 import vox.lib;
 import vox.vm;
+import vox.vm.tests.infra;
 
 @nogc nothrow:
 
-// attribute
+// attributes
 enum VmTest;
+enum TestPtrSize32;
+enum TestPtrSize64;
 struct VmTestParam {
 	TestParamId id;
 	u32[] values;
@@ -19,20 +22,47 @@ struct VmTestParam {
 
 void collectTests(alias M)(ref VoxAllocator allocator, ref Array!Test tests) {
 	import std.traits : hasUDA;
+	Array!TestDefinition defs;
 	foreach(m; __traits(allMembers, M))
 	{
 		alias member = __traits(getMember, M, m);
 		static if (hasUDA!(member, VmTest)) {
-			makeTest!member(allocator, tests);
+			defs.put(allocator, TestDefinition.init);
+			gatherTestDefinition!member(allocator, defs.back);
+		}
+	}
+	foreach(ref d; defs) makeTest(allocator, tests, d);
+}
+
+struct TestDefinition {
+	@nogc nothrow:
+	static struct Param {
+		TestParamId id;
+		u32[] values;
+	}
+	bool attrPtrSize32;
+	bool attrPtrSize64;
+	Array!Param parameters;
+	void function(ref VmTestContext) test_handler;
+}
+
+// This must be as small as possible, otherwise compile times are to big
+void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefinition def) {
+	def.test_handler = &test;
+	foreach (attr; __traits(getAttributes, test)) {
+		static if (is(attr == TestPtrSize32)) {
+			def.attrPtrSize32 = true;
+		} else static if (is(attr == TestPtrSize64)) {
+			def.attrPtrSize64 = true;
+		} else static if (is(typeof(attr) == VmTestParam)) {
+			static __gshared u32[] attr_values = attr.values;
+			def.parameters.put(allocator, TestDefinition.Param(attr.id, attr_values));
 		}
 	}
 }
 
-void makeTest(alias test)(ref VoxAllocator allocator, ref Array!Test tests) {
+void makeTest(ref VoxAllocator allocator, ref Array!Test tests, TestDefinition def) {
 	Test res;
-
-	bool attrPtrSize32;
-	bool attrPtrSize64;
 	u32 numPermutations = 1;
 
 	static struct Param {
@@ -43,34 +73,20 @@ void makeTest(alias test)(ref VoxAllocator allocator, ref Array!Test tests) {
 
 	Array!Param parameters;
 
-	foreach (attr; __traits(getAttributes, test)) {
-		static if (is(typeof(attr) == TestAtrib)) {
-			final switch(attr) with(TestAtrib) {
-				case ptrSize32:
-					attrPtrSize32 = true;
-					break;
-				case ptrSize64:
-					attrPtrSize64 = true;
-					break;
-			}
-		} else static if (is(typeof(attr) == VmTestParam)) {
+	foreach(ref p; def.parameters) {
+		// skip empty parameters
+		if (p.values.length > 0) {
+			numPermutations *= p.values.length;
 			Array!u32 values;
-			values.reserve(allocator, attr.values.length);
-			numPermutations *= attr.values.length;
-			foreach(val; attr.values) {
-				values.put(allocator, val);
-			}
-			// skip empty parameters
-			if (values.length > 0) {
-				parameters.put(allocator, Param(attr.id, values));
-			}
+			values.put(allocator, p.values);
+			parameters.put(allocator, Param(p.id, values));
 		}
 	}
 
 	// Add ptr sizes
 	Array!u32 ptr_size_values;
-	if (attrPtrSize32 != attrPtrSize64) {
-		ptr_size_values.put(allocator, attrPtrSize32 ? 4 : 8);
+	if (def.attrPtrSize32 != def.attrPtrSize64) {
+		ptr_size_values.put(allocator, def.attrPtrSize32 ? 4 : 8);
 	} else {
 		ptr_size_values.put(allocator, 4, 8);
 		numPermutations *= 2;
@@ -94,7 +110,7 @@ void makeTest(alias test)(ref VoxAllocator allocator, ref Array!Test tests) {
 		//writeln;
 
 		Test t = {
-			test_handler : &test,
+			test_handler : def.test_handler,
 			parameters : testParameters,
 		};
 		tests.put(allocator, t);
@@ -142,81 +158,4 @@ enum TestParamId : u8 {
 	ptr_size,
 	instr,
 	memory,
-}
-
-enum TestAtrib : u8 {
-	ptrSize32 = 1,
-	ptrSize64 = 2,
-}
-
-struct VmTestContext {
-	@nogc nothrow:
-	VmState* vm;
-	SinkDelegate sink;
-	Test test;
-
-	private VmFunction* setupCall(AllocId funcId, VmReg[] params) {
-		if(funcId.index >= vm.functions.length) {
-			panic("Invalid function index (%s), only %s functions exist",
-				funcId.index, vm.functions.length);
-		}
-		if(funcId.kind != MemoryKind.func_id) {
-			panic("Invalid AllocId kind, expected func_id, got %s",
-				memoryKindString[funcId.kind]);
-		}
-		VmFunction* func = &vm.functions[funcId.index];
-		if(func.numParameters != params.length) {
-			panic("Invalid number of parameters provided, expected %s, got %s",
-				func.numParameters, params.length);
-		}
-
-		vm.pushRegisters(func.numResults);
-		vm.pushRegisters(params);
-
-		vm.beginCall(funcId);
-
-		return func;
-	}
-
-	VmReg[] call(AllocId funcId, VmReg[] params...) {
-		VmFunction* func = setupCall(funcId, params);
-		vm.run();
-		// vm.runVerbose(sink);
-
-		if (vm.status != VmStatus.OK) {
-			u32 ipCopy = vm.frames.back.ip;
-			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
-			sink("Error: ");
-			vm.format_vm_error(sink);
-			panic("Function expected to finish successfully");
-		}
-
-		if(vm.registers.length != func.numResults) panic("Function with %s results returned %s results.", func.numResults, vm.registers.length);
-
-		return vm.registers[];
-	}
-
-	void callFail(AllocId funcId, VmReg[] params...) {
-		setupCall(funcId, params);
-		vm.run();
-		if (vm.status == VmStatus.OK) {
-			panic("Function expected to trap");
-		}
-	}
-
-	AllocId staticAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.static_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.static_mem);
-	}
-
-	AllocId heapAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.heap_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.heap_mem);
-	}
-
-	AllocId stackAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.stack_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.stack_mem);
-	}
-
-	AllocId genericMemAlloc(MemoryKind kind, SizeAndAlign sizeAlign) {
-		return vm.memories[kind].allocate(*vm.allocator, sizeAlign, kind);
-	}
 }

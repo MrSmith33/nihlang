@@ -5,7 +5,7 @@ module vox.vm.tests.tests;
 
 import vox.lib;
 import vox.vm;
-import vox.vm.tests.infra.test;
+import vox.vm.tests.infra;
 
 @nogc nothrow:
 
@@ -14,7 +14,7 @@ void vmTests(ref VoxAllocator allocator, ref Array!Test tests) {
 }
 
 
-@VmTest @(TestAtrib.ptrSize64)
+@VmTest @TestPtrSize64
 void test_warmup(ref VmTestContext c) {
 	// Big code to warmup the memory and caches
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -32,12 +32,12 @@ void test_warmup(ref VmTestContext c) {
 }
 
 
-@VmTest @(TestAtrib.ptrSize32)
+@VmTest @TestPtrSize32
 void test_runner_32bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == 4);
 }
 
-@VmTest @(TestAtrib.ptrSize64)
+@VmTest @TestPtrSize64
 void test_runner_64bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == 8);
 }
