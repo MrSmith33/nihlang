@@ -61,6 +61,11 @@ T paddingSize(T)(T address, T alignment) {
 	return cast(T)(alignValue(address, alignment) - address);
 }
 
+u64 bitmask(u64 n) {
+	if (n >= 64) return u64.max;
+	return (1UL << n) - 1;
+}
+
 // [16 21f0aaad 15 d35a2d97 15] https://github.com/skeeto/hash-prospector
 u32 int32_hash(u32 x) {
     x ^= x >> 16;

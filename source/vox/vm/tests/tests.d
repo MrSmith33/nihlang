@@ -13,6 +13,9 @@ void vmTests(ref VoxAllocator allocator, ref Array!Test tests) {
 	return collectTests!(vox.vm.tests.tests)(allocator, tests);
 }
 
+// Test ideas:
+// - What if the same register/memory is used multiple times in an instruction
+
 
 @VmTest @TestPtrSize64
 void test_warmup(ref VmTestContext c) {
@@ -387,6 +390,82 @@ void test_load_mXX_5(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
 	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_load_mXX_6(ref VmTestContext c) {
+	// Test load_mXX raw bytes with offset from 0 to 8
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	u64 sizeMask = bitmask(1 << (op - VmOpcode.load_m8 + 3));
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
+	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
+	c.vm.memWrite!u64(memId, 0, value0); // make memory initialized
+	c.vm.memWrite!u64(memId, 8, value1); // make memory initialized
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+
+	foreach(offset; 0..9) {
+		u64 shiftSize  = offset * 8;
+		u64 shiftSize2 = 64 - shiftSize;
+		u64 val0 = shiftSize == 64 ? 0 : value0 >> shiftSize;
+		u64 val1 = shiftSize2 == 64 ? 0 : value1 << shiftSize2;
+		u64 val  = (val1 | val0) & sizeMask;
+		//writefln("read %02X", res[0].as_u64);
+		//writefln("  val0 %016X", val0);
+		//writefln("  val1 %016X", val1);
+		//writefln("  val  %016X", val1 | val0);
+		//writefln("  mask %02X", val);
+
+		VmReg[] res = c.call(funcId, VmReg(memId, offset));
+		assert(res[0] == VmReg(val));
+		c.clearStack;
+	}
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_load_mXX_7(ref VmTestContext c) {
+	// Test load_mXX on pointer bytes with offset from 0 to 8
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	u32 size = 1 << (op - VmOpcode.load_m8);
+	u64 sizeMask = bitmask(1 << (op - VmOpcode.load_m8 + 3));
+
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
+	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
+	c.vm.memWrite!u64(memId, 0, value0); // make memory initialized
+	c.vm.memWrite!u64(memId, 8, value1); // make memory initialized
+	c.vm.memWritePtr(memId, 0, memId);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+
+	foreach(offset; 0..9) {
+		u64 shiftSize  = offset * 8;
+		u64 shiftSize2 = 64 - shiftSize;
+		u64 val0 = shiftSize == 64 ? 0 : value0 >> shiftSize;
+		u64 val1 = shiftSize2 == 64 ? 0 : value1 << shiftSize2;
+		u64 val  = (val1 | val0) & sizeMask;
+
+		VmReg[] res = c.call(funcId, VmReg(memId, offset));
+		if (size == c.vm.ptrSize && offset == 0) {
+			// writefln("op %s size %s mem %s offset %s", op, size, memKind, offset);
+			assert(res[0] == VmReg(memId, val));
+		} else {
+			assert(res[0] == VmReg(val));
+		}
+		c.clearStack;
+	}
 }
 
 

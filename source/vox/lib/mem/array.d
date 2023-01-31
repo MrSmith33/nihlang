@@ -71,10 +71,11 @@ struct Array(T)
 		return copy;
 	}
 
-	void voidPut(ref VoxAllocator allocator, uint howMany)
+	T[] voidPut(ref VoxAllocator allocator, uint howMany)
 	{
 		if (_length + howMany > _capacity) extend(allocator, howMany);
 		_length += howMany;
+		return this[_length-howMany.._length];
 	}
 
 	void put(ref VoxAllocator allocator, T[] items...)

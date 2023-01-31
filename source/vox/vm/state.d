@@ -280,23 +280,43 @@ struct VmState {
 	}
 
 	// For VM users
-	void memWrite(T)(AllocId allocId, u32 offset, T value)
+	void memWrite(T)(AllocId dstMem, u32 offset, T value)
 		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
 	{
-		Memory* mem = &memories[allocId.kind];
-		Allocation* alloc = &mem.allocations[allocId.index];
+		Memory* mem = &memories[dstMem.kind];
+		Allocation* alloc = &mem.allocations[dstMem.index];
 		u8* memory = mem.memory[].ptr;
-		*cast(T*)(memory+alloc.offset+offset) = value;
+		*cast(T*)(memory + alloc.offset + offset) = value;
+	}
+
+	void memWritePtr(AllocId dstMem, u32 offset, AllocId ptrVal) {
+		Memory* mem = &memories[dstMem.kind];
+		Allocation* alloc = &mem.allocations[dstMem.index];
+		memWritePtr(mem, alloc, offset, ptrVal);
+	}
+
+	void memWritePtr(Memory* mem, Allocation* alloc, u32 offset, AllocId ptrVal) {
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+			if (ptrVal.isDefined)
+				alloc.relocations.put(*allocator, cast(u32)offset, ptrVal);
+			else
+				alloc.relocations.remove(*allocator, cast(u32)offset);
+		} else {
+			if (ptrVal.isDefined)
+				mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), ptrVal);
+			else
+				mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset));
+		}
 	}
 
 	// For VM users
-	T memRead(T)(AllocId allocId, u32 offset)
+	T memRead(T)(AllocId srcMem, u32 offset)
 		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
 	{
-		Memory* mem = &memories[allocId.kind];
-		Allocation* alloc = &mem.allocations[allocId.index];
+		Memory* mem = &memories[srcMem.kind];
+		Allocation* alloc = &mem.allocations[srcMem.index];
 		u8* memory = mem.memory[].ptr;
-		return *cast(T*)(memory+alloc.offset+offset);
+		return *cast(T*)(memory + alloc.offset + offset);
 	}
 
 	private void setTrap(VmStatus status, u64 data = 0) {

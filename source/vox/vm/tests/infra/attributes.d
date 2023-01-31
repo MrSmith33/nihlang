@@ -17,3 +17,10 @@ struct VmTestParam {
 	TestParamId id;
 	u32[] values;
 }
+
+enum TestParamId : u8 {
+	ptr_size,
+	instr,
+	memory,
+	user,
+}

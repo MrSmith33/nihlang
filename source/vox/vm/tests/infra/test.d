@@ -32,9 +32,3 @@ struct Test {
 		u32 value;
 	}
 }
-
-enum TestParamId : u8 {
-	ptr_size,
-	instr,
-	memory,
-}

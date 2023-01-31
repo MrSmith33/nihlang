@@ -66,6 +66,10 @@ struct VmTestContext {
 		}
 	}
 
+	void clearStack() {
+		vm.registers.clear;
+	}
+
 	AllocId staticAlloc(SizeAndAlign sizeAlign) {
 		return vm.memories[MemoryKind.static_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.static_mem);
 	}
