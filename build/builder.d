@@ -574,7 +574,9 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	void printCalleeOutput() {
 		auto stripped = result.output.strip;
 		if (stripped.empty) return;
-		stderr.writeln(stripped.lineSplitter.filter!(l => !l.empty).joiner("\n"));
+		foreach(line; stripped.lineSplitter.filter!(l => !l.empty)) {
+			stderr.writeln("  ", line);
+		}
 	}
 
 	if (result.status == 0) {

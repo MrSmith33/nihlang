@@ -3,6 +3,8 @@
 /// Authors: Andrey Penechko
 module vox.vm.tests.infra;
 
+public import vox.vm.tests.infra.attributes;
 public import vox.vm.tests.infra.context;
 public import vox.vm.tests.infra.runner;
 public import vox.vm.tests.infra.test;
+public import vox.vm.tests.infra.test_maker;
