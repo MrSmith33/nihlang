@@ -12,8 +12,7 @@ import vox.vm;
 struct VmState {
 	@nogc nothrow:
 
-	// 4 or 8
-	u8 ptrSize;
+	PtrSize ptrSize;
 	u8 readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_R;
 
 	bool isRunning = true;
@@ -60,8 +59,7 @@ struct VmState {
 	AllocId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
 		u32 index = functions.length;
 		functions.put(*allocator, VmFunction(code, numResults, numParameters, numLocalRegisters));
-		u32 generation = 0;
-		return AllocId(index, generation, MemoryKind.func_id);
+		return AllocId(index, MemoryKind.func_id);
 	}
 
 	void pushRegisters(u32 numRegisters) {
@@ -213,7 +211,7 @@ struct VmState {
 				}
 
 				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-				if (ptrSize == size) {
+				if (ptrSize.inBytes == size) {
 					// this can be a pointer load
 					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 						dst.pointer = alloc.relocations.get(cast(u32)offset);
@@ -260,7 +258,7 @@ struct VmState {
 				}
 
 				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-				if (ptrSize == size) {
+				if (ptrSize.inBytes == size) {
 					// this can be a pointer store
 					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 						if (src.pointer.isDefined)

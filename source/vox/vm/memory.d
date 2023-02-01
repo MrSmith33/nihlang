@@ -7,12 +7,12 @@ import vox.lib;
 
 @nogc nothrow:
 
-enum MEMORY_RELOCATIONS_PER_ALLOCATION = true;
+enum MEMORY_RELOCATIONS_PER_ALLOCATION = false;
 enum MEMORY_RELOCATIONS_PER_MEMORY = !MEMORY_RELOCATIONS_PER_ALLOCATION;
 
 struct AllocId {
 	@nogc nothrow:
-	this(u32 index, u32 generation, MemoryKind kind) {
+	this(u32 index, MemoryKind kind) {
 		this.payload = (index & ((1 << 30) - 1)) | (kind << 30);
 	}
 
@@ -32,8 +32,13 @@ struct AllocId {
 }
 
 struct Allocation {
+	// Start in parent Memory
 	u32 offset;
+	// Size in bytes
 	u32 size;
+	// How many pointers to this allocation exist in other allocations
+	// Pointers in registers do not increment the refcount
+	u32 refcount;
 	static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 		HashMap!(u32, AllocId, u32.max) relocations;
 	}
@@ -42,30 +47,42 @@ struct Allocation {
 struct Memory {
 	@nogc nothrow:
 
+	// Individual allocations
 	Array!Allocation allocations;
+	// Actual memory bytes
 	Array!u8 memory;
+	// 1 bit per pointer slot
+	// Pointers must be aligned in memory
+	// Each allocation is aligned at least to a pointer size
 	Array!u8 pointerBitmap;
+	// 1 bit per byte
+	// 1 means byte is initialized, 0 uninitialized
+	Array!u8 initBitmap;
+	// Stores pointer data for every pointer in memory
+	// This maps memory offset to AllocId
 	static if (MEMORY_RELOCATIONS_PER_MEMORY) {
 		HashMap!(u32, AllocId, u32.max) relocations;
 	}
+	// How many bytes are used out of memory.reserved bytes
 	u32 bytesUsed;
 
-	// ptrSize is 4 or 8
-	void reserve(ref VoxAllocator allocator, u32 size, u32 ptrSize) {
-		assert(ptrSize == 4 || ptrSize == 8, "Invalid ptr size");
+	void reserve(ref VoxAllocator allocator, u32 size, PtrSize ptrSize) {
 		memory.voidPut(allocator, size);
-		// 1 bit per pointer slot
-		// pointers must be aligned in memory
-		// each allocation is aligned at least to a pointer size
-		pointerBitmap.voidPut(allocator, size / (ptrSize * 8));
+		// By default no pointers are in memory
+		u8[] data1 = pointerBitmap.voidPut(allocator, size / ptrSize.inBits);
+		data1[] = 0;
+		// By default all bytes are uninitialized
+		u8[] data2 = initBitmap.voidPut(allocator, size / 8);
+		data2[] = 0;
 	}
 
 	void clear(ref VoxAllocator allocator) {
 		static if (MEMORY_RELOCATIONS_PER_MEMORY) {
 			relocations.clear;
 		} else {
-			foreach(ref alloc; allocations)
+			foreach(ref alloc; allocations) {
 				alloc.relocations.free(allocator);
+			}
 		}
 		allocations.clear;
 		bytesUsed = 0;
@@ -77,8 +94,7 @@ struct Memory {
 		bytesUsed += sizeAlign.size;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign.size));
-		u32 generation = 0;
-		return AllocId(index, generation, allocKind);
+		return AllocId(index, allocKind);
 	}
 }
 
@@ -115,4 +131,17 @@ enum MemFlags : u8 {
 	heap_RW   = 0b_0001_0001,
 	stack_RW  = 0b_0010_0010,
 	static_RW = 0b_0100_0100,
+}
+
+enum PtrSize : u8 {
+	_32 = 1,
+	_64 = 2,
+}
+
+u32 inBytes(PtrSize s) {
+	return s * 4;
+}
+
+u32 inBits(PtrSize s) {
+	return s * 32;
 }

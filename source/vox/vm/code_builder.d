@@ -5,6 +5,7 @@ module vox.vm.code_builder;
 
 import vox.lib;
 import vox.vm.opcode;
+import vox.vm.memory;
 
 @nogc nothrow:
 
@@ -89,15 +90,15 @@ struct CodeBuilder {
 		code.put(*allocator, src);
 	}
 
-	void emit_load_ptr(u8 ptrSize, u8 dst, u8 src) {
-		VmOpcode load_op = ptrSize == 4 ? VmOpcode.load_m32 : VmOpcode.load_m64;
+	void emit_load_ptr(PtrSize ptrSize, u8 dst, u8 src) {
+		VmOpcode load_op = ptrSize == PtrSize._32 ? VmOpcode.load_m32 : VmOpcode.load_m64;
 		code.put(*allocator, load_op);
 		code.put(*allocator, dst);
 		code.put(*allocator, src);
 	}
 
-	void emit_store_ptr(u8 ptrSize, u8 dst, u8 src) {
-		VmOpcode store_op = ptrSize == 4 ? VmOpcode.store_m32 : VmOpcode.store_m64;
+	void emit_store_ptr(PtrSize ptrSize, u8 dst, u8 src) {
+		VmOpcode store_op = ptrSize == PtrSize._32 ? VmOpcode.store_m32 : VmOpcode.store_m64;
 		code.put(*allocator, store_op);
 		code.put(*allocator, dst);
 		code.put(*allocator, src);

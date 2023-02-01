@@ -22,7 +22,7 @@ i32 runVmTests() {
 	VmState vm = {
 		allocator : &allocator,
 		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
-		ptrSize : 4,
+		ptrSize : PtrSize._32,
 	};
 
 	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);

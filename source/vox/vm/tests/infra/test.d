@@ -16,8 +16,8 @@ struct Test {
 	void function(ref VmTestContext) test_handler;
 	Array!Param parameters;
 
-	u8 ptrSize() {
-		return cast(u8)getParam(TestParamId.ptr_size);
+	PtrSize ptrSize() {
+		return cast(PtrSize)getParam(TestParamId.ptr_size);
 	}
 
 	u32 getParam(TestParamId id) {

@@ -77,9 +77,9 @@ void makeTest(ref VoxAllocator allocator, ref Array!Test tests, TestDefinition d
 	// Add ptr sizes
 	Array!u32 ptr_size_values;
 	if (def.attrPtrSize32 != def.attrPtrSize64) {
-		ptr_size_values.put(allocator, def.attrPtrSize32 ? 4 : 8);
+		ptr_size_values.put(allocator, def.attrPtrSize32 ? PtrSize._32 : PtrSize._64);
 	} else {
-		ptr_size_values.put(allocator, 4, 8);
+		ptr_size_values.put(allocator, PtrSize._32, PtrSize._64);
 		numPermutations *= 2;
 	}
 	parameters.put(allocator, Param(TestParamId.ptr_size, ptr_size_values));

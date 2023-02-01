@@ -37,12 +37,12 @@ void test_warmup(ref VmTestContext c) {
 
 @VmTest @TestPtrSize32
 void test_runner_32bit_ptr(ref VmTestContext c) {
-	assert(c.vm.ptrSize == 4);
+	assert(c.vm.ptrSize == PtrSize._32);
 }
 
 @VmTest @TestPtrSize64
 void test_runner_64bit_ptr(ref VmTestContext c) {
-	assert(c.vm.ptrSize == 8);
+	assert(c.vm.ptrSize == PtrSize._64);
 }
 
 
@@ -458,7 +458,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 		u64 val  = (val1 | val0) & sizeMask;
 
 		VmReg[] res = c.call(funcId, VmReg(memId, offset));
-		if (size == c.vm.ptrSize && offset == 0) {
+		if (size == c.vm.ptrSize.inBytes && offset == 0) {
 			// writefln("op %s size %s mem %s offset %s", op, size, memKind, offset);
 			assert(res[0] == VmReg(memId, val));
 		} else {
@@ -479,9 +479,9 @@ void test100(ref VmTestContext c) {
 	b.emit_ret();
 
 	AllocId funcId   = c.vm.addFunction(b.code, 1, 4, 0);
-	AllocId staticId = c.staticAlloc(SizeAndAlign(c.vm.ptrSize, 1));
-	AllocId heapId   = c.heapAlloc(SizeAndAlign(c.vm.ptrSize, 1));
-	AllocId stackId  = c.stackAlloc(SizeAndAlign(c.vm.ptrSize, 1));
+	AllocId staticId = c.staticAlloc(SizeAndAlign(c.vm.ptrSize.inBytes, 1));
+	AllocId heapId   = c.heapAlloc(SizeAndAlign(c.vm.ptrSize.inBytes, 1));
+	AllocId stackId  = c.stackAlloc(SizeAndAlign(c.vm.ptrSize.inBytes, 1));
 
 	VmReg[] res = c.call(funcId, VmReg(funcId), VmReg(staticId), VmReg(heapId), VmReg(stackId));
 	assert(res[0] == VmReg(heapId));

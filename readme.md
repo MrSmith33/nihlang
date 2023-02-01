@@ -64,6 +64,8 @@ Exploring ways of doing:
     - Individual units
     - Lang compiler tests
     - Backend tests
+    - VM tests
+  - Test coverage
   - Fuzzing
     - Entry points for various components
     - Backend (whole and each pass)
