@@ -85,4 +85,19 @@ struct VmTestContext {
 	AllocId genericMemAlloc(MemoryKind kind, SizeAndAlign sizeAlign) {
 		return vm.memories[kind].allocate(*vm.allocator, sizeAlign, kind);
 	}
+
+	// Assumes that non-pointer data was already written
+	void memWritePtr(AllocId dstMem, u32 offset, AllocId ptrVal) {
+		Memory* mem = &vm.memories[dstMem.kind];
+		Allocation* alloc = &mem.allocations[dstMem.index];
+		memWritePtr(mem, alloc, offset, ptrVal);
+	}
+
+	void memWritePtr(Memory* mem, Allocation* alloc, u32 offset, AllocId ptrVal) {
+		if (ptrVal.isDefined) {
+			vm.pointerPut(mem, alloc, offset, ptrVal);
+		} else {
+			vm.pointerRemove(mem, alloc, offset);
+		}
+	}
 }

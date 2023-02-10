@@ -54,6 +54,10 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 
 	/// Returns false if no value was deleted, true otherwise
 	bool remove(ref VoxAllocator allocator, Key key) {
+		Value existingValue;
+		return remove(allocator, key, existingValue);
+	}
+	bool remove(ref VoxAllocator allocator, Key key, out Value existingValue) {
 		if (_length == 0) return false;
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t searched_dib = 0;
@@ -67,6 +71,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 			++searched_dib;
 			index = (index + 1) & (_capacity - 1); // % capacity
 		}
+		existingValue = values[index];
 		while (true) { // Backward shift
 			size_t nextIndex = (index + 1) & (_capacity - 1); // % capacity
 			if (keyBuckets[nextIndex].empty) break; // Found stop bucket (empty)
@@ -209,7 +214,13 @@ mixin template HashMapImpl()
 	alias KeyT = Key;
 	alias ValueT = Value;
 
-	Value* put(ref VoxAllocator allocator, Key key, Value value)
+	Value* put(ref VoxAllocator allocator, Key key, Value value) {
+		Value oldValue;
+		return put(allocator, key, value, oldValue);
+	}
+
+	// Length will increase if we inserted new key, otherwise oldValue contains old value
+	Value* put(ref VoxAllocator allocator, Key key, Value value, out Value oldValue)
 	{
 		assert(KeyBucketT.isValidKey(key), "Invalid key");
 		if (_length == maxLength) extend(allocator);
@@ -217,6 +228,7 @@ mixin template HashMapImpl()
 		size_t inserted_dib = 0;
 		while (true) {
 			if (keyBuckets[index].key == key) { // same key
+				oldValue = values[index];
 				values[index] = value;
 				return &values[index];
 			}

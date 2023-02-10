@@ -29,6 +29,14 @@ struct AllocId {
 
 	bool isDefined() const { return payload != 0; }
 	bool isUndefined() const { return payload == 0; }
+
+	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
+		if (isDefined) {
+			sink.formattedWrite("%s%s", memoryKindLetter[kind], index);
+		} else {
+			sink("null");
+		}
+	}
 }
 
 struct Allocation {
@@ -55,7 +63,7 @@ struct Memory {
 	// Pointers must be aligned in memory
 	// Each allocation is aligned at least to a pointer size
 	Array!u8 pointerBitmap;
-	// 1 bit per byte
+	// 1 bit per byte in memory
 	// 1 means byte is initialized, 0 uninitialized
 	Array!u8 initBitmap;
 	// Stores pointer data for every pointer in memory
@@ -76,7 +84,7 @@ struct Memory {
 		data2[] = 0;
 	}
 
-	void clear(ref VoxAllocator allocator) {
+	void clear(ref VoxAllocator allocator, PtrSize ptrSize) {
 		static if (MEMORY_RELOCATIONS_PER_MEMORY) {
 			relocations.clear;
 		} else {

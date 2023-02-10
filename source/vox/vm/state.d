@@ -44,16 +44,20 @@ struct VmState {
 		frames.clear;
 		registers.clear;
 		foreach(ref mem; memories)
-			mem.clear(*allocator);
+			mem.clear(*allocator, ptrSize);
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 	}
 
-	bool isReadableMemory(MemoryKind kind) {
+	bool isMemoryReadable(MemoryKind kind) {
 		return cast(bool)(readWriteMask & (1 << kind));
 	}
 
-	bool isWritableMemory(MemoryKind kind) {
+	bool isMemoryWritable(MemoryKind kind) {
 		return cast(bool)(readWriteMask & (1 << (kind + 4)));
+	}
+
+	bool isMemoryRefcounted(MemoryKind kind) {
+		return kind < MemoryKind.func_id;
 	}
 
 	AllocId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
@@ -107,8 +111,8 @@ struct VmState {
 		isRunning = true;
 		status = VmStatus.OK;
 
-		writeln("---");
-		printRegs();
+		sink("---");
+		printRegs(sink);
 		while(isRunning) {
 			u32 ipCopy = frames.back.ip;
 			disasmOne(sink, frames.back.func.code[], ipCopy);
@@ -118,11 +122,12 @@ struct VmState {
 				format_vm_error(sink);
 				break;
 			}
-			printRegs();
+			printRegs(sink);
 		}
-		writeln("---");
+		sink("---");
 	}
 
+	// Invariant: when trap happens, VM state should remain as if instruction was not executed
 	void step() {
 		if(frames.length == 0) panic("step: Frame stack is empty");
 		VmFrame* frame = &frames.back();
@@ -192,7 +197,7 @@ struct VmState {
 				VmReg* src = &registers[srcIndex];
 
 				if (src.pointer.isUndefined) return setTrap(VmStatus.ERR_LOAD_NOT_PTR);
-				if (!isReadableMemory(src.pointer.kind)) return setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+				if (!isMemoryReadable(src.pointer.kind)) return setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
 
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
@@ -213,11 +218,7 @@ struct VmState {
 				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 				if (ptrSize.inBytes == size) {
 					// this can be a pointer load
-					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-						dst.pointer = alloc.relocations.get(cast(u32)offset);
-					} else {
-						dst.pointer = mem.relocations.get(cast(u32)(alloc.offset + offset));
-					}
+					dst.pointer = pointerGet(mem, alloc, cast(u32)offset);
 				} else {
 					dst.pointer = AllocId();
 				}
@@ -239,16 +240,16 @@ struct VmState {
 				VmReg* src = &registers[srcIndex];
 
 				if (dst.pointer.isUndefined) return setTrap(VmStatus.ERR_STORE_NOT_PTR);
-				if (!isWritableMemory(dst.pointer.kind)) return setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+				if (!isMemoryWritable(dst.pointer.kind)) return setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
 
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
-				u8* memory = mem.memory[].ptr;
 
 				i64 offset = dst.as_s64;
 				if (offset < 0) return setTrap(VmStatus.ERR_LOAD_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_STORE_OOB);
 
+				u8* memory = mem.memory[].ptr;
 				switch(op) {
 					case store_m8:  *cast( u8*)(memory+alloc.offset+offset) = src.as_u8; break;
 					case store_m16: *cast(u16*)(memory+alloc.offset+offset) = src.as_u16; break;
@@ -260,21 +261,48 @@ struct VmState {
 				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 				if (ptrSize.inBytes == size) {
 					// this can be a pointer store
-					static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-						if (src.pointer.isDefined)
-							alloc.relocations.put(*allocator, cast(u32)offset, src.pointer);
-						else
-							alloc.relocations.remove(*allocator, cast(u32)offset);
-					} else {
-						if (src.pointer.isDefined)
-							mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), src.pointer);
-						else
-							mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset));
-					}
+					if (src.pointer.isDefined)
+						pointerPut(mem, alloc, cast(u32)offset, src.pointer);
+					else
+						pointerRemove(mem, alloc, cast(u32)offset);
 				}
 				frame.ip += 3;
 				return;
 		}
+	}
+
+	private void setTrap(VmStatus status, u64 data = 0) {
+		isRunning = false;
+		this.status = status;
+		this.errData = data;
+	}
+
+	AllocId pointerGet(Memory* mem, Allocation* alloc, u32 offset) {
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+			return alloc.relocations.get(offset);
+		} else {
+			return mem.relocations.get(cast(u32)(alloc.offset + offset));
+		}
+	}
+
+	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
+		AllocId oldPtr;
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+			alloc.relocations.put(*allocator, cast(u32)offset, value, oldPtr);
+		} else {
+			mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
+		}
+		return oldPtr;
+	}
+
+	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
+		AllocId oldPtr;
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+			alloc.relocations.remove(*allocator, cast(u32)offset, oldPtr);
+		} else {
+			mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset), oldPtr);
+		}
+		return oldPtr;
 	}
 
 	// For VM users
@@ -287,49 +315,29 @@ struct VmState {
 		*cast(T*)(memory + alloc.offset + offset) = value;
 	}
 
-	void memWritePtr(AllocId dstMem, u32 offset, AllocId ptrVal) {
-		Memory* mem = &memories[dstMem.kind];
-		Allocation* alloc = &mem.allocations[dstMem.index];
-		memWritePtr(mem, alloc, offset, ptrVal);
-	}
-
-	void memWritePtr(Memory* mem, Allocation* alloc, u32 offset, AllocId ptrVal) {
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-			if (ptrVal.isDefined)
-				alloc.relocations.put(*allocator, cast(u32)offset, ptrVal);
-			else
-				alloc.relocations.remove(*allocator, cast(u32)offset);
-		} else {
-			if (ptrVal.isDefined)
-				mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), ptrVal);
-			else
-				mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset));
-		}
-	}
-
 	// For VM users
-	T memRead(T)(AllocId srcMem, u32 offset)
+	T memRead(T)(Memory* mem, Allocation* alloc, u32 offset)
 		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
 	{
-		Memory* mem = &memories[srcMem.kind];
-		Allocation* alloc = &mem.allocations[srcMem.index];
 		u8* memory = mem.memory[].ptr;
 		return *cast(T*)(memory + alloc.offset + offset);
 	}
 
-	private void setTrap(VmStatus status, u64 data = 0) {
-		isRunning = false;
-		this.status = status;
-		this.errData = data;
+	// no OOB check
+	u64 memReadPtrSize(Memory* mem, Allocation* alloc, u32 offset) {
+		final switch(ptrSize) {
+			case PtrSize._32: return memRead!u32(mem, alloc, offset);
+			case PtrSize._64: return memRead!u64(mem, alloc, offset);
+		}
 	}
 
-	void printRegs() {
-		write("     [");
+	void printRegs(scope SinkDelegate sink) {
+		sink("     [");
 		foreach(i, reg; registers) {
-			if (i > 0) write(", ");
-			write(reg);
+			if (i > 0) sink(", ");
+			sink.formatValue(reg);
 		}
-		writeln("]");
+		sink("]\n");
 	}
 
 	void format_vm_error(scope SinkDelegate sink) {

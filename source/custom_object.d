@@ -28,6 +28,16 @@ extern(C) void* _memset32(void* dst, uint val, size_t len) {
 }
 
 version(DigitalMars)
+extern(C) void* _memset64(void* dst, ulong val, size_t len) {
+	void* dstCopy = dst;
+	for (; len > 0; --len) {
+		*cast(ulong*)dst = val;
+		dst += 8;
+	}
+	return dstCopy;
+}
+
+version(DigitalMars)
 extern(C) void* _memsetn(void* dst, void* val, int len, size_t elemsz) {
 	void* dstCopy = dst;
 	for (; len; --len) {

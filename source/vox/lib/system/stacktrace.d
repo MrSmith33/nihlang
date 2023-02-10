@@ -64,9 +64,9 @@ void simpleNamedStackTrace(u32 bottomFramesToSkip = 0, u32 topFramesToSkip = 0) 
 			IMAGEHLP_LINEA64 line;
 
 			if (SymGetLineFromAddr64(hProcess, cast(u64)pc, &disp, &line)) {
-				writefln("- %s at %s:%s:%s", Demangler(symbol.Name.ptr[0..symbol.NameLen]), line.FileName.fromStringz, line.LineNumber, disp);
+				writefln("  %s at %s:%s:%s", Demangler(symbol.Name.ptr[0..symbol.NameLen]), line.FileName.fromStringz, line.LineNumber, disp);
 			} else {
-				writefln("- %s", Demangler(symbol.Name.ptr[0..symbol.NameLen]));
+				writefln("  %s", Demangler(symbol.Name.ptr[0..symbol.NameLen]));
 			}
 		} else {
 			writefln("%X", pc);

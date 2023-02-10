@@ -281,20 +281,6 @@ void test_const_s8_4(ref VmTestContext c) {
 
 
 @VmTest
-void test_load_m8_0(ref VmTestContext c) {
-	// Test load_m8
-	AllocId staticId = c.staticAlloc(SizeAndAlign(1, 1));
-	c.vm.memWrite!u8(staticId, 0, 42);
-
-	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_load_m8(0, 1);
-	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
-	VmReg[] res = c.call(funcId, VmReg(staticId));
-	assert(res[0] == VmReg(42));
-}
-
-@VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_0(ref VmTestContext c) {
 	// Test load_mXX OOB dst register
@@ -443,7 +429,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
 	c.vm.memWrite!u64(memId, 0, value0); // make memory initialized
 	c.vm.memWrite!u64(memId, 8, value1); // make memory initialized
-	c.vm.memWritePtr(memId, 0, memId);
+	c.memWritePtr(memId, 0, memId);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
