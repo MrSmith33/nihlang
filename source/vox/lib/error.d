@@ -13,6 +13,7 @@ noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line 
 	writef(fmt, args);
 	writeln;
 	version(Windows) {
+		writeln("Stack trace:");
 		import vox.lib.stacktrace : simpleNamedStackTrace;
 		simpleNamedStackTrace(3,2);
 	}

@@ -9,8 +9,8 @@ import vox.vm.tests.infra;
 
 @nogc nothrow:
 
-void vmTests(ref VoxAllocator allocator, ref Array!Test tests) {
-	return collectTests!(vox.vm.tests.tests)(allocator, tests);
+void vmTests(ref VoxAllocator allocator, ref TestSuite suite) {
+	return collectTests!(vox.vm.tests.tests)(allocator, suite);
 }
 
 // Test ideas:

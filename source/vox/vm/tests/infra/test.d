@@ -11,10 +11,25 @@ import vox.vm.tests.infra;
 
 @nogc nothrow:
 
+struct TestSuite {
+	Array!TestDefinition definitions;
+	// test permutations
+	Array!Test tests;
+	TestFilter filter;
+}
+
 struct Test {
 	@nogc nothrow:
+
 	void function(ref VmTestContext) test_handler;
 	Array!Param parameters;
+	string name;
+	// Index into TestSuite.definitions
+	u32 definition;
+	// index of permutation within this test 0..n
+	u32 permutation;
+	// Index into TestSuite.tests
+	u32 index;
 
 	PtrSize ptrSize() {
 		return cast(PtrSize)getParam(TestParamId.ptr_size);
@@ -31,4 +46,15 @@ struct Test {
 		TestParamId id;
 		u32 value;
 	}
+}
+
+struct TestFilter {
+	@nogc nothrow:
+
+	bool enabled = false;
+	bool shouldRun(ref Test test) {
+		return definition == test.definition;
+	}
+
+	u32 definition;
 }

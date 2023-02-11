@@ -14,52 +14,48 @@ import vox.vm.tests.tests;
 
 i32 runVmTests() {
 	VoxAllocator allocator;
+	auto context = VmTestContext(allocator, stdoutSink);
 
-	enum static_bytes = 64*1024;
-	enum heap_bytes = 64*1024;
-	enum stack_bytes = 64*1024;
+	TestSuite suite;
+	vox.vm.tests.tests.vmTests(allocator, suite);
 
-	VmState vm = {
-		allocator : &allocator,
-		readWriteMask : MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW,
-		ptrSize : PtrSize._32,
-	};
+	if (suite.filter.enabled) {
+		u32 numTests;
+		writefln("Running %s tests with filter", suite.tests.length);
+		MonoTime start = currTime;
+		foreach(ref test; suite.tests) {
+			if (suite.filter.shouldRun(test)) {
+				++numTests;
+				runSingleTest(context, test);
+			}
+		}
+		MonoTime end = currTime;
+		writefln("Done %s/%s tests in %s", numTests, suite.tests.length, end - start);
+		return 0;
+	}
 
-	vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
-
-	auto context = VmTestContext(&vm, stdoutSink);
-
-	Array!Test tests;
-	vox.vm.tests.tests.vmTests(allocator, tests);
-
-	writefln("Running %s tests", tests.length);
+	writefln("Running %s tests", suite.tests.length);
 
 	// Warmup (first run does all the allocations and memory faults)
-	if (tests.length) {
-		runSingleTest(context, tests[0]);
-		runSingleTest(context, tests[0]);
-		runSingleTest(context, tests[0]);
+	if (suite.tests.length) {
+		runSingleTest(context, suite.tests[0]);
+		runSingleTest(context, suite.tests[0]);
+		runSingleTest(context, suite.tests[0]);
 	}
 	// End warmup
 
 	MonoTime start = currTime;
-
-	foreach(ref test; tests) {
+	foreach(ref test; suite.tests) {
 		runSingleTest(context, test);
 	}
-
 	MonoTime end = currTime;
-
-	writefln("Done %s tests in %s", tests.length, end - start);
+	writefln("Done %s tests in %s", suite.tests.length, end - start);
 
 	return 0;
 }
 
 void runSingleTest(ref VmTestContext c, ref Test test) {
-	c.vm.reset;
-	c.test = test;
-	c.vm.ptrSize = test.ptrSize;
-	c.vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
+	c.prepareForTest(test);
 	//writef("-- test");
 	//foreach(ref param; test.parameters) {
 	//	writef(" (%s %s)", param.id, param.value);

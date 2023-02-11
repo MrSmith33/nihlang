@@ -13,9 +13,30 @@ import vox.vm.tests.infra;
 
 struct VmTestContext {
 	@nogc nothrow:
-	VmState* vm;
+	VmState vm;
 	SinkDelegate sink;
 	Test test;
+
+	this(ref VoxAllocator allocator, SinkDelegate _sink) {
+		vm.allocator = &allocator;
+		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
+		vm.ptrSize = PtrSize._32;
+
+		enum static_bytes = 64*1024;
+		enum heap_bytes = 64*1024;
+		enum stack_bytes = 64*1024;
+		vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
+
+		sink = _sink;
+	}
+
+	// Called before each test
+	void prepareForTest(ref Test _test) {
+		vm.reset;
+		test = _test;
+		vm.ptrSize = test.ptrSize;
+		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
+	}
 
 	private VmFunction* setupCall(AllocId funcId, VmReg[] params) {
 		if(funcId.index >= vm.functions.length) {

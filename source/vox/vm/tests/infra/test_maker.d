@@ -11,28 +11,35 @@ import vox.vm.tests.infra;
 
 @nogc nothrow:
 
-void collectTests(alias M)(ref VoxAllocator allocator, ref Array!Test tests) {
+void collectTests(alias M)(ref VoxAllocator allocator, ref TestSuite suite) {
 	import std.traits : hasUDA;
-	Array!TestDefinition defs;
 	foreach(m; __traits(allMembers, M))
 	{
 		alias member = __traits(getMember, M, m);
 		static if (hasUDA!(member, VmTest)) {
-			defs.put(allocator, TestDefinition.init);
-			gatherTestDefinition!member(allocator, defs.back);
+			suite.definitions.put(allocator, TestDefinition.init);
+			gatherTestDefinition!member(allocator, suite.definitions.back);
 		}
 	}
-	foreach(ref d; defs) makeTest(allocator, tests, d);
+	foreach(u32 i, ref d; suite.definitions) {
+		d.index = i;
+		makeTest(allocator, suite, d);
+	}
 }
 
 // This must be as small as possible, otherwise compile times are to big
 void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefinition def) {
+	def.name = __traits(identifier, test);
+	def.file = __traits(getLocation, test)[0];
+	def.line = __traits(getLocation, test)[1];
 	def.test_handler = &test;
 	foreach (attr; __traits(getAttributes, test)) {
 		static if (is(attr == TestPtrSize32)) {
 			def.attrPtrSize32 = true;
 		} else static if (is(attr == TestPtrSize64)) {
 			def.attrPtrSize64 = true;
+		} else static if (is(attr == VmTestOnly)) {
+			def.onlyThis = true;
 		} else static if (is(typeof(attr) == VmTestParam)) {
 			static __gshared u32[] attr_values = attr.values;
 			def.parameters.put(allocator, TestDefinition.Param(attr.id, attr_values));
@@ -42,18 +49,33 @@ void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefini
 
 struct TestDefinition {
 	@nogc nothrow:
+	string name;
+	string file;
+	u32 line;
+	u32 index;
 	static struct Param {
 		TestParamId id;
 		u32[] values;
 	}
 	bool attrPtrSize32;
 	bool attrPtrSize64;
+	bool onlyThis;
 	Array!Param parameters;
 	void function(ref VmTestContext) test_handler;
 }
 
-void makeTest(ref VoxAllocator allocator, ref Array!Test tests, TestDefinition def) {
-	Test res;
+void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
+	if (def.onlyThis) {
+		if (suite.filter.enabled) {
+			auto otherDef = suite.definitions[suite.filter.definition];
+			panic("VmTestOnly attribute found in multiple places:\n  %s at %s:%s\n  %s at %s:%s\n",
+				otherDef.name, otherDef.file, otherDef.line,
+				def.name, def.file, def.line);
+		}
+		suite.filter.definition = def.index;
+		suite.filter.enabled = true;
+	}
+
 	u32 numPermutations = 1;
 
 	static struct Param {
@@ -63,6 +85,7 @@ void makeTest(ref VoxAllocator allocator, ref Array!Test tests, TestDefinition d
 	}
 
 	Array!Param parameters;
+	scope(exit) parameters.free(allocator);
 
 	foreach(ref p; def.parameters) {
 		// skip empty parameters
@@ -101,10 +124,14 @@ void makeTest(ref VoxAllocator allocator, ref Array!Test tests, TestDefinition d
 		//writeln;
 
 		Test t = {
+			name : def.name,
+			definition : def.index,
+			permutation : numPermutations - 1,
+			index : suite.tests.length,
 			test_handler : def.test_handler,
 			parameters : testParameters,
 		};
-		tests.put(allocator, t);
+		suite.tests.put(allocator, t);
 
 		// increment
 		foreach(ref param; parameters) {
