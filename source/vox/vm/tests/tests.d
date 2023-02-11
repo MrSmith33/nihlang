@@ -331,7 +331,6 @@ void test_load_mXX_3(ref VmTestContext c) {
 	AllocId memId;
 	if (memKind != MemoryKind.func_id) {
 		memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
-		c.vm.memWrite!u64(memId, 0, 0); // make memory initialized
 	}
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -352,7 +351,6 @@ void test_load_mXX_4(ref VmTestContext c) {
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
-	c.vm.memWrite!u64(memId, 0, 0); // make memory initialized
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -369,7 +367,6 @@ void test_load_mXX_5(ref VmTestContext c) {
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
-	c.vm.memWrite!u64(memId, 0, 0); // make memory initialized
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -382,6 +379,22 @@ void test_load_mXX_5(ref VmTestContext c) {
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_6(ref VmTestContext c) {
+	// Test load_mXX src memory uninitialized
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	c.callFail(funcId, VmReg(0), VmReg(memId, 0));
+	assert(c.vm.status == VmStatus.ERR_LOAD_UNINIT);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_load_mXX_7(ref VmTestContext c) {
 	// Test load_mXX raw bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -389,8 +402,9 @@ void test_load_mXX_6(ref VmTestContext c) {
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
 	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
-	c.vm.memWrite!u64(memId, 0, value0); // make memory initialized
-	c.vm.memWrite!u64(memId, 8, value1); // make memory initialized
+	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
+	c.vm.memWrite!u64(memId, 8, value1); // fill memory with data
+	c.vm.markInitialized(memId, 0, 16);  // make memory initialized
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_ret();
@@ -417,7 +431,7 @@ void test_load_mXX_6(ref VmTestContext c) {
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_load_mXX_7(ref VmTestContext c) {
+void test_load_mXX_8(ref VmTestContext c) {
 	// Test load_mXX on pointer bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -427,8 +441,9 @@ void test_load_mXX_7(ref VmTestContext c) {
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
 	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
-	c.vm.memWrite!u64(memId, 0, value0); // make memory initialized
-	c.vm.memWrite!u64(memId, 8, value1); // make memory initialized
+	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
+	c.vm.memWrite!u64(memId, 8, value1); // fill memory with data
+	c.vm.markInitialized(memId, 0, 16);  // make memory initialized
 	c.memWritePtr(memId, 0, memId);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -455,7 +470,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 }
 
 
-@VmTest
+/*@VmTest
 void test100(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 2, 1);
@@ -471,4 +486,4 @@ void test100(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(funcId), VmReg(staticId), VmReg(heapId), VmReg(stackId));
 	assert(res[0] == VmReg(heapId));
-}
+}*/

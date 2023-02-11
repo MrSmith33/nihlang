@@ -207,6 +207,10 @@ struct VmState {
 				if (offset < 0) return setTrap(VmStatus.ERR_LOAD_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_LOAD_OOB);
 
+				size_t* initBits = cast(size_t*)&mem.initBitmap.front();
+				size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
+				if (numInitedBytes != size) return setTrap(VmStatus.ERR_LOAD_UNINIT);
+
 				switch(op) {
 					case load_m8:  dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset); break;
 					case load_m16: dst.as_u64 = *cast(u16*)(memory + alloc.offset + offset); break;
@@ -315,6 +319,12 @@ struct VmState {
 		*cast(T*)(memory + alloc.offset + offset) = value;
 	}
 
+	void markInitialized(AllocId dstMem, u32 offset, u32 size) {
+		Memory* mem = &memories[dstMem.kind];
+		Allocation* alloc = &mem.allocations[dstMem.index];
+		mem.markInitBits(alloc.offset + offset, size, true);
+	}
+
 	// For VM users
 	T memRead(T)(Memory* mem, Allocation* alloc, u32 offset)
 		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))
@@ -338,6 +348,53 @@ struct VmState {
 			sink.formatValue(reg);
 		}
 		sink("]\n");
+	}
+
+	void printMem(scope SinkDelegate sink, AllocId allocId, u32 offset, u32 length, u32 bytesPerLine = 16, u32 indentation = 0) {
+		static immutable char[16] spaces = ' ';
+
+		static void printIndent(scope SinkDelegate sink, u32 indentation) {
+			while(indentation > spaces.length) {
+				sink(spaces);
+				indentation -= spaces.length;
+			}
+			if (indentation) sink(spaces[0..indentation]);
+		}
+
+		printIndent(sink, indentation);
+		sink.formattedWrite("Memory %s, %X..%X, %s bytes\n", allocId, offset, offset+length, length);
+
+		Memory* mem = &memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		u8[] bytes = mem.memory[offset..offset+length];
+		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
+
+		size_t index = 0;
+
+		if (bytesPerLine) {
+			while (index + bytesPerLine <= bytes.length) {
+				printIndent(sink, indentation);
+				foreach(i, b; bytes[index..index+bytesPerLine]) {
+					if (getBitAt(initBits, index+i))
+						sink.formattedWrite("%02X ", b);
+					else
+						sink("?? ");
+				}
+				sink("\n");
+				index += bytesPerLine;
+			}
+		}
+
+		if (index < bytes.length) {
+			printIndent(sink, indentation);
+			foreach(i, b; bytes[index..$]) {
+				if (getBitAt(initBits, index+i))
+					sink.formattedWrite("%02X ", b);
+				else
+					sink("?? ");
+			}
+			sink("\n");
+		}
 	}
 
 	void format_vm_error(scope SinkDelegate sink) {
@@ -413,7 +470,7 @@ struct VmState {
 
 				u64 offset = dst.as_u64;
 
-				sink.formattedWrite("Writing past the end of the allocation (r%s:%s).\nWriting %s bytes at offset %s, to allocation of %s bytes\n",
+				sink.formattedWrite("Writing past the end of the allocation (r%s:%s)\nWriting %s bytes at offset %s, to allocation of %s bytes\n",
 					code[frame.ip+1], *dst,
 					size,
 					offset,
@@ -429,11 +486,28 @@ struct VmState {
 
 				u64 offset = src.as_u64;
 
-				sink.formattedWrite("Reading past the end of the allocation (r%s:%s).\nReading %s bytes at offset %s, from allocation of %s bytes\n",
+				sink.formattedWrite("Reading past the end of the allocation (r%s:%s)\nReading %s bytes at offset %s, from allocation of %s bytes\n",
 					code[frame.ip+2], *src,
 					size,
 					offset,
 					alloc.size);
+				break;
+
+			case ERR_LOAD_UNINIT:
+				u8 op = code[frame.ip+0];
+				u32 size = 1 << (op - VmOpcode.load_m8);
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				Memory* mem = &memories[src.pointer.kind];
+				Allocation* alloc = &mem.allocations[src.pointer.index];
+
+				u64 offset = src.as_u64;
+
+				sink.formattedWrite("Reading uninitialized memory from allocation (r%s:%s)\n  Reading %s bytes at offset %s\n",
+					code[frame.ip+2], *src,
+					size,
+					offset);
+
+				printMem(sink, src.pointer, cast(u32)offset, size, 16, 2);
 				break;
 		}
 	}
@@ -450,6 +524,7 @@ enum VmStatus : u8 {
 	ERR_LOAD_NOT_PTR,
 	ERR_STORE_OOB,
 	ERR_LOAD_OOB,
+	ERR_LOAD_UNINIT,
 }
 
 struct VmFunction {

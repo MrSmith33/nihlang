@@ -92,6 +92,7 @@ struct Memory {
 				alloc.relocations.free(allocator);
 			}
 		}
+		markInitBits(0, bytesUsed, false);
 		allocations.clear;
 		bytesUsed = 0;
 	}
@@ -103,6 +104,11 @@ struct Memory {
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign.size));
 		return AllocId(index, allocKind);
+	}
+
+	void markInitBits(u32 offset, u32 size, bool value) {
+		size_t* ptr = cast(size_t*)&initBitmap.front();
+		setBitRange(ptr, offset, offset+size, value);
 	}
 }
 

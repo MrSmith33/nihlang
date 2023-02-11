@@ -21,8 +21,8 @@ void collectTests(alias M)(ref VoxAllocator allocator, ref TestSuite suite) {
 			gatherTestDefinition!member(allocator, suite.definitions.back);
 		}
 	}
-	foreach(u32 i, ref d; suite.definitions) {
-		d.index = i;
+	foreach(i, ref d; suite.definitions) {
+		d.index = cast(u32)i;
 		makeTest(allocator, suite, d);
 	}
 }

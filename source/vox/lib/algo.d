@@ -135,6 +135,19 @@ int resetBitAt(size_t* p, size_t bitnum) pure @system {
 }
 
 
+version(LDC)
+pragma(LDC_intrinsic, "llvm.ctpop.i#")
+T _popcnt(T)(T src) pure if (__traits(isIntegral, T));
+
+version (DigitalMars) {
+	import core.bitop : _popcnt;
+}
+
+pragma(inline, true)
+int popcnt(size_t x) pure {
+	return cast(int)_popcnt(x);
+}
+
 // end is exclusive
 void setBitRange(size_t* ptr, size_t from, size_t to, bool val) {
 	enum BITS_PER_SLOT = size_t.sizeof * 8;
@@ -173,6 +186,48 @@ void setBitRange(size_t* ptr, size_t from, size_t to, bool val) {
 		if (val) ptr[toSlot] |=  toSlotMask;
 		else     ptr[toSlot] &= ~toSlotMask;
 	}
+}
+
+// counts set bits in a range of bits
+size_t popcntBitRange(size_t* ptr, size_t from, size_t to) {
+	enum BITS_PER_SLOT = size_t.sizeof * 8;
+
+	size_t fromBit  = from % BITS_PER_SLOT;
+	size_t toBit    =   to % BITS_PER_SLOT;
+
+	size_t fromSlot = from / BITS_PER_SLOT;
+	size_t toSlot   =   to / BITS_PER_SLOT;
+
+	// All bits are in the same size_t slot
+	if (fromSlot == toSlot) {
+		size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+		size_t toSlotMask =    (size_t(1) << toBit) - 1;
+		size_t mask = fromSlotMask & toSlotMask;
+
+		return popcnt(ptr[fromSlot] & mask);
+	}
+
+	size_t count = 0;
+
+	// Incomplete slot at the beginning
+	if (fromBit != 0) {
+		size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+		count = popcnt(ptr[fromSlot] & fromSlotMask);
+		++fromSlot;
+	}
+
+	// Range of full slots can be counted faster
+	foreach(size_t slot; ptr[fromSlot .. toSlot]) {
+		count += popcnt(slot);
+	}
+
+	// Incomplete slot at the end
+	if (toBit != 0) {
+		size_t toSlotMask = (size_t(1) << toBit) - 1;
+		count += popcnt(ptr[fromSlot] & toSlotMask);
+	}
+
+	return count;
 }
 
 

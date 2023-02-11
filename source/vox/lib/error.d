@@ -9,7 +9,7 @@ noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line 
 	import vox.lib.io : writefln, writef, writeln;
 	import vox.lib.system.entrypoint : vox_exit_process;
 	//writefln("\033[1;31mPanic:\033[0m %s:%s", file, line);
-	writefln("Panic: %s:%s", file, line);
+	writefln("Panic at %s:%s", file, line);
 	writef(fmt, args);
 	writeln;
 	version(Windows) {

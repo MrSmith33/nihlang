@@ -67,11 +67,17 @@ struct VmTestContext {
 		// vm.runVerbose(sink);
 
 		if (vm.status != VmStatus.OK) {
-			u32 ipCopy = vm.frames.back.ip;
-			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
-			sink("Error: ");
+			sink("  ---\n");
+			sink.formattedWrite("  Test %s failed\n", test.name);
+			sink("  Function expected to finish successfully\n");
+			sink("  ");
 			vm.format_vm_error(sink);
-			panic("Function expected to finish successfully");
+			u32 ipCopy = vm.frames.back.ip;
+			sink("  ---\n");
+			sink("  ");
+			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
+			sink("  ---\n");
+			panic("  Function expected to finish successfully");
 		}
 
 		if(vm.registers.length != func.numResults) panic("Function with %s results returned %s results.", func.numResults, vm.registers.length);
