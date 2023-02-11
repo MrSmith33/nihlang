@@ -250,7 +250,7 @@ struct VmState {
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 
 				i64 offset = dst.as_s64;
-				if (offset < 0) return setTrap(VmStatus.ERR_LOAD_OOB);
+				if (offset < 0) return setTrap(VmStatus.ERR_STORE_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_STORE_OOB);
 
 				u8* memory = mem.memory[].ptr;
@@ -270,6 +270,10 @@ struct VmState {
 					else
 						pointerRemove(mem, alloc, cast(u32)offset);
 				}
+
+				// mark bytes as initialized
+				mem.markInitBits(cast(u32)(alloc.offset + offset), size, true);
+
 				frame.ip += 3;
 				return;
 		}

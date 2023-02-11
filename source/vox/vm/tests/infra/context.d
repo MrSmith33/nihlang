@@ -127,4 +127,17 @@ struct VmTestContext {
 			vm.pointerRemove(mem, alloc, offset);
 		}
 	}
+
+	void setAllocInitBits(AllocId allocId, bool value) {
+		Memory* mem = &vm.memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		mem.markInitBits(alloc.offset, alloc.size, value);
+	}
+
+	size_t countAllocInitBits(AllocId allocId) {
+		Memory* mem = &vm.memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
+		return popcntBitRange(initBits, alloc.offset, alloc.offset + alloc.size);
+	}
 }

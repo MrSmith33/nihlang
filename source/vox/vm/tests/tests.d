@@ -470,6 +470,134 @@ void test_load_mXX_8(ref VmTestContext c) {
 }
 
 
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+void test_store_mXX_0(ref VmTestContext c) {
+	// Test store_mXX OOB dst register
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 0);
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_REGISTER_OOB);
+	assert(c.vm.errData == 0); // r0
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+void test_store_mXX_1(ref VmTestContext c) {
+	// Test store_mXX OOB src register
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 1);
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_REGISTER_OOB);
+	assert(c.vm.errData == 1); // r1
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+void test_store_mXX_2(ref VmTestContext c) {
+	// Test store_mXX dst pointer undefined
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	c.callFail(funcId, VmReg(0), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_STORE_NOT_PTR);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem, MemoryKind.func_id])
+void test_store_mXX_3(ref VmTestContext c) {
+	// Test store_mXX dst memory is not writable
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId;
+	if (memKind != MemoryKind.func_id) {
+		memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	}
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	if (memKind == MemoryKind.func_id) memId = funcId;
+	c.vm.readWriteMask = 0; // everything is non-writable
+	c.callFail(funcId, VmReg(memId), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_4(ref VmTestContext c) {
+	// Test store_mXX dst memory offset is negative
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	c.callFail(funcId, VmReg(memId, -1), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_5(ref VmTestContext c) {
+	// Test store_mXX dst memory offset is too big
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
+}
+
+@VmTest
+@VmTestParam(TestParamId.user, [0, 1, 2, 3])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_6(ref VmTestContext c) {
+	// Test store_mXX raw bytes with offset from 0 to 8
+	// Check that init bits are set
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	u32 param = c.test.getParam(TestParamId.user);
+	u32 size = 1 << param;
+	u64 sizeMask = bitmask(1 << param+3);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+	VmOpcode store_op = cast(VmOpcode)(VmOpcode.store_m8 + param);
+	VmOpcode load_op = cast(VmOpcode)(VmOpcode.load_m8 + param);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(store_op, 1, 2);
+	b.emit_binop(load_op, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+
+	foreach(offset; 0..9) {
+		VmReg[] res = c.call(funcId, VmReg(memId, offset), VmReg(value));
+		// should not init unrelated bytes
+		assert(c.countAllocInitBits(memId) == size);
+		assert(res[0] == VmReg(value & sizeMask));
+
+		// mark whole allocation as uninitialized
+		c.setAllocInitBits(memId, false);
+		c.clearStack;
+	}
+}
+
+
 /*@VmTest
 void test100(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
