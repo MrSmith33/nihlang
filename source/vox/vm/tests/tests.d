@@ -15,6 +15,8 @@ void vmTests(ref VoxAllocator allocator, ref TestSuite suite) {
 
 // Test ideas:
 // - What if the same register/memory is used multiple times in an instruction
+// - Check that state is not changed on trap
+//   - Memory init bits are not changed on trapped store
 
 
 @VmTest @TestPtrSize64
@@ -594,6 +596,29 @@ void test_store_mXX_6(ref VmTestContext c) {
 		// mark whole allocation as uninitialized
 		c.setAllocInitBits(memId, false);
 		c.clearStack;
+	}
+}
+
+@VmTest
+//@VmTestOnly
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_7(ref VmTestContext c) {
+	// Test store_mXX of pointers to unaligned address
+	VmOpcode store_op = cast(VmOpcode)(VmOpcode.store_m32 + c.vm.ptrSize.as_u32);
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(store_op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
+
+	foreach(offset; 1..c.vm.ptrSize.inBytes) {
+		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
+		assert(c.vm.status == VmStatus.ERR_STORE_PTR_UNALIGNED);
+
+		// memory was not touched by unsuccessful store
+		assert(c.countAllocInitBits(memId) == 0);
 	}
 }
 

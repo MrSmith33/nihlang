@@ -73,8 +73,7 @@ struct VmTestContext {
 			sink("  ");
 			vm.format_vm_error(sink);
 			u32 ipCopy = vm.frames.back.ip;
-			sink("  ---\n");
-			sink("  ");
+			sink("\n  ---\n  ");
 			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
 			sink("  ---\n");
 			panic("  Function expected to finish successfully");
@@ -88,9 +87,16 @@ struct VmTestContext {
 	void callFail(AllocId funcId, VmReg[] params...) {
 		setupCall(funcId, params);
 		vm.run();
+		//vm.runVerbose(sink);
 		if (vm.status == VmStatus.OK) {
 			panic("Function expected to trap");
 		}
+		//vm.format_vm_error(sink);
+		//sink("\n  ---\n  ");
+		//u32 ipCopy = vm.frames.back.ip;
+		//disasmOne(sink, vm.frames.back.func.code[], ipCopy);
+		//sink("  ---\n");
+		clearStack;
 	}
 
 	void clearStack() {

@@ -8,6 +8,8 @@ import vox.vm;
 
 @nogc nothrow:
 
+version = CONSISTENCY_CHECKS;
+
 
 struct VmState {
 	@nogc nothrow:
@@ -220,7 +222,7 @@ struct VmState {
 				}
 
 				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-				if (ptrSize.inBytes == size) {
+				if (ptrSize.inBytes == size && offset % size == 0) {
 					// this can be a pointer load
 					dst.pointer = pointerGet(mem, alloc, cast(u32)offset);
 				} else {
@@ -253,22 +255,27 @@ struct VmState {
 				if (offset < 0) return setTrap(VmStatus.ERR_STORE_OOB);
 				if (offset + size > alloc.size) return setTrap(VmStatus.ERR_STORE_OOB);
 
+				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
+				// Note: this part should execute before bytes are written, because we need original data in trap handler
+				if (ptrSize.inBytes == size) {
+					// this can be a pointer store
+					if (src.pointer.isDefined) {
+						// Pointer stores must be aligned
+						if (offset % size != 0) return setTrap(VmStatus.ERR_STORE_PTR_UNALIGNED);
+
+						pointerPut(mem, alloc, cast(u32)offset, src.pointer);
+					} else if (offset % size == 0) {
+						pointerRemove(mem, alloc, cast(u32)offset);
+					}
+				}
+
 				u8* memory = mem.memory[].ptr;
 				switch(op) {
-					case store_m8:  *cast( u8*)(memory+alloc.offset+offset) = src.as_u8; break;
+					case store_m8:  *cast( u8*)(memory+alloc.offset+offset) = src.as_u8;  break;
 					case store_m16: *cast(u16*)(memory+alloc.offset+offset) = src.as_u16; break;
 					case store_m32: *cast(u32*)(memory+alloc.offset+offset) = src.as_u32; break;
 					case store_m64: *cast(u64*)(memory+alloc.offset+offset) = src.as_u64; break;
 					default: assert(false);
-				}
-
-				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-				if (ptrSize.inBytes == size) {
-					// this can be a pointer store
-					if (src.pointer.isDefined)
-						pointerPut(mem, alloc, cast(u32)offset, src.pointer);
-					else
-						pointerRemove(mem, alloc, cast(u32)offset);
 				}
 
 				// mark bytes as initialized
@@ -286,6 +293,7 @@ struct VmState {
 	}
 
 	AllocId pointerGet(Memory* mem, Allocation* alloc, u32 offset) {
+		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			return alloc.relocations.get(offset);
 		} else {
@@ -294,6 +302,7 @@ struct VmState {
 	}
 
 	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
+		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			alloc.relocations.put(*allocator, cast(u32)offset, value, oldPtr);
@@ -304,6 +313,7 @@ struct VmState {
 	}
 
 	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
+		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			alloc.relocations.remove(*allocator, cast(u32)offset, oldPtr);
@@ -401,6 +411,7 @@ struct VmState {
 		}
 	}
 
+	// No new line or dot at the end of the message
 	void format_vm_error(scope SinkDelegate sink) {
 		if (status == VmStatus.OK) return;
 
@@ -414,11 +425,11 @@ struct VmState {
 				break;
 
 			case ERR_TRAP:
-				sink("trap instruction reached.");
+				sink("trap instruction reached");
 				break;
 
 			case ERR_REGISTER_OOB:
-				sink.formattedWrite("Trying to access register out of bounds of register stack.\n  Num frame registers: %s\n  Invalid register: r%s\n",
+				sink.formattedWrite("Trying to access register out of bounds of register stack.\n  Num frame registers: %s\n  Invalid register: r%s",
 					registers.length - firstReg, errData - firstReg);
 				break;
 
@@ -427,7 +438,7 @@ struct VmState {
 				VmReg* src0 = &registers[firstReg + code[frame.ip+2]];
 				VmReg* src1 = &registers[firstReg + code[frame.ip+3]];
 
-				sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s\n",
+				sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s",
 					code[frame.ip+1], *dst,
 					code[frame.ip+2], *src0,
 					code[frame.ip+3], *src1);
@@ -437,7 +448,7 @@ struct VmState {
 				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 
-				sink.formattedWrite("Writing to %s pointer is disabled.\n  r%s: %s\n  r%s: %s\n",
+				sink.formattedWrite("Writing to %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 					memoryKindString[dst.pointer.kind],
 					code[frame.ip+1], *dst,
 					code[frame.ip+2], *src);
@@ -447,7 +458,7 @@ struct VmState {
 				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 				VmReg* src = &registers[firstReg + code[frame.ip+2]];
 
-				sink.formattedWrite("Reading from %s pointer is disabled.\n  r%s: %s\n  r%s: %s\n",
+				sink.formattedWrite("Reading from %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 					memoryKindString[src.pointer.kind],
 					code[frame.ip+1], *dst,
 					code[frame.ip+2], *src);
@@ -474,11 +485,25 @@ struct VmState {
 
 				u64 offset = dst.as_u64;
 
-				sink.formattedWrite("Writing past the end of the allocation (r%s:%s)\nWriting %s bytes at offset %s, to allocation of %s bytes\n",
+				sink.formattedWrite("Writing past the end of the allocation (r%s:%s)\nWriting %s bytes at offset %s, to allocation of %s bytes",
 					code[frame.ip+1], *dst,
 					size,
 					offset,
 					alloc.size);
+				break;
+
+			case ERR_STORE_PTR_UNALIGNED:
+				u8 op = code[frame.ip+0];
+				u32 size = 1 << (op - VmOpcode.load_m8);
+				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				Memory* mem = &memories[dst.pointer.kind];
+				Allocation* alloc = &mem.allocations[dst.pointer.index];
+
+				u64 offset = dst.as_u64;
+
+				sink.formattedWrite("Writing pointer value (r%s:%s) to an unaligned offset (0x%X)",
+					code[frame.ip+1], *dst,
+					offset);
 				break;
 
 			case ERR_LOAD_OOB:
@@ -490,7 +515,7 @@ struct VmState {
 
 				u64 offset = src.as_u64;
 
-				sink.formattedWrite("Reading past the end of the allocation (r%s:%s)\nReading %s bytes at offset %s, from allocation of %s bytes\n",
+				sink.formattedWrite("Reading past the end of the allocation (r%s:%s)\nReading %s bytes at offset %s, from allocation of %s bytes",
 					code[frame.ip+2], *src,
 					size,
 					offset,
@@ -506,7 +531,7 @@ struct VmState {
 
 				u64 offset = src.as_u64;
 
-				sink.formattedWrite("Reading uninitialized memory from allocation (r%s:%s)\n  Reading %s bytes at offset %s\n",
+				sink.formattedWrite("Reading uninitialized memory from allocation (r%s:%s)\n  Reading %s bytes at offset %s",
 					code[frame.ip+2], *src,
 					size,
 					offset);
@@ -527,6 +552,7 @@ enum VmStatus : u8 {
 	ERR_STORE_NOT_PTR,
 	ERR_LOAD_NOT_PTR,
 	ERR_STORE_OOB,
+	ERR_STORE_PTR_UNALIGNED,
 	ERR_LOAD_OOB,
 	ERR_LOAD_UNINIT,
 }

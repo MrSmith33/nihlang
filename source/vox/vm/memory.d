@@ -148,14 +148,18 @@ enum MemFlags : u8 {
 }
 
 enum PtrSize : u8 {
-	_32 = 1,
-	_64 = 2,
+	_32 = 0,
+	_64 = 1,
+}
+
+u32 as_u32(PtrSize s) {
+	return s;
 }
 
 u32 inBytes(PtrSize s) {
-	return s * 4;
+	return (s+1) * 4;
 }
 
 u32 inBits(PtrSize s) {
-	return s * 32;
+	return (s+1) * 32;
 }
