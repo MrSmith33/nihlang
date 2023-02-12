@@ -262,9 +262,10 @@ struct VmState {
 					if (src.pointer.isDefined) {
 						// Pointer stores must be aligned
 						if (offset % size != 0) return setTrap(VmStatus.ERR_STORE_PTR_UNALIGNED);
-
+						// Mutate
 						pointerPut(mem, alloc, cast(u32)offset, src.pointer);
 					} else if (offset % size == 0) {
+						// Erase pointer if write is aligned
 						pointerRemove(mem, alloc, cast(u32)offset);
 					}
 				}

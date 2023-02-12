@@ -600,16 +600,14 @@ void test_store_mXX_6(ref VmTestContext c) {
 }
 
 @VmTest
-//@VmTestOnly
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_7(ref VmTestContext c) {
 	// Test store_mXX of pointers to unaligned address
-	VmOpcode store_op = cast(VmOpcode)(VmOpcode.store_m32 + c.vm.ptrSize.as_u32);
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_binop(store_op, 0, 1);
+	b.emit_store_ptr(c.vm.ptrSize, 0, 1);
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(b.code, 0, 2, 0);
 
@@ -622,8 +620,62 @@ void test_store_mXX_7(ref VmTestContext c) {
 	}
 }
 
+@VmTest
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_8(ref VmTestContext c) {
+	// Test store_mXX of pointers to aligned address
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
 
-/*@VmTest
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 2); // store memId
+	b.emit_load_ptr(c.vm.ptrSize, 0, 1); //   load memId
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+
+	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId));
+	assert(res[0] == VmReg(memId));
+}
+
+@VmTest
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_9(ref VmTestContext c) {
+	// Test store_mXX of pointers to aligned address that overwrites an existing pointer
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId1 = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId2 = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 2); // store memId1
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // store memId2 (overwrites memId1)
+	b.emit_load_ptr(c.vm.ptrSize, 0, 1);  //  load memId2
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 3, 0);
+
+	VmReg[] res = c.call(funcId, VmReg(memId1), VmReg(memId1), VmReg(memId2));
+	assert(res[0] == VmReg(memId2));
+}
+
+@VmTest
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_10(ref VmTestContext c) {
+	// Test store_mXX of non-pointer to aligned address that removes an existing pointer
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 2); // store memId
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // store 0
+	b.emit_load_ptr(c.vm.ptrSize, 0, 1);  //  load 0
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 1, 3, 0);
+
+	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId), VmReg(0));
+	assert(res[0] == VmReg(0));
+}
+
+
+@VmTest
 void test100(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 2, 1);
@@ -639,4 +691,4 @@ void test100(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(funcId), VmReg(staticId), VmReg(heapId), VmReg(stackId));
 	assert(res[0] == VmReg(heapId));
-}*/
+}
