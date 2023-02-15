@@ -16,9 +16,9 @@ We need to know what memory bytes contain a pointer and which contain bytes that
 1. Why do we need to know where pointers are in each memory allocation?
    We want each allocation to be a separate object during linking.
    This gives us:
-   a) Ability to strip unused data
-   b) Reorder and compact data, so it takes minimal space
-   c) If the allocation will end up in the executable later, its address will be diffrent. Which means that for every pointer to another allocation linker needs to have a relocation entry, so each pointer value can be adjusted to pointer to correct address
+   - Ability to strip unused data
+   - Reorder and compact data, so it takes minimal space
+   - If the allocation will end up in the executable later, its address will be diffrent. Which means that for every pointer to another allocation linker needs to have a relocation entry, so each pointer value can be adjusted to pointer to correct address
    All this is relevant to transferring allocations from heap to static memory in CTFE, although it is possible to not move any allocations at all.
 
 2. Why don't we just use the raw pointer in the VM memory?
@@ -28,8 +28,8 @@ We need to know what memory bytes contain a pointer and which contain bytes that
    1) False positives
       We can find that some byte sequence can be interpreted as a valid pointer.
       If we assume it to be a real pointer, we would have the following potential situations:
-      a) False dependency of one allocation to another. This may result in an allocation that is not reachable from root pointers, to become reachable. So it will end up in static memory, bloating the executable. This does not pose any correctness problems.
-      b) Data corruption. When compiler/linker/loader need to move the target allocation, the pointer data will be updated, changing the original bytes of false pointer. The data is different from the result of CTFE.
+      - False dependency of one allocation to another. This may result in an allocation that is not reachable from root pointers, to become reachable. So it will end up in static memory, bloating the executable. This does not pose any correctness problems.
+      - Data corruption. When compiler/linker/loader need to move the target allocation, the pointer data will be updated, changing the original bytes of false pointer. The data is different from the result of CTFE.
    2) False negatives
       Pointer may be disguised by some pointer tagging scheme (like using top 16 bits of 64bit pointer).
       In this case we wouldn't find the pointer. It will not be added to relocation list. And when address changes, the pointer value will not be updated, resulting in the pointer pointing to the wrong location.
@@ -54,29 +54,29 @@ Allocation metadata is useful for detecting:
 - Uninitialized memory access
 
 3. How to model address space if we use shadow pointers? Linear memory or individual allocations or both?
-   a) Shadow pointer stores the offset into the linear address space.
-      1. How do we get allocation metadata from the pointer?
-   b) Shadow pointer stores allocation index and memory offset. This way we can access the memory through the offset immediately, but we still need metadata to do bounds checking, so no cache gain here.
-   c) Shadow pointer stores allocation index. Allocation metadata stores the data offset + size.
-      This is the current one. But some features may require adding generation index to the shadow pointer to help find stale pointers.
+   - Shadow pointer stores the offset into the linear address space.
+     1. How do we get allocation metadata from the pointer?
+   - Shadow pointer stores allocation index and memory offset. This way we can access the memory through the offset immediately, but we still need metadata to do bounds checking, so no cache gain here.
+   - Shadow pointer stores allocation index. Allocation metadata stores the data offset + size.
+     This is the current one. But some features may require adding generation index to the shadow pointer to help find stale pointers.
 
 I decided to use 4 pointer kinds:
-a) Static memory. We only append static initializers to it and copy reachable heap allocations. Data lives until the backend is involved.
-b) Heap memory. Used for dynamic allocations. Allocations can be marked as freed. This memory is wiped after each CTFE run, after reachable allocations are copied to static memory.
-c) Stack memory. Stores stack slots of function frames. This memory grows and shrinks like a stack, so having it as a separate arena seems efficient. Distinguishing it from the others is useful if we want to detect dangling pointers to stack memory.
-d) Non-memory references like function pointers. You cannot read/write through these, but you can call functions, or pass them to external functions. Can be used for unforgable tokens, for example for permission system.
+- Static memory. We only append static initializers to it and copy reachable heap allocations. Data lives until the backend is involved.
+- Heap memory. Used for dynamic allocations. Allocations can be marked as freed. This memory is wiped after each CTFE run, after reachable allocations are copied to static memory.
+- Stack memory. Stores stack slots of function frames. This memory grows and shrinks like a stack, so having it as a separate arena seems efficient. Distinguishing it from the others is useful if we want to detect dangling pointers to stack memory.
+- Non-memory references like function pointers. You cannot read/write through these, but you can call functions, or pass them to external functions. Can be used for unforgable tokens, for example for permission system.
 
 4. Only allow aligned pointers?
-   a) Yes (most likely choice)
-      8 times less bits for pointer bitmap
-      Trap for unaligned pointer store
-   b) No (Allow unaligned pointers)
-      1. What if pointers overlap?
-         a) Allow that (most likely choice)
-         b) Trap
-            Need to check in pointer bitmap if written pointer will overlap with existing pointers
-            That means checking ptrSize-1 bits to the left and to the right of the target address
-            This option is highly likely results in poor performance
+   - Yes (most likely choice)
+     8 times less bits for pointer bitmap
+     Trap for unaligned pointer store
+   - No (Allow unaligned pointers)
+     What if pointers overlap?
+     - Allow that (most likely choice)
+     - Trap
+       Need to check in pointer bitmap if written pointer will overlap with existing pointers
+       That means checking ptrSize-1 bits to the left and to the right of the target address
+       This option is highly likely results in poor performance
 
 5. Why do we need pointer bitmap?
    We need memcopy/memmove instructions that are aware of shadow pointers
@@ -91,27 +91,26 @@ d) Non-memory references like function pointers. You cannot read/write through t
 
 6. How to detect escaped references to stack allocations?
    Solutions that trap on load must handle the case where allocation struct is reused
-   a) Reference count each allocation and when function returns, check if any remaining references point to stack allocations of the frame
-      Pro: No need for generation index in the pointer
-      Pro: Detects escaped stack reference when function returns
-      Con: Need 32bit reference count in the allocation metadata (same as 32bit generation index)
-      Con: Need to increase/decrease refcount on every pointer write/pointer erase
+   - Reference count each allocation and when function returns, check if any remaining references point to stack allocations of the frame
+     Pro: No need for generation index in the pointer
+     Pro: Detects escaped stack reference when function returns
+     Con: Need 32bit reference count in the allocation metadata (same as 32bit generation index)
+     Con: Need to increase/decrease refcount on every pointer write/pointer erase
 
+     Parent frame registers can not contain pointers to current stack frame.
+     We need to check result registers when function ends.
+   - Use generation index for allocations and references. Dead stack allocations will have their generation increased, so that dangling pointers can be detected when they are used.
+     Pro: should be faster than refcounting
+     Pro: works for external references (stored outside of VM)
+     Con: 32bit generation is stored in allocation metadata (same as 32bit refcount) and in each pointer
+     Con: Can only detect when pointer is accessed
+   - Use some sort of GC that runs on each stack frame end to find all references to stack allocations
+     Pro: No extra data needs to be stored
+     Pro: No instrumentation like in refcounting, only at the end of function
+     Pro: Detects escaped stack reference when function returns
+     Con: Need to traverse the whole heap/stack/static memory (iterate through the hashmap of relocations, that contains pointers)
 
-      Parent frame registers can not contain pointers to current stack frame.
-      We need to check result registers when function ends.
-   b) Use generation index for allocations and references. Dead stack allocations will have their generation increased, so that dangling pointers can be detected when they are used.
-      Pro: should be faster than refcounting
-      Pro: works for external references (stored outside of VM)
-      Con: 32bit generation is stored in allocation metadata (same as 32bit refcount) and in each pointer
-      Con: Can only detect when pointer is accessed
-   c) Use some sort of GC that runs on each stack frame end to find all references to stack allocations
-      Pro: No extra data needs to be stored
-      Pro: No instrumentation like in refcounting, only at the end of function
-      Pro: Detects escaped stack reference when function returns
-      Con: Need to traverse the whole heap/stack/static memory (iterate through the hashmap of relocations, that contains pointers)
-
-      This may use some sort of write-barrier where we store info about which pointers point to the stack allocation.
+     This may use some sort of write-barrier where we store info about which pointers point to the stack allocation.
 
    We can have this code behind a callback, so that we can have multiple implementations with compile time switch.
    If we define all this in terms of handlers that handle:
@@ -126,10 +125,10 @@ d) Non-memory references like function pointers. You cannot read/write through t
    For now it an absense of pointer, so when null is written to memory, we just remove pointer from the destination if any.
 
 8. Reading from uninitialized register
-   a) trap
-   b) conservative check in validation
-   c) allow and return garbage (potentially insecure and undeterministic)
-   d) allow and return zero
+   - trap
+   - conservative check in validation
+   - allow and return garbage (potentially insecure and undeterministic)
+   - allow and return zero
 
 9. What opcodes must be aware of shadow pointers?
     1. Any register assignment must erase the pointer
@@ -153,9 +152,9 @@ d) Non-memory references like function pointers. You cannot read/write through t
     When memcopy copies a pointer, the pointer must land into aligned memory location. (Same with a store of a pointer)
 
 11. What happens when load_m64 tries to load two 32-bit pointers?
-    a) Only load raw bytes (current solution)
-    b) trap
-    c) Somehow support 2 pointers per register. This would probably mean supporting several arithmetic operations, like shifting left/right by 32.
+    - Only load raw bytes (current solution)
+    - trap
+    - Somehow support 2 pointers per register. This would probably mean supporting several arithmetic operations, like shifting left/right by 32.
 
 12. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes)
 
