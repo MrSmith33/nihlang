@@ -8,3 +8,6 @@ enum MEMORY_RELOCATIONS_PER_MEMORY = !MEMORY_RELOCATIONS_PER_ALLOCATION;
 
 // Checks for invariants that can be violated through an external API
 enum CONSISTENCY_CHECKS = true;
+
+// Initializes all newly pushed registers
+enum INIT_REGISTERS = false;

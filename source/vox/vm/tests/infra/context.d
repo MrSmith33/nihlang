@@ -72,9 +72,9 @@ struct VmTestContext {
 			sink("  Function expected to finish successfully\n");
 			sink("  ");
 			vm.format_vm_error(sink);
-			u32 ipCopy = vm.frames.back.ip;
+			u32 ipCopy = vm.frameIp;
 			sink("\n  ---\n  ");
-			disasmOne(sink, vm.frames.back.func.code[], ipCopy);
+			disasmOne(sink, vm.functions[vm.frameFuncIndex].code[], ipCopy);
 			sink("  ---\n");
 			panic("  Function expected to finish successfully");
 		}
@@ -94,7 +94,7 @@ struct VmTestContext {
 		//vm.format_vm_error(sink);
 		//sink("\n  ---\n  ");
 		//u32 ipCopy = vm.frames.back.ip;
-		//disasmOne(sink, vm.frames.back.func.code[], ipCopy);
+		//disasmOne(sink, vm.functions[vm.frames.back.funcIndex].code[], ipCopy);
 		//sink("  ---\n");
 		clearStack;
 	}

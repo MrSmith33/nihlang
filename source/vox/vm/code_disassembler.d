@@ -40,6 +40,22 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			writefln("%04X branch r%s %04X", addr, src, addr + jump_offset + 6);
 			break;
 
+		case push:
+			u8 length = code[ip++];
+			writefln("%04X push %s", addr, length);
+			break;
+
+		case pop:
+			u8 length = code[ip++];
+			writefln("%04X pop %s", addr, length);
+			break;
+
+		case call:
+			i32 func_id = *cast(i32*)&code[ip];
+			ip += 4;
+			writefln("%04X call f%s", addr, func_id);
+			break;
+
 		case mov:
 			u8 dst = code[ip++];
 			u8 src = code[ip++];
@@ -62,6 +78,13 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
 			writefln("%04X add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case sub_i64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			writefln("%04X sub.i64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
 		case const_s8:

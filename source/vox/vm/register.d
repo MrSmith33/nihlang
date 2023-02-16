@@ -31,6 +31,10 @@ struct VmReg {
 	}
 	AllocId pointer;
 
+	bool opEquals(VmReg other) {
+		return as_u64 == other.as_u64 && pointer == other.pointer;
+	}
+
 	void toString(scope SinkDelegate sink, FormatSpec spec) @nogc nothrow const {
 		if (pointer.isDefined) {
 			sink.formattedWrite("%s%s", memoryKindLetter[pointer.kind], pointer.index);

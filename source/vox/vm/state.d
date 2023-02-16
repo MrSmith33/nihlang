@@ -25,8 +25,15 @@ struct VmState {
 	Memory[3] memories;
 
 	Array!VmFunction functions;
-	Array!VmFrame frames;
+	Array!VmFrame callerFrames; // current function doesn't have a frame
 	Array!VmReg registers;
+
+	u32 numCalls;
+
+	u32 frameFuncIndex;
+	u32 frameFirstReg;
+	u32 frameIp;
+	u8* frameCode;
 
 	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
 		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
@@ -41,11 +48,17 @@ struct VmState {
 		foreach(ref func; functions)
 			func.free(*allocator);
 		functions.clear;
-		frames.clear;
+		callerFrames.clear;
 		registers.clear;
 		foreach(ref mem; memories)
 			mem.clear(*allocator, ptrSize);
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+
+		numCalls = 0;
+		frameFuncIndex = 0;
+		frameFirstReg = 0;
+		frameIp = 0;
+		frameCode = null;
 	}
 
 	bool isMemoryReadable(MemoryKind kind) {
@@ -60,14 +73,35 @@ struct VmState {
 		return kind < MemoryKind.func_id;
 	}
 
-	AllocId addFunction(Array!u8 code, u8 numResults, u8 numParameters, u8 numLocalRegisters) {
+	AllocId addFunction(u8 numResults, u8 numParameters, u8 numLocals, Array!u8 code) {
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(code, numResults, numParameters, numLocalRegisters));
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults, numParameters, numLocals, code));
+		return AllocId(index, MemoryKind.func_id);
+	}
+
+	AllocId addExternalFunction(u8 numResults, u8 numParameters, u8 numLocals, VmExternalFn fn, void* userData = null) {
+		u32 index = functions.length;
+		VmFunction f = {
+			kind : VmFuncKind.external,
+			numResults : numResults,
+			numParameters : numParameters,
+			numLocals : numLocals,
+			external : fn,
+			externalUserData : userData,
+		};
+		functions.put(*allocator, f);
 		return AllocId(index, MemoryKind.func_id);
 	}
 
 	void pushRegisters(u32 numRegisters) {
-		registers.voidPut(*allocator, numRegisters);
+		auto regs = registers.voidPut(*allocator, numRegisters);
+		static if (INIT_REGISTERS) {
+			regs[] = VmReg.init;
+		}
+	}
+
+	void popRegisters(u32 numRegisters) {
+		registers.unput(numRegisters);
 	}
 
 	void pushRegisters(VmReg[] regs) {
@@ -92,12 +126,12 @@ struct VmState {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
 		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
 		VmFunction* func = &functions[funcId.index];
-		VmFrame frame = {
-			func : func,
-			ip : 0,
-		};
-		frames.put(*allocator, frame);
-		registers.voidPut(*allocator, func.numLocalRegisters);
+		pushRegisters(func.numLocals);
+
+		frameFuncIndex = funcId.index;
+		frameFirstReg = 0;
+		frameIp = 0;
+		frameCode = func.code[].ptr;
 	}
 
 	void run() {
@@ -114,8 +148,8 @@ struct VmState {
 		sink("---\n");
 		printRegs(sink);
 		while(isRunning) {
-			u32 ipCopy = frames.back.ip;
-			disasmOne(sink, frames.back.func.code[], ipCopy);
+			u32 ipCopy = frameIp;
+			disasmOne(sink, functions[frameFuncIndex].code[], ipCopy);
 			step();
 			if (status != VmStatus.OK) {
 				sink("Error: ");
@@ -124,73 +158,145 @@ struct VmState {
 				break;
 			}
 			printRegs(sink);
+			// writefln("stack: %s", frames.length+1);
 		}
 		sink("---\n");
 	}
 
 	// Invariant: when trap happens, VM state should remain as if instruction was not executed
 	void step() {
-		if(frames.length == 0) panic("step: Frame stack is empty");
-		VmFrame* frame = &frames.back();
-		//enforce(frame.ip < frame.func.code.length, "IP is out of bounds (%s), code is %s bytes", frame.ip, frame.func.code.length);
-		VmOpcode op = cast(VmOpcode)frame.func.code[frame.ip+0];
+		VmOpcode op = cast(VmOpcode)frameCode[frameIp+0];
 
 		final switch(op) with(VmOpcode) {
 			case ret:
-				registers.unput(frame.func.numParameters + frame.func.numLocalRegisters);
-				frames.unput(1);
+				VmFunction* func = &functions[frameFuncIndex];
+				registers.unput(func.numParameters + func.numLocals);
 
-				if (frames.length == 0) {
+				if (callerFrames.length == 0) {
 					isRunning = false;
+					frameFirstReg = 0;
+					frameFuncIndex = 0;
+					frameIp = 0;
+					frameCode = null;
+				} else {
+					VmFrame* frame = &callerFrames.back();
+					frameFirstReg = frame.firstRegister;
+					frameFuncIndex = frame.funcIndex;
+					frameIp = frame.ip;
+					frameCode = functions[frameFuncIndex].code[].ptr;
+					callerFrames.unput(1);
 				}
+				//++numCalls;
 				return;
 
 			case trap:
 				return setTrap(VmStatus.ERR_TRAP);
 
 			case jump:
-				i32 offset = *cast(i32*)&frame.func.code[frame.ip+1];
-				frame.ip += offset + 5;
+				i32 offset = *cast(i32*)&frameCode[frameIp+1];
+				frameIp += offset + 5;
 				return;
 
 			case branch:
-				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 srcIndex = frameFirstReg + frameCode[frameIp+1];
 				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 				VmReg* src = &registers[srcIndex];
 
-				i32 offset = *cast(i32*)&frame.func.code[frame.ip+2];
+				i32 offset = *cast(i32*)&frameCode[frameIp+2];
 
 				if (src.as_u64 || src.pointer.isDefined) {
-					frame.ip += offset + 6;
+					frameIp += offset + 6;
 					return;
 				}
 
-				frame.ip += 6;
+				frameIp += 6;
 				return;
 
+			case push:
+				u8 length = frameCode[frameIp+1];
+				pushRegisters(length);
+				frameIp += 2;
+				return;
+
+			case pop:
+				u8 length = frameCode[frameIp+1];
+				popRegisters(length);
+				frameIp += 2;
+				return;
+
+			case call:
+				u32 funcIndex = *cast(i32*)&frameCode[frameIp+1];
+
+				if(funcIndex >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcIndex, functions.length);
+
+				VmFunction* callee = &functions[funcIndex];
+
+				VmFunction* caller = &functions[frameFuncIndex];
+				u32 calleeFirstRegister = frameFirstReg + caller.numResults + caller.numParameters + caller.numLocals;
+
+				if(calleeFirstRegister + callee.numResults + callee.numParameters != registers.length)
+					panic("Invalid stack setup");
+
+				// modify current frame here, before pushing new one, as reallocation might happen
+				frameIp += 5;
+
+				if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
+
+				VmFrame callerFrame = {
+					funcIndex : frameFuncIndex,
+					ip : frameIp,
+					firstRegister : frameFirstReg,
+				};
+				callerFrames.put(*allocator, callerFrame);
+
+				frameFirstReg = calleeFirstRegister;
+				frameFuncIndex = funcIndex;
+				frameIp = 0;
+
+				final switch(callee.kind) {
+					case VmFuncKind.bytecode:
+						frameCode = callee.code[].ptr;
+						pushRegisters(callee.numLocals);
+						return;
+
+					case VmFuncKind.external:
+						frameCode = null;
+						// call
+						callee.external(this, callee.externalUserData);
+						// restore
+						registers.unput(callee.numParameters + callee.numLocals);
+						VmFrame* frame = &callerFrames.back();
+						frameFirstReg = frame.firstRegister;
+						frameFuncIndex = frame.funcIndex;
+						frameIp = frame.ip;
+						frameCode = caller.code[].ptr;
+						callerFrames.unput(1);
+						return;
+				}
+
 			case mov:
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
-				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				u32 srcIndex = frameFirstReg + frameCode[frameIp+2];
 				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 				registers[dstIndex] = registers[srcIndex];
-				frame.ip += 3;
+				frameIp += 3;
 				return;
 
 			// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 			case cmp:
-				VmBinCond cond = cast(VmBinCond)frame.func.code[frame.ip+1];
+				VmBinCond cond = cast(VmBinCond)frameCode[frameIp+1];
 				if (cond > VmBinCond.max) return setTrap(VmStatus.ERR_COND_OOB, cond);
 
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+2];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 				VmReg* dst = &registers[dstIndex];
 
-				u32 src0Index = frame.firstRegister + frame.func.code[frame.ip+3];
+				u32 src0Index = frameFirstReg + frameCode[frameIp+3];
 				if (src0Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
 				VmReg* src0 = &registers[src0Index];
 
-				u32 src1Index = frame.firstRegister + frame.func.code[frame.ip+4];
+				u32 src1Index = frameFirstReg + frameCode[frameIp+4];
 				if (src1Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
 				VmReg* src1 = &registers[src1Index];
 
@@ -237,33 +343,53 @@ struct VmState {
 				}
 
 				dst.pointer = AllocId();
-				frame.ip += 5;
+				frameIp += 5;
 				break;
 
 			case add_i64:
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 				VmReg* dst = &registers[dstIndex];
-				u32 src0Index = frame.firstRegister + frame.func.code[frame.ip+2];
+				u32 src0Index = frameFirstReg + frameCode[frameIp+2];
 				if (src0Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
 				VmReg* src0 = &registers[src0Index];
-				u32 src1Index = frame.firstRegister + frame.func.code[frame.ip+3];
+				u32 src1Index = frameFirstReg + frameCode[frameIp+3];
 				if (src1Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
 				VmReg* src1 = &registers[src1Index];
 				dst.as_u64 = src0.as_u64 + src1.as_u64;
 				dst.pointer = src0.pointer;
 				if (src1.pointer.isDefined) return setTrap(VmStatus.ERR_PTR_SRC1);
-				frame.ip += 4;
+				frameIp += 4;
+				return;
+
+			case sub_i64:
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+				u32 src0Index = frameFirstReg + frameCode[frameIp+2];
+				if (src0Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
+				VmReg* src0 = &registers[src0Index];
+				u32 src1Index = frameFirstReg + frameCode[frameIp+3];
+				if (src1Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
+				VmReg* src1 = &registers[src1Index];
+				dst.as_u64 = src0.as_u64 - src1.as_u64;
+				if (src0.pointer == src1.pointer)
+					dst.pointer = AllocId();
+				else if (src1.pointer.isUndefined)
+					dst.pointer = AllocId();
+				else
+					return setTrap(VmStatus.ERR_PTR_SRC1);
+				frameIp += 4;
 				return;
 
 			case const_s8:
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 				VmReg* dst = &registers[dstIndex];
-				i8 imm = frame.func.code[frame.ip+2];
+				i8 imm = frameCode[frameIp+2];
 				dst.as_s64 = imm;
 				dst.pointer = AllocId();
-				frame.ip += 3;
+				frameIp += 3;
 				return;
 
 			case load_m8:
@@ -272,11 +398,11 @@ struct VmState {
 			case load_m64:
 				u32 size = 1 << (op - load_m8);
 
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 				VmReg* dst = &registers[dstIndex];
 
-				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				u32 srcIndex = frameFirstReg + frameCode[frameIp+2];
 				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 				VmReg* src = &registers[srcIndex];
 
@@ -313,7 +439,7 @@ struct VmState {
 					default: assert(false);
 				}
 
-				frame.ip += 3;
+				frameIp += 3;
 				return;
 
 			case store_m8:
@@ -322,11 +448,11 @@ struct VmState {
 			case store_m64:
 				u32 size = 1 << (op - store_m8);
 
-				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				u32 dstIndex = frameFirstReg + frameCode[frameIp+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 				VmReg* dst = &registers[dstIndex];
 
-				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				u32 srcIndex = frameFirstReg + frameCode[frameIp+2];
 				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 				VmReg* src = &registers[srcIndex];
 
@@ -367,7 +493,7 @@ struct VmState {
 				// mark bytes as initialized
 				mem.markInitBits(cast(u32)(alloc.offset + offset), size, true);
 
-				frame.ip += 3;
+				frameIp += 3;
 				return;
 		}
 	}
@@ -448,9 +574,15 @@ struct VmState {
 	}
 
 	void printRegs(scope SinkDelegate sink) {
+		u32 numTotalRegs = registers.length;
+		u32 firstReg = frameFirstReg;
+
 		sink("     [");
-		foreach(i, reg; registers) {
-			if (i > 0) sink(", ");
+		foreach(i, reg; registers[firstReg..$]) {
+			if (i > 0) {
+				if (i == numTotalRegs) sink("; ");
+				else sink(", ");
+			}
 			sink.formatValue(reg);
 		}
 		sink("]\n");
@@ -507,9 +639,8 @@ struct VmState {
 	void format_vm_error(scope SinkDelegate sink) {
 		if (status == VmStatus.OK) return;
 
-		VmFrame* frame = &frames.back();
-		u8[] code = frame.func.code[];
-		u32 firstReg = frame.firstRegister;
+		u8* code = frameCode;
+		u32 firstReg = frameFirstReg;
 
 		final switch(status) with(VmStatus) {
 			case OK:
@@ -525,23 +656,23 @@ struct VmState {
 				break;
 
 			case ERR_CMP_DIFFERENT_PTR:
-				VmReg* dst  = &registers[firstReg + code[frame.ip+2]];
-				VmReg* src0 = &registers[firstReg + code[frame.ip+3]];
-				VmReg* src1 = &registers[firstReg + code[frame.ip+4]];
+				VmReg* dst  = &registers[firstReg + code[frameIp+2]];
+				VmReg* src0 = &registers[firstReg + code[frameIp+3]];
+				VmReg* src1 = &registers[firstReg + code[frameIp+4]];
 				sink.formattedWrite("Cannot compare different pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-					code[frame.ip+2], *dst,
-					code[frame.ip+3], *src0,
-					code[frame.ip+4], *src1);
+					code[frameIp+2], *dst,
+					code[frameIp+3], *src0,
+					code[frameIp+4], *src1);
 				break;
 
 			case ERR_CMP_REQUIRES_NO_PTR:
-				VmReg* dst  = &registers[firstReg + code[frame.ip+2]];
-				VmReg* src0 = &registers[firstReg + code[frame.ip+3]];
-				VmReg* src1 = &registers[firstReg + code[frame.ip+4]];
+				VmReg* dst  = &registers[firstReg + code[frameIp+2]];
+				VmReg* src0 = &registers[firstReg + code[frameIp+3]];
+				VmReg* src1 = &registers[firstReg + code[frameIp+4]];
 				sink.formattedWrite("Compare operation expects no pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-					code[frame.ip+2], *dst,
-					code[frame.ip+3], *src0,
-					code[frame.ip+4], *src1);
+					code[frameIp+2], *dst,
+					code[frameIp+3], *src0,
+					code[frameIp+4], *src1);
 				break;
 
 			case ERR_REGISTER_OOB:
@@ -550,56 +681,56 @@ struct VmState {
 				break;
 
 			case ERR_PTR_SRC1:
-				VmReg* dst  = &registers[firstReg + code[frame.ip+1]];
-				VmReg* src0 = &registers[firstReg + code[frame.ip+2]];
-				VmReg* src1 = &registers[firstReg + code[frame.ip+3]];
+				VmReg* dst  = &registers[firstReg + code[frameIp+1]];
+				VmReg* src0 = &registers[firstReg + code[frameIp+2]];
+				VmReg* src1 = &registers[firstReg + code[frameIp+3]];
 
 				sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-					code[frame.ip+1], *dst,
-					code[frame.ip+2], *src0,
-					code[frame.ip+3], *src1);
+					code[frameIp+1], *dst,
+					code[frameIp+2], *src0,
+					code[frameIp+3], *src1);
 				break;
 
 			case ERR_STORE_NO_WRITE_PERMISSION:
-				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* dst = &registers[firstReg + code[frameIp+1]];
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
 
 				sink.formattedWrite("Writing to %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 					memoryKindString[dst.pointer.kind],
-					code[frame.ip+1], *dst,
-					code[frame.ip+2], *src);
+					code[frameIp+1], *dst,
+					code[frameIp+2], *src);
 				break;
 
 			case ERR_LOAD_NO_READ_PERMISSION:
-				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* dst = &registers[firstReg + code[frameIp+1]];
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
 
 				sink.formattedWrite("Reading from %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 					memoryKindString[src.pointer.kind],
-					code[frame.ip+1], *dst,
-					code[frame.ip+2], *src);
+					code[frameIp+1], *dst,
+					code[frameIp+2], *src);
 				break;
 
 			case ERR_STORE_NOT_PTR:
-				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* dst = &registers[firstReg + code[frameIp+1]];
 
-				sink.formattedWrite("Writing to non-pointer value (r%s:%s)", code[frame.ip+1], *dst);
+				sink.formattedWrite("Writing to non-pointer value (r%s:%s)", code[frameIp+1], *dst);
 				break;
 
 			case ERR_LOAD_NOT_PTR:
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
-				sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[frame.ip+2], *src);
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
+				sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[frameIp+2], *src);
 				break;
 
 			case ERR_LOAD_INVALID_POINTER:
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
-				sink.formattedWrite("Reading from invalid pointer (r%s:%s)", code[frame.ip+2], *src);
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
+				sink.formattedWrite("Reading from invalid pointer (r%s:%s)", code[frameIp+2], *src);
 				break;
 
 			case ERR_STORE_OOB:
-				u8 op = code[frame.ip+0];
+				u8 op = code[frameIp+0];
 				u32 size = 1 << (op - VmOpcode.store_m8);
-				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* dst = &registers[firstReg + code[frameIp+1]];
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 
@@ -613,23 +744,23 @@ struct VmState {
 				break;
 
 			case ERR_STORE_PTR_UNALIGNED:
-				u8 op = code[frame.ip+0];
+				u8 op = code[frameIp+0];
 				u32 size = 1 << (op - VmOpcode.store_m8);
-				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
+				VmReg* dst = &registers[firstReg + code[frameIp+1]];
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 
 				u64 offset = dst.as_u64;
 
 				sink.formattedWrite("Writing pointer value (r%s:%s) to an unaligned offset (0x%X)",
-					code[frame.ip+1], *dst,
+					code[frameIp+1], *dst,
 					offset);
 				break;
 
 			case ERR_LOAD_OOB:
-				u8 op = code[frame.ip+0];
+				u8 op = code[frameIp+0];
 				u32 size = 1 << (op - VmOpcode.load_m8);
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 
@@ -643,16 +774,16 @@ struct VmState {
 				break;
 
 			case ERR_LOAD_UNINIT:
-				u8 op = code[frame.ip+0];
+				u8 op = code[frameIp+0];
 				u32 size = 1 << (op - VmOpcode.load_m8);
-				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src = &registers[firstReg + code[frameIp+2]];
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 
 				u64 offset = src.as_u64;
 
 				sink.formattedWrite("Reading uninitialized memory from allocation (r%s:%s)\n  Reading %s bytes at offset %s",
-					code[frame.ip+2], *src,
+					code[frameIp+2], *src,
 					size,
 					offset);
 
@@ -684,20 +815,40 @@ enum VmStatus : u8 {
 struct VmFunction {
 	@nogc nothrow:
 
-	Array!u8 code;
+	VmFuncKind kind;
 	u8 numResults;
 	u8 numParameters;
-	u8 numLocalRegisters;
+	u8 numLocals;
+	u32 numTotalRegs() { return numResults + numParameters + numLocals; }
+	union {
+		Array!u8 code;
+		struct {
+			VmExternalFn external;
+			void* externalUserData;
+		}
+	}
 
 	void free(ref VoxAllocator allocator) {
-		code.free(allocator);
+		final switch (kind) {
+			case VmFuncKind.bytecode:
+				code.free(allocator);
+				break;
+			case VmFuncKind.external: break;
+		}
 	}
 }
+
+enum VmFuncKind : u8 {
+	bytecode,
+	external,
+}
+
+alias VmExternalFn = extern(C) void function(ref VmState state, void* userData);
 
 struct VmFrame {
 	@nogc nothrow:
 
-	VmFunction* func;
+	u32 funcIndex;
 	u32 ip;
 	// index of the first register
 	u32 firstRegister;

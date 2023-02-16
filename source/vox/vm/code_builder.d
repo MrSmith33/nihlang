@@ -27,6 +27,24 @@ struct CodeBuilder {
 		code.put(*allocator, VmOpcode.trap);
 	}
 
+	void emit_push(u8 length) {
+		code.put(*allocator, VmOpcode.push);
+		code.put(*allocator, length);
+	}
+
+	void emit_pop(u8 length) {
+		code.put(*allocator, VmOpcode.pop);
+		code.put(*allocator, length);
+	}
+
+	void emit_call(u32 funcIndex) {
+		code.put(*allocator, VmOpcode.call);
+		code.put(*allocator, (funcIndex >>  0) & 0xFF);
+		code.put(*allocator, (funcIndex >>  8) & 0xFF);
+		code.put(*allocator, (funcIndex >> 16) & 0xFF);
+		code.put(*allocator, (funcIndex >> 24) & 0xFF);
+	}
+
 	u32 emit_jump() {
 		code.put(*allocator, VmOpcode.jump);
 		code.put(*allocator, 0);
@@ -62,6 +80,13 @@ struct CodeBuilder {
 
 	void emit_add_i64(u8 dst, u8 src0, u8 src1) {
 		code.put(*allocator, VmOpcode.add_i64);
+		code.put(*allocator, dst);
+		code.put(*allocator, src0);
+		code.put(*allocator, src1);
+	}
+
+	void emit_sub_i64(u8 dst, u8 src0, u8 src1) {
+		code.put(*allocator, VmOpcode.sub_i64);
 		code.put(*allocator, dst);
 		code.put(*allocator, src0);
 		code.put(*allocator, src1);

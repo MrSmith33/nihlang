@@ -29,6 +29,22 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	branch,
 
+	// u8 op, u8 length
+	// pushed {length} registers on the stack
+	// used to allocate results and parameters for a function call
+	push,
+
+	// u8 op, u8 length
+	// pops {length} registers from the stack
+	// used to deallocate results after a function call
+	// Cannot only pop registers that were pushed
+	// Function registers (results, parameters, locals) can not be popped
+	pop,
+
+	// u8 op, u32 func_id
+	// Calls a function passing all pushed registers as results/parameters
+	call,
+
 	// u8 op, u8 dst, u8 src
 	// reg[dst] = reg[src]
 	mov,
@@ -40,6 +56,9 @@ enum VmOpcode : u8 {
 	//
 	// Pointer can only occur in first argument
 	add_i64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	sub_i64,
 
 	// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 	// reg[dst].u64 = reg[src0].u64 {cmp_op} reg[src1].u64
