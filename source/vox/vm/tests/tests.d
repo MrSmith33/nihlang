@@ -107,6 +107,23 @@ void test_trap_0(ref VmTestContext c) {
 
 
 @VmTest
+void test_jump_0(ref VmTestContext c) {
+	// Test jump
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(0,  0);
+	u32 jump_addr = b.next_addr;
+	b.emit_jump();
+	b.emit_const_s8(0, -1); // shouldn't execute
+	u32 ret_addr = b.next_addr;
+	b.emit_ret();
+	b.patch_jump(jump_addr, ret_addr);
+	AllocId funcId = c.vm.addFunction(b.code, 1, 0, 0);
+	VmReg[] res = c.call(funcId);
+	assert(res[0] == VmReg(0));
+}
+
+
+@VmTest
 void test_mov_0(ref VmTestContext c) {
 	// Test mov of non-pointer from parameter to result
 	CodeBuilder b = CodeBuilder(c.vm.allocator);

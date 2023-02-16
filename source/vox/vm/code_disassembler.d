@@ -20,17 +20,23 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 	VmOpcode op = cast(VmOpcode)code[ip++];
 	final switch(op) with(VmOpcode) {
 		case ret:
-			writefln("%04x ret", addr);
+			writefln("%04X ret", addr);
 			break;
 
 		case trap:
-			writefln("%04x trap", addr);
+			writefln("%04X trap", addr);
+			break;
+
+		case jump:
+			i32 jump_offset = *cast(i32*)&code[ip];
+			ip += 4;
+			writefln("%04X jump %04X", addr, addr + jump_offset);
 			break;
 
 		case mov:
 			u8 dst = code[ip++];
 			u8 src = code[ip++];
-			writefln("%04x mov r%s, r%s", addr, dst, src);
+			writefln("%04X mov r%s, r%s", addr, dst, src);
 			break;
 
 		case cmp:
@@ -39,22 +45,22 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
 			if (cond <= VmBinCond.max)
-				writefln("%04x cmp.%s r%s, r%s, r%s", addr, vmBinCondString[cond], dst, src0, src1);
+				writefln("%04X cmp.%s r%s, r%s, r%s", addr, vmBinCondString[cond], dst, src0, src1);
 			else
-				writefln("%04x cmp.%s r%s, r%s, r%s", addr, cond, dst, src0, src1);
+				writefln("%04X cmp.%s r%s, r%s, r%s", addr, cond, dst, src0, src1);
 			break;
 
 		case add_i64:
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			writefln("%04x add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			writefln("%04X add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
 		case const_s8:
 			u8 dst = code[ip++];
 			i8 src = code[ip++];
-			writefln("%04x const.s8 r%s, %s", addr, dst, src);
+			writefln("%04X const.s8 r%s, %s", addr, dst, src);
 			break;
 
 		case load_m8:
@@ -64,7 +70,7 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			u32 size_bits = (1 << (op - load_m8)) * 8;
 			u8 dst = code[ip++];
 			i8 src = code[ip++];
-			writefln("%04x load.m%s r%s, [r%s]", addr, size_bits, dst, src);
+			writefln("%04X load.m%s r%s, [r%s]", addr, size_bits, dst, src);
 			break;
 
 		case store_m8:
@@ -74,7 +80,7 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			u32 size_bits = (1 << (op - store_m8)) * 8;
 			u8 dst = code[ip++];
 			i8 src = code[ip++];
-			writefln("%04x store.m%s [r%s], r%s", addr, size_bits, dst, src);
+			writefln("%04X store.m%s [r%s], r%s", addr, size_bits, dst, src);
 			break;
 	}
 }

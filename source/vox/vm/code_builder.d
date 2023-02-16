@@ -15,12 +15,40 @@ struct CodeBuilder {
 	VoxAllocator* allocator;
 	Array!u8 code;
 
+	u32 next_addr() {
+		return code.length;
+	}
+
 	void emit_ret() {
 		code.put(*allocator, VmOpcode.ret);
 	}
 
 	void emit_trap() {
 		code.put(*allocator, VmOpcode.trap);
+	}
+
+	void emit_jump() {
+		code.put(*allocator, VmOpcode.jump);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+	}
+
+	void emit_jump(i32 offset) {
+		code.put(*allocator, VmOpcode.jump);
+		code.put(*allocator, (offset >>  0) & 0xFF);
+		code.put(*allocator, (offset >>  8) & 0xFF);
+		code.put(*allocator, (offset >> 16) & 0xFF);
+		code.put(*allocator, (offset >> 24) & 0xFF);
+	}
+
+	void patch_jump(u32 jump_addr, u32 jump_target) {
+		i32 offset = jump_target - jump_addr;
+		code[jump_addr+1] = (offset >>  0) & 0xFF;
+		code[jump_addr+2] = (offset >>  8) & 0xFF;
+		code[jump_addr+3] = (offset >> 16) & 0xFF;
+		code[jump_addr+4] = (offset >> 24) & 0xFF;
 	}
 
 	void emit_const_s8(u8 dst, i8 val) {

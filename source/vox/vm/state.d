@@ -111,7 +111,7 @@ struct VmState {
 		isRunning = true;
 		status = VmStatus.OK;
 
-		sink("---");
+		sink("---\n");
 		printRegs(sink);
 		while(isRunning) {
 			u32 ipCopy = frames.back.ip;
@@ -124,7 +124,7 @@ struct VmState {
 			}
 			printRegs(sink);
 		}
-		sink("---");
+		sink("---\n");
 	}
 
 	// Invariant: when trap happens, VM state should remain as if instruction was not executed
@@ -146,6 +146,11 @@ struct VmState {
 
 			case trap:
 				return setTrap(VmStatus.ERR_TRAP);
+
+			case jump:
+				i32 offset = *cast(i32*)&frame.func.code[frame.ip+1];
+				frame.ip += offset;
+				return;
 
 			case mov:
 				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];

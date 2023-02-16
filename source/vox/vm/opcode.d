@@ -20,6 +20,10 @@ enum VmOpcode : u8 {
 	ret,
 	trap,
 
+	// u8 op, s32 offset
+	// jumps relative to instruction address
+	jump,
+
 	// u8 op, u8 dst, u8 src
 	// reg[u8.dst] = reg[u8.src]
 	mov,
