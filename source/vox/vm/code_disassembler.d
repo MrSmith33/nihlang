@@ -33,6 +33,17 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			writefln("%04x mov r%s, r%s", addr, dst, src);
 			break;
 
+		case cmp:
+			u8 cond = code[ip++];
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			if (cond <= VmBinCond.max)
+				writefln("%04x cmp.%s r%s, r%s, r%s", addr, vmBinCondString[cond], dst, src0, src1);
+			else
+				writefln("%04x cmp.%s r%s, r%s, r%s", addr, cond, dst, src0, src1);
+			break;
+
 		case add_i64:
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];

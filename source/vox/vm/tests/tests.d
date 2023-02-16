@@ -176,6 +176,320 @@ void test_mov_5(ref VmTestContext c) {
 
 
 @VmTest
+void test_cmp_0(ref VmTestContext c) {
+	// Test cmp OOB condition
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(cast(VmBinCond)(VmBinCond.max+1), 0, 1, 2);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 0);
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_COND_OOB);
+}
+
+@VmTest
+void test_cmp_1(ref VmTestContext c) {
+	// Test cmp OOB dst register
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.min, 0, 1, 2);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 0); // 0 locals
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_REGISTER_OOB);
+	assert(c.vm.errData == 0); // r0
+}
+
+@VmTest
+void test_cmp_2(ref VmTestContext c) {
+	// Test cmp OOB src0 register
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.min, 0, 1, 2);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 1); // 1 local
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_REGISTER_OOB);
+	assert(c.vm.errData == 1); // r1
+}
+
+@VmTest
+void test_cmp_3(ref VmTestContext c) {
+	// Test cmp OOB src1 register
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.min, 0, 1, 2);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(b.code, 0, 0, 2); // 2 locals
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_REGISTER_OOB);
+	assert(c.vm.errData == 2); // r2
+}
+
+@VmTest
+void test_cmp_4(ref VmTestContext c) {
+	// Test cmp.m64.eq
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.m64_eq, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	// ptr is null
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+
+	// ptr is not null
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+}
+
+@VmTest
+void test_cmp_5(ref VmTestContext c) {
+	// Test cmp.m64.ne
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.m64_ne, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	// ptr is null
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+
+	// ptr is not null
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+}
+
+@VmTest
+void test_cmp_6(ref VmTestContext c) {
+	// Test cmp.u64.gt
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.u64_gt, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	// ptr is null
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(20), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+
+	// ptr is not null
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 20), VmReg(memId1, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+}
+
+@VmTest
+void test_cmp_7(ref VmTestContext c) {
+	// Test cmp.u64.ge
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.u64_ge, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	// ptr is null
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(20), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+
+	// ptr is not null
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(memId1, 20), VmReg(memId1, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+}
+
+@VmTest
+@VmTestParam(TestParamId.user, [VmBinCond.u64_gt, VmBinCond.u64_ge])
+void test_cmp_8(ref VmTestContext c) {
+	// Test cmp.u64.gt/ge different pointers
+	VmBinCond cond = cast(VmBinCond)c.test.getParam(TestParamId.user);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(cond, 0, 1, 2);
+	b.emit_trap();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
+	assert(c.vm.status == VmStatus.ERR_CMP_DIFFERENT_PTR);
+}
+
+@VmTest
+@VmTestParam(TestParamId.user, [
+	VmBinCond.s64_gt, VmBinCond.s64_ge, VmBinCond.f32_gt, VmBinCond.f32_ge, VmBinCond.f64_gt, VmBinCond.f64_ge,])
+void test_cmp_9(ref VmTestContext c) {
+	// Test cmp condition that requires pointers to be null
+	VmBinCond cond = cast(VmBinCond)c.test.getParam(TestParamId.user);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(cond, 0, 1, 2);
+	b.emit_trap();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
+	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+	c.clearStack;
+	c.callFail(funcId, VmReg(memId1, 10), VmReg(10));
+	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+	c.clearStack;
+	c.callFail(funcId, VmReg(10), VmReg(memId1, 10));
+	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+}
+
+@VmTest
+void test_cmp_10(ref VmTestContext c) {
+	// Test cmp.s64.gt
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.s64_gt, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(20), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-20), VmReg(-10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-20), VmReg(-20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-10), VmReg(-20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+}
+
+@VmTest
+void test_cmp_11(ref VmTestContext c) {
+	// Test cmp.s64.ge
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.s64_ge, 0, 1, 2);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 1, 2, 0);
+	VmReg[] res;
+
+	res = c.call(funcId, VmReg(10), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10), VmReg(20));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(20), VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-20), VmReg(-10));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-20), VmReg(-20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(-10), VmReg(-20));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+}
+
+@VmTest
+void test_cmp_12(ref VmTestContext c) {
+	// Test cmp.f32
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.f32_gt, 0, 4, 5);
+	b.emit_cmp(VmBinCond.f32_ge, 1, 4, 5);
+	b.emit_cmp(VmBinCond.f32_gt, 2, 4, 5);
+	b.emit_cmp(VmBinCond.f32_ge, 3, 4, 5);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 4, 2, 0);
+	VmReg[] res = c.call(funcId, VmReg(cast(f32)100.0), VmReg(cast(f32)50.0));
+	assert(res[0] == VmReg(1)); // 100 >  50
+	assert(res[1] == VmReg(1)); // 100 >= 50
+	assert(res[2] == VmReg(1)); // 100 >  100
+	assert(res[3] == VmReg(1)); // 100 >= 100
+}
+
+@VmTest
+void test_cmp_13(ref VmTestContext c) {
+	// Test cmp.f64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_cmp(VmBinCond.f64_gt, 0, 4, 5);
+	b.emit_cmp(VmBinCond.f64_ge, 1, 4, 5);
+	b.emit_cmp(VmBinCond.f64_gt, 2, 4, 5);
+	b.emit_cmp(VmBinCond.f64_ge, 3, 4, 5);
+	b.emit_ret();
+	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(b.code, 4, 2, 0);
+	VmReg[] res = c.call(funcId, VmReg(cast(f64)100.0), VmReg(cast(f64)50.0));
+	assert(res[0] == VmReg(1)); // 100 >  50
+	assert(res[1] == VmReg(1)); // 100 >= 50
+	assert(res[2] == VmReg(1)); // 100 >  100
+	assert(res[3] == VmReg(1)); // 100 >= 100
+}
+
+
+@VmTest
 void test_add_i64_0(ref VmTestContext c) {
 	// Test add_i64 number addition
 	CodeBuilder b = CodeBuilder(c.vm.allocator);

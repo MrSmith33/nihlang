@@ -144,6 +144,10 @@ I decided to use 4 pointer kinds:
        ptr - ptr (pointer bases must be equal, otherwise trap)  
        int - ptr trap
     7. memcopy
+    8. cmp
+       eq, ne also check the pointer
+       gt, ge trap if pointer is not the same
+       Only unsigned integer compares should check for pointers
 
 10. What if we memcopy a chunk of memory containing a pointer?  
     Memcopy must be aware of shadow pointers, but checking each word in the hashmap for potential pointer seems slow.  

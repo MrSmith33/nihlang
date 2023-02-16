@@ -46,6 +46,14 @@ struct VmReg {
 		this.as_u64 = num;
 	}
 
+	this(f32 num) {
+		this.as_f32 = num;
+	}
+
+	this(f64 num) {
+		this.as_f64 = num;
+	}
+
 	this(AllocId ptr, u64 offset = 0) {
 		this.as_u64 = offset;
 		this.pointer = ptr;

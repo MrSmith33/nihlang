@@ -42,6 +42,14 @@ struct CodeBuilder {
 		code.put(*allocator, src);
 	}
 
+	void emit_cmp(VmBinCond cond, u8 dst, u8 src0, u8 src1) {
+		code.put(*allocator, VmOpcode.cmp);
+		code.put(*allocator, cond);
+		code.put(*allocator, dst);
+		code.put(*allocator, src0);
+		code.put(*allocator, src1);
+	}
+
 	void emit_load_m8(u8 dst, u8 src) {
 		code.put(*allocator, VmOpcode.load_m8);
 		code.put(*allocator, dst);

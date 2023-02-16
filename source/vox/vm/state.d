@@ -156,6 +156,69 @@ struct VmState {
 				frame.ip += 3;
 				return;
 
+			// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
+			case cmp:
+				VmBinCond cond = cast(VmBinCond)frame.func.code[frame.ip+1];
+				if (cond > VmBinCond.max) return setTrap(VmStatus.ERR_COND_OOB, cond);
+
+				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+2];
+				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
+				VmReg* dst = &registers[dstIndex];
+
+				u32 src0Index = frame.firstRegister + frame.func.code[frame.ip+3];
+				if (src0Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
+				VmReg* src0 = &registers[src0Index];
+
+				u32 src1Index = frame.firstRegister + frame.func.code[frame.ip+4];
+				if (src1Index >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
+				VmReg* src1 = &registers[src1Index];
+
+				final switch(cond) with(VmBinCond) {
+					case m64_eq:
+						dst.as_u64 = src0.as_u64 == src1.as_u64 && src0.pointer == src1.pointer;
+						break;
+					case m64_ne:
+						dst.as_u64 = src0.as_u64 != src1.as_u64 || src0.pointer != src1.pointer;
+						break;
+					case u64_gt:
+						if (src0.pointer != src1.pointer) return setTrap(VmStatus.ERR_CMP_DIFFERENT_PTR);
+						dst.as_u64 = src0.as_u64 >  src1.as_u64;
+						break;
+					case u64_ge:
+						if (src0.pointer != src1.pointer) return setTrap(VmStatus.ERR_CMP_DIFFERENT_PTR);
+						dst.as_u64 = src0.as_u64 >= src1.as_u64;
+						break;
+					case s64_gt:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_s64 >  src1.as_s64;
+						break;
+					case s64_ge:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_s64 >= src1.as_s64;
+						break;
+
+					case f32_gt:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_f32 >  src1.as_f32;
+						break;
+					case f32_ge:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_f32 >= src1.as_f32;
+						break;
+					case f64_gt:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_f64 >  src1.as_f64;
+						break;
+					case f64_ge:
+						if (src0.pointer.isDefined || src1.pointer.isDefined) return setTrap(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+						dst.as_u64 = src0.as_f64 >= src1.as_f64;
+						break;
+				}
+
+				dst.pointer = AllocId();
+				frame.ip += 5;
+				break;
+
 			case add_i64:
 				u32 dstIndex = frame.firstRegister + frame.func.code[frame.ip+1];
 				if (dstIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
@@ -436,6 +499,30 @@ struct VmState {
 				sink("trap instruction reached");
 				break;
 
+			case ERR_COND_OOB:
+				sink.formattedWrite("Invalid condition %s, max condition is %s", errData, VmBinCond.max);
+				break;
+
+			case ERR_CMP_DIFFERENT_PTR:
+				VmReg* dst  = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src0 = &registers[firstReg + code[frame.ip+3]];
+				VmReg* src1 = &registers[firstReg + code[frame.ip+4]];
+				sink.formattedWrite("Cannot compare different pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
+					code[frame.ip+2], *dst,
+					code[frame.ip+3], *src0,
+					code[frame.ip+4], *src1);
+				break;
+
+			case ERR_CMP_REQUIRES_NO_PTR:
+				VmReg* dst  = &registers[firstReg + code[frame.ip+2]];
+				VmReg* src0 = &registers[firstReg + code[frame.ip+3]];
+				VmReg* src1 = &registers[firstReg + code[frame.ip+4]];
+				sink.formattedWrite("Compare operation expects no pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
+					code[frame.ip+2], *dst,
+					code[frame.ip+3], *src0,
+					code[frame.ip+4], *src1);
+				break;
+
 			case ERR_REGISTER_OOB:
 				sink.formattedWrite("Trying to access register out of bounds of register stack.\n  Num frame registers: %s\n  Invalid register: r%s",
 					registers.length - firstReg, errData - firstReg);
@@ -557,6 +644,9 @@ struct VmState {
 enum VmStatus : u8 {
 	OK,
 	ERR_TRAP,
+	ERR_COND_OOB,
+	ERR_CMP_DIFFERENT_PTR,
+	ERR_CMP_REQUIRES_NO_PTR,
 	ERR_REGISTER_OOB,
 	ERR_PTR_SRC1,
 	ERR_STORE_NO_WRITE_PERMISSION,
