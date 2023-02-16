@@ -148,6 +148,8 @@ I decided to use 4 pointer kinds:
        eq, ne also check the pointer
        gt, ge trap if pointer is not the same
        Only unsigned integer compares should check for pointers
+    9. branch
+       jumps if either data or pointer is not zero
 
 10. What if we memcopy a chunk of memory containing a pointer?  
     Memcopy must be aware of shadow pointers, but checking each word in the hashmap for potential pointer seems slow.  

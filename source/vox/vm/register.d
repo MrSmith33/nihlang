@@ -35,7 +35,10 @@ struct VmReg {
 		if (pointer.isDefined) {
 			sink.formattedWrite("%s%s", memoryKindLetter[pointer.kind], pointer.index);
 			if (as_u64 != 0) {
-				sink.formattedWrite("+%s", as_u64);
+				if (as_s64 > 0)
+					sink.formattedWrite("+%s", as_s64);
+				else
+					sink.formattedWrite("%s", as_s64);
 			}
 		} else {
 			sink.formatValue(as_u64);

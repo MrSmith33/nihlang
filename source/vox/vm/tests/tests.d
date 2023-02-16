@@ -111,15 +111,45 @@ void test_jump_0(ref VmTestContext c) {
 	// Test jump
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0,  0);
-	u32 jump_addr = b.next_addr;
-	b.emit_jump();
+	u32 patch_addr = b.emit_jump();
 	b.emit_const_s8(0, -1); // shouldn't execute
 	u32 ret_addr = b.next_addr;
 	b.emit_ret();
-	b.patch_jump(jump_addr, ret_addr);
+	b.patch_rip(patch_addr, ret_addr);
 	AllocId funcId = c.vm.addFunction(b.code, 1, 0, 0);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(0));
+}
+
+
+@VmTest
+void test_branch_0(ref VmTestContext c) {
+	// Test jump
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	u32 patch_addr = b.emit_branch(1);
+	b.emit_const_s8(0, 0);
+	b.emit_ret();
+	u32 true_addr = b.next_addr;
+	b.emit_const_s8(0, 1);
+	b.emit_ret();
+	b.patch_rip(patch_addr, true_addr);
+	AllocId funcId = c.vm.addFunction(b.code, 1, 1, 0);
+	VmReg[] res;
+
+	res = c.call(funcId, VmReg(0));
+	assert(res[0] == VmReg(0));
+	c.clearStack;
+	res = c.call(funcId, VmReg(10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+
+	// branch on pointer
+	res = c.call(funcId, VmReg(funcId, 0));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
+	res = c.call(funcId, VmReg(funcId, 10));
+	assert(res[0] == VmReg(1));
+	c.clearStack;
 }
 
 

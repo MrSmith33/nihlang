@@ -120,6 +120,7 @@ struct VmState {
 			if (status != VmStatus.OK) {
 				sink("Error: ");
 				format_vm_error(sink);
+				sink("\n");
 				break;
 			}
 			printRegs(sink);
@@ -149,7 +150,22 @@ struct VmState {
 
 			case jump:
 				i32 offset = *cast(i32*)&frame.func.code[frame.ip+1];
-				frame.ip += offset;
+				frame.ip += offset + 5;
+				return;
+
+			case branch:
+				u32 srcIndex = frame.firstRegister + frame.func.code[frame.ip+1];
+				if (srcIndex >= registers.length) return setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
+				VmReg* src = &registers[srcIndex];
+
+				i32 offset = *cast(i32*)&frame.func.code[frame.ip+2];
+
+				if (src.as_u64 || src.pointer.isDefined) {
+					frame.ip += offset + 6;
+					return;
+				}
+
+				frame.ip += 6;
 				return;
 
 			case mov:
@@ -582,15 +598,15 @@ struct VmState {
 
 			case ERR_STORE_OOB:
 				u8 op = code[frame.ip+0];
-				u32 size = 1 << (op - VmOpcode.load_m8);
+				u32 size = 1 << (op - VmOpcode.store_m8);
 				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
 
-				u64 offset = dst.as_u64;
+				i64 offset = dst.as_s64;
 
-				sink.formattedWrite("Writing past the end of the allocation (r%s:%s)\nWriting %s bytes at offset %s, to allocation of %s bytes",
-					code[frame.ip+1], *dst,
+				sink.formattedWrite("Writing outside of the allocation %s\nWriting %s bytes at offset %s, to allocation of %s bytes",
+					dst.pointer,
 					size,
 					offset,
 					alloc.size);
@@ -598,7 +614,7 @@ struct VmState {
 
 			case ERR_STORE_PTR_UNALIGNED:
 				u8 op = code[frame.ip+0];
-				u32 size = 1 << (op - VmOpcode.load_m8);
+				u32 size = 1 << (op - VmOpcode.store_m8);
 				VmReg* dst = &registers[firstReg + code[frame.ip+1]];
 				Memory* mem = &memories[dst.pointer.kind];
 				Allocation* alloc = &mem.allocations[dst.pointer.index];
@@ -617,10 +633,10 @@ struct VmState {
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 
-				u64 offset = src.as_u64;
+				i64 offset = src.as_s64;
 
-				sink.formattedWrite("Reading past the end of the allocation (r%s:%s)\nReading %s bytes at offset %s, from allocation of %s bytes",
-					code[frame.ip+2], *src,
+				sink.formattedWrite("Reading outside of the allocation %s\nReading %s bytes at offset %s, from allocation of %s bytes",
+					src.pointer,
 					size,
 					offset,
 					alloc.size);

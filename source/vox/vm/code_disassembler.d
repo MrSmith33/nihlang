@@ -30,7 +30,14 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 		case jump:
 			i32 jump_offset = *cast(i32*)&code[ip];
 			ip += 4;
-			writefln("%04X jump %04X", addr, addr + jump_offset);
+			writefln("%04X jump %04X", addr, addr + jump_offset + 5);
+			break;
+
+		case branch:
+			u8 src = code[ip++];
+			i32 jump_offset = *cast(i32*)&code[ip];
+			ip += 4;
+			writefln("%04X branch r%s %04X", addr, src, addr + jump_offset + 6);
 			break;
 
 		case mov:

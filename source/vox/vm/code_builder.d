@@ -27,28 +27,31 @@ struct CodeBuilder {
 		code.put(*allocator, VmOpcode.trap);
 	}
 
-	void emit_jump() {
+	u32 emit_jump() {
 		code.put(*allocator, VmOpcode.jump);
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);
+		return code.length;
 	}
 
-	void emit_jump(i32 offset) {
-		code.put(*allocator, VmOpcode.jump);
-		code.put(*allocator, (offset >>  0) & 0xFF);
-		code.put(*allocator, (offset >>  8) & 0xFF);
-		code.put(*allocator, (offset >> 16) & 0xFF);
-		code.put(*allocator, (offset >> 24) & 0xFF);
+	u32 emit_branch(u8 src) {
+		code.put(*allocator, VmOpcode.branch);
+		code.put(*allocator, src);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		return code.length;
 	}
 
-	void patch_jump(u32 jump_addr, u32 jump_target) {
-		i32 offset = jump_target - jump_addr;
-		code[jump_addr+1] = (offset >>  0) & 0xFF;
-		code[jump_addr+2] = (offset >>  8) & 0xFF;
-		code[jump_addr+3] = (offset >> 16) & 0xFF;
-		code[jump_addr+4] = (offset >> 24) & 0xFF;
+	void patch_rip(u32 patch_addr, u32 target) {
+		i32 offset = target - patch_addr;
+		code[patch_addr-4+0] = (offset >>  0) & 0xFF;
+		code[patch_addr-4+1] = (offset >>  8) & 0xFF;
+		code[patch_addr-4+2] = (offset >> 16) & 0xFF;
+		code[patch_addr-4+3] = (offset >> 24) & 0xFF;
 	}
 
 	void emit_const_s8(u8 dst, i8 val) {

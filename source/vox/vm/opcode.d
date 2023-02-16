@@ -21,11 +21,16 @@ enum VmOpcode : u8 {
 	trap,
 
 	// u8 op, s32 offset
-	// jumps relative to instruction address
+	// jumps relative to the address of the next instruction
 	jump,
 
+	// u8 op, u8 src, s32 offset
+	// if reg[src] is non zero jumps
+	// jumps relative to the address of the next instruction
+	branch,
+
 	// u8 op, u8 dst, u8 src
-	// reg[u8.dst] = reg[u8.src]
+	// reg[dst] = reg[src]
 	mov,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
