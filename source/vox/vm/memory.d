@@ -4,11 +4,9 @@
 module vox.vm.memory;
 
 import vox.lib;
+import vox.vm.feature_flags;
 
 @nogc nothrow:
-
-enum MEMORY_RELOCATIONS_PER_ALLOCATION = false;
-enum MEMORY_RELOCATIONS_PER_MEMORY = !MEMORY_RELOCATIONS_PER_ALLOCATION;
 
 struct AllocId {
 	@nogc nothrow:
@@ -85,12 +83,12 @@ struct Memory {
 	}
 
 	void clear(ref VoxAllocator allocator, PtrSize ptrSize) {
-		static if (MEMORY_RELOCATIONS_PER_MEMORY) {
-			relocations.clear;
-		} else {
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			foreach(ref alloc; allocations) {
 				alloc.relocations.free(allocator);
 			}
+		} else {
+			relocations.clear;
 		}
 		markInitBits(0, bytesUsed, false);
 		allocations.clear;

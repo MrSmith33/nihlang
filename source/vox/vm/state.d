@@ -8,8 +8,6 @@ import vox.vm;
 
 @nogc nothrow:
 
-version = CONSISTENCY_CHECKS;
-
 
 struct VmState {
 	@nogc nothrow:
@@ -201,6 +199,8 @@ struct VmState {
 				if (src.pointer.isUndefined) return setTrap(VmStatus.ERR_LOAD_NOT_PTR);
 				if (!isMemoryReadable(src.pointer.kind)) return setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
 
+				if (!isPointerValid(src.pointer)) return setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
+
 				Memory* mem = &memories[src.pointer.kind];
 				Allocation* alloc = &mem.allocations[src.pointer.index];
 				u8* memory = mem.memory[].ptr;
@@ -213,6 +213,14 @@ struct VmState {
 				size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
 				if (numInitedBytes != size) return setTrap(VmStatus.ERR_LOAD_UNINIT);
 
+				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
+				if (ptrSize.inBytes == size && offset % size == 0) {
+					// this can be a pointer load
+					dst.pointer = pointerGet(mem, alloc, cast(u32)offset);
+				} else {
+					dst.pointer = AllocId();
+				}
+
 				switch(op) {
 					case load_m8:  dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset); break;
 					case load_m16: dst.as_u64 = *cast(u16*)(memory + alloc.offset + offset); break;
@@ -221,13 +229,6 @@ struct VmState {
 					default: assert(false);
 				}
 
-				// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-				if (ptrSize.inBytes == size && offset % size == 0) {
-					// this can be a pointer load
-					dst.pointer = pointerGet(mem, alloc, cast(u32)offset);
-				} else {
-					dst.pointer = AllocId();
-				}
 				frame.ip += 3;
 				return;
 
@@ -294,7 +295,7 @@ struct VmState {
 	}
 
 	AllocId pointerGet(Memory* mem, Allocation* alloc, u32 offset) {
-		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			return alloc.relocations.get(offset);
 		} else {
@@ -303,7 +304,7 @@ struct VmState {
 	}
 
 	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
-		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			alloc.relocations.put(*allocator, cast(u32)offset, value, oldPtr);
@@ -314,7 +315,7 @@ struct VmState {
 	}
 
 	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
-		version(CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
 			alloc.relocations.remove(*allocator, cast(u32)offset, oldPtr);
@@ -322,6 +323,12 @@ struct VmState {
 			mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset), oldPtr);
 		}
 		return oldPtr;
+	}
+
+	bool isPointerValid(AllocId ptr) {
+		// Pointer validity check should go here
+		// TODO: Relevant tests must be added when this is implemented
+		return true;
 	}
 
 	// For VM users
@@ -473,8 +480,12 @@ struct VmState {
 
 			case ERR_LOAD_NOT_PTR:
 				VmReg* src = &registers[firstReg + code[frame.ip+2]];
-
 				sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[frame.ip+2], *src);
+				break;
+
+			case ERR_LOAD_INVALID_POINTER:
+				VmReg* src = &registers[firstReg + code[frame.ip+2]];
+				sink.formattedWrite("Reading from invalid pointer (r%s:%s)", code[frame.ip+2], *src);
 				break;
 
 			case ERR_STORE_OOB:
@@ -556,6 +567,7 @@ enum VmStatus : u8 {
 	ERR_STORE_PTR_UNALIGNED,
 	ERR_LOAD_OOB,
 	ERR_LOAD_UNINIT,
+	ERR_LOAD_INVALID_POINTER,
 }
 
 struct VmFunction {
