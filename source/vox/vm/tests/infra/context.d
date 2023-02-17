@@ -71,7 +71,7 @@ struct VmTestContext {
 			sink.formattedWrite("  Test %s failed\n", test.name);
 			sink("  Function expected to finish successfully\n");
 			sink("  ");
-			vm.format_vm_error(sink);
+			vmFormatError(vm, sink);
 			u32 ipCopy = vm.frameIp;
 			sink("\n  ---\n  ");
 			disasmOne(sink, vm.functions[vm.frameFuncIndex].code[], ipCopy);
