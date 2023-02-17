@@ -1135,3 +1135,57 @@ void test_call_1(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId, VmReg(6));
 	assert(res[0] == VmReg(8));
 }
+
+
+@VmTest
+//@VmTestOnly
+//@TestPtrSize64
+void test_call_2(ref VmTestContext c) {
+	// Benchmark
+
+	AllocId funcId = c.vm.addFunction(1, 1, 2, Array!u8.init);
+
+	//AllocId extPrint = c.vm.addExternalFunction(0, 1, 0, &externPrint);
+
+	// u64 fib(u64 number) {
+	//     if (number <= 1) return number;
+	//     return fib(number-1) + fib(number-2);
+	// }
+	// r0: result
+	// r1: number
+	// r2: temp1
+	// r3: temp2
+	// r4: callee result
+	// r5: callee number
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	// if (number <= 1)
+	b.emit_const_s8(2, 1);
+	b.emit_cmp(VmBinCond.s64_ge, 2, 2, 1);
+	u32 patch_addr1 = b.emit_branch(2);
+	// fib(number-1)
+	b.emit_push(2);
+	b.emit_const_s8(3, 1);
+	b.emit_sub_i64(5, 1, 3);
+	b.emit_call(funcId.index);
+	b.emit_mov(2, 4);
+	b.emit_pop(1);
+	// fib(number-2)
+	b.emit_push(2);
+	b.emit_const_s8(3, 2);
+	b.emit_sub_i64(5, 1, 3);
+	b.emit_call(funcId.index);
+	b.emit_mov(3, 4);
+	b.emit_pop(1);
+	// fib(number-1) + fib(number-2)
+	b.emit_add_i64(0, 2, 3);
+	b.emit_ret();
+	// return number
+	b.patch_rip(patch_addr1, b.next_addr);
+	b.emit_mov(0, 1);
+	b.emit_ret();
+
+	c.vm.functions[funcId.index].code = b.code;
+
+	VmReg[] res = c.call(funcId, VmReg(6));
+	assert(res[0] == VmReg(8));
+}
