@@ -27,18 +27,10 @@ struct CodeBuilder {
 		code.put(*allocator, VmOpcode.trap);
 	}
 
-	void emit_push(u8 length) {
-		code.put(*allocator, VmOpcode.push);
-		code.put(*allocator, length);
-	}
-
-	void emit_pop(u8 length) {
-		code.put(*allocator, VmOpcode.pop);
-		code.put(*allocator, length);
-	}
-
-	void emit_call(u32 funcIndex) {
+	void emit_call(u8 arg0_idx, u8 num_args, u32 funcIndex) {
 		code.put(*allocator, VmOpcode.call);
+		code.put(*allocator, arg0_idx);
+		code.put(*allocator, num_args);
 		code.put(*allocator, (funcIndex >>  0) & 0xFF);
 		code.put(*allocator, (funcIndex >>  8) & 0xFF);
 		code.put(*allocator, (funcIndex >> 16) & 0xFF);

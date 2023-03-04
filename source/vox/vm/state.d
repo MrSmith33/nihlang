@@ -59,6 +59,9 @@ struct VmState {
 		frameFirstReg = 0;
 		frameIp = 0;
 		frameCode = null;
+
+		// Each function can access top 256 registers
+		pushRegisters(256);
 	}
 
 	bool isMemoryReadable(MemoryKind kind) {
@@ -73,19 +76,18 @@ struct VmState {
 		return kind < MemoryKind.func_id;
 	}
 
-	AllocId addFunction(u8 numResults, u8 numParameters, u8 numLocals, Array!u8 code) {
+	AllocId addFunction(u8 numResults, u8 numParameters, Array!u8 code) {
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults, numParameters, numLocals, code));
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults, numParameters, code));
 		return AllocId(index, MemoryKind.func_id);
 	}
 
-	AllocId addExternalFunction(u8 numResults, u8 numParameters, u8 numLocals, VmExternalFn fn, void* userData = null) {
+	AllocId addExternalFunction(u8 numResults, u8 numParameters, VmExternalFn fn, void* userData = null) {
 		u32 index = functions.length;
 		VmFunction f = {
 			kind : VmFuncKind.external,
 			numResults : numResults,
 			numParameters : numParameters,
-			numLocals : numLocals,
 			external : fn,
 			externalUserData : userData,
 		};
@@ -104,29 +106,16 @@ struct VmState {
 		registers.unput(numRegisters);
 	}
 
-	void pushRegisters(VmReg[] regs) {
-		registers.put(*allocator, regs);
-	}
-
-	void pushRegister_u64(u64 val) {
-		registers.put(*allocator, VmReg(val));
-	}
-
-	void pushRegister(VmReg val) {
-		registers.put(*allocator, val);
-	}
-
 	VmReg getRegister(u32 index) {
 		if(index >= registers.length) panic("Invalid register index (%s), only %s registers exist", index, registers.length);
 		return registers[index];
 	}
 
-	// Assumes result and parameter registers to be setup
+	// Assumes parameter registers to be setup
 	void beginCall(AllocId funcId) {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
 		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
 		VmFunction* func = &functions[funcId.index];
-		pushRegisters(func.numLocals);
 
 		frameFuncIndex = funcId.index;
 		frameFirstReg = 0;
@@ -307,8 +296,7 @@ struct VmFunction {
 	VmFuncKind kind;
 	u8 numResults;
 	u8 numParameters;
-	u8 numLocals;
-	u32 numTotalRegs() { return numResults + numParameters + numLocals; }
+
 	union {
 		Array!u8 code;
 		struct {

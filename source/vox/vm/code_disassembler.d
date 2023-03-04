@@ -40,20 +40,12 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			writefln("%04X branch r%s %04X", addr, src, addr + jump_offset + 6);
 			break;
 
-		case push:
-			u8 length = code[ip++];
-			writefln("%04X push %s", addr, length);
-			break;
-
-		case pop:
-			u8 length = code[ip++];
-			writefln("%04X pop %s", addr, length);
-			break;
-
 		case call:
+			u8 arg0_idx = code[ip++];
+			u8 num_args = code[ip++];
 			i32 func_id = *cast(i32*)&code[ip];
 			ip += 4;
-			writefln("%04X call f%s", addr, func_id);
+			writefln("%04X call %s %s f%s", addr, arg0_idx, num_args, func_id);
 			break;
 
 		case mov:

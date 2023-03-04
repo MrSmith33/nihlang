@@ -48,15 +48,16 @@ struct VmTestContext {
 				memoryKindString[funcId.kind]);
 		}
 		VmFunction* func = &vm.functions[funcId.index];
-		if(func.numParameters != params.length) {
-			panic("Invalid number of parameters provided, expected %s, got %s",
+		if(func.numParameters < params.length) {
+			panic("Invalid number of parameters provided, expected at least %s, got %s",
 				func.numParameters, params.length);
 		}
 
-		vm.pushRegisters(func.numResults);
-		vm.pushRegisters(params);
-
 		vm.beginCall(funcId);
+		// set parameters
+		foreach(i; 0..func.numParameters) {
+			vm.registers[i] = params[i];
+		}
 
 		return func;
 	}
@@ -79,9 +80,7 @@ struct VmTestContext {
 			panic("  Function expected to finish successfully");
 		}
 
-		if(vm.registers.length != func.numResults) panic("Function with %s results returned %s results.", func.numResults, vm.registers.length);
-
-		return vm.registers[];
+		return vm.registers[0..func.numResults];
 	}
 
 	void callFail(AllocId funcId, VmReg[] params...) {

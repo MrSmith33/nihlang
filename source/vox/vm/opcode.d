@@ -29,20 +29,11 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	branch,
 
-	// u8 op, u8 length
-	// pushed {length} registers on the stack
-	// used to allocate results and parameters for a function call
-	push,
-
-	// u8 op, u8 length
-	// pops {length} registers from the stack
-	// used to deallocate results after a function call
-	// Cannot only pop registers that were pushed
-	// Function registers (results, parameters, locals) can not be popped
-	pop,
-
-	// u8 op, u32 func_id
-	// Calls a function passing all pushed registers as results/parameters
+	// u8 op, u8 arg0_idx, u8 num_args, u32 func_id
+	// Calls a function {func_id}
+	// arg0_idx becomes new reg[0] in the callee frame
+	// num_args must be equal or greater than number of parameters of {func_id}
+	// arg0_idx + num_args <= 256
 	call,
 
 	// u8 op, u8 dst, u8 src

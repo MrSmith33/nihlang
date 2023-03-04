@@ -17,8 +17,6 @@ void vmStep(ref VmState vm) {
 		case trap: return instr_trap(vm);
 		case jump: return instr_jump(vm);
 		case branch: return instr_branch(vm);
-		case push: return instr_push(vm);
-		case pop: return instr_pop(vm);
 		case call: return instr_call(vm);
 		case mov: return instr_mov(vm);
 		case cmp: return instr_cmp(vm);
@@ -40,9 +38,6 @@ void vmStep(ref VmState vm) {
 
 void instr_ret(ref VmState vm) {
 	pragma(inline, true);
-	VmFunction* func = &vm.functions[vm.frameFuncIndex];
-	vm.registers.unput(func.numParameters + func.numLocals);
-
 	if (vm.callerFrames.length == 0) {
 		vm.isRunning = false;
 		vm.frameFirstReg = 0;
@@ -57,6 +52,7 @@ void instr_ret(ref VmState vm) {
 		vm.frameCode = vm.functions[vm.frameFuncIndex].code[].ptr;
 		vm.callerFrames.unput(1);
 	}
+	vm.popRegisters(vm.registers.length - vm.frameFirstReg - 256);
 	//++vm.numCalls;
 }
 
@@ -72,7 +68,6 @@ void instr_jump(ref VmState vm) {
 void instr_branch(ref VmState vm) {
 	pragma(inline, true);
 	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (srcIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 	VmReg* src = &vm.registers[srcIndex];
 
 	i32 offset = *cast(i32*)&vm.frameCode[vm.frameIp+2];
@@ -84,34 +79,21 @@ void instr_branch(ref VmState vm) {
 
 	vm.frameIp += 6;
 }
-void instr_push(ref VmState vm) {
-	pragma(inline, true);
-	u8 length = vm.frameCode[vm.frameIp+1];
-	vm.pushRegisters(length);
-	vm.frameIp += 2;
-}
-void instr_pop(ref VmState vm) {
-	pragma(inline, true);
-	u8 length = vm.frameCode[vm.frameIp+1];
-	vm.popRegisters(length);
-	vm.frameIp += 2;
-}
 void instr_call(ref VmState vm) {
 	pragma(inline, true);
-	u32 funcIndex = *cast(i32*)&vm.frameCode[vm.frameIp+1];
-
-	if(funcIndex >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", funcIndex, vm.functions.length);
-
-	VmFunction* callee = &vm.functions[funcIndex];
+	u8  arg0_idx = vm.frameCode[vm.frameIp+1];
+	u8  num_args = vm.frameCode[vm.frameIp+2];
+	u32 funcIndex = *cast(i32*)&vm.frameCode[vm.frameIp+3];
 
 	VmFunction* caller = &vm.functions[vm.frameFuncIndex];
-	u32 calleeFirstRegister = vm.frameFirstReg + caller.numResults + caller.numParameters + caller.numLocals;
 
-	if(calleeFirstRegister + callee.numResults + callee.numParameters != vm.registers.length)
-		panic("Invalid stack setup");
+	if(funcIndex >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", funcIndex, vm.functions.length);
+	VmFunction* callee = &vm.functions[funcIndex];
 
-	// modify current frame here, before pushing new one, as reallocation might happen
-	vm.frameIp += 5;
+	if(arg0_idx + num_args > 256) panic("Invalid stack setup"); // TODO validation
+
+	// modify current frame here, before pushing new one, as reallocation of callerFrames might happen
+	vm.frameIp += 7;
 
 	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
 
@@ -122,14 +104,14 @@ void instr_call(ref VmState vm) {
 	};
 	vm.callerFrames.put(*vm.allocator, callerFrame);
 
-	vm.frameFirstReg = calleeFirstRegister;
+	vm.frameFirstReg += arg0_idx;
 	vm.frameFuncIndex = funcIndex;
 	vm.frameIp = 0;
+	vm.pushRegisters(arg0_idx);
 
 	final switch(callee.kind) {
 		case VmFuncKind.bytecode:
 			vm.frameCode = callee.code[].ptr;
-			vm.pushRegisters(callee.numLocals);
 			return;
 
 		case VmFuncKind.external:
@@ -137,12 +119,12 @@ void instr_call(ref VmState vm) {
 			// call
 			callee.external(vm, callee.externalUserData);
 			// restore
-			vm.registers.unput(callee.numParameters + callee.numLocals);
 			VmFrame* frame = &vm.callerFrames.back();
 			vm.frameFirstReg = frame.firstRegister;
 			vm.frameFuncIndex = frame.funcIndex;
 			vm.frameIp = frame.ip;
 			vm.frameCode = caller.code[].ptr;
+			vm.popRegisters(vm.registers.length - vm.frameFirstReg - 256);
 			vm.callerFrames.unput(1);
 			return;
 	}
@@ -150,9 +132,7 @@ void instr_call(ref VmState vm) {
 void instr_mov(ref VmState vm) {
 	pragma(inline, true);
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (srcIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 	vm.registers[dstIndex] = vm.registers[srcIndex];
 	vm.frameIp += 3;
 }
@@ -163,15 +143,12 @@ void instr_cmp(ref VmState vm) {
 	if (cond > VmBinCond.max) return vm.setTrap(VmStatus.ERR_COND_OOB, cond);
 
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 
 	u32 src0Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+3];
-	static if (CHK_REG_IDX) if (src0Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
 	VmReg* src0 = &vm.registers[src0Index];
 
 	u32 src1Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+4];
-	static if (CHK_REG_IDX) if (src1Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
 	VmReg* src1 = &vm.registers[src1Index];
 
 	final switch(cond) with(VmBinCond) {
@@ -222,13 +199,10 @@ void instr_cmp(ref VmState vm) {
 void instr_add_i64(ref VmState vm) {
 	pragma(inline, true);
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 	u32 src0Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (src0Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
 	VmReg* src0 = &vm.registers[src0Index];
 	u32 src1Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+3];
-	static if (CHK_REG_IDX) if (src1Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
 	VmReg* src1 = &vm.registers[src1Index];
 	dst.as_u64 = src0.as_u64 + src1.as_u64;
 	dst.pointer = src0.pointer;
@@ -238,13 +212,10 @@ void instr_add_i64(ref VmState vm) {
 void instr_sub_i64(ref VmState vm) {
 	pragma(inline, true);
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 	u32 src0Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (src0Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src0Index);
 	VmReg* src0 = &vm.registers[src0Index];
 	u32 src1Index = vm.frameFirstReg + vm.frameCode[vm.frameIp+3];
-	static if (CHK_REG_IDX) if (src1Index >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, src1Index);
 	VmReg* src1 = &vm.registers[src1Index];
 	dst.as_u64 = src0.as_u64 - src1.as_u64;
 	if (src0.pointer == src1.pointer)
@@ -258,7 +229,6 @@ void instr_sub_i64(ref VmState vm) {
 void instr_const_s8(ref VmState vm) {
 	pragma(inline, true);
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 	i8 imm = vm.frameCode[vm.frameIp+2];
 	dst.as_s64 = imm;
@@ -271,11 +241,9 @@ void instr_load(ref VmState vm) {
 	u32 size = 1 << (op - VmOpcode.load_m8);
 
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 
 	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (srcIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 	VmReg* src = &vm.registers[srcIndex];
 
 	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_LOAD_NOT_PTR);
@@ -318,11 +286,9 @@ void instr_load_m8(ref VmState vm) {
 	enum u32 size = 1;
 
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 
 	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (srcIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 	VmReg* src = &vm.registers[srcIndex];
 
 	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_LOAD_NOT_PTR);
@@ -365,11 +331,9 @@ void instr_store(ref VmState vm) {
 	u32 size = 1 << (op - VmOpcode.store_m8);
 
 	u32 dstIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
-	static if (CHK_REG_IDX) if (dstIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, dstIndex);
 	VmReg* dst = &vm.registers[dstIndex];
 
 	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+2];
-	static if (CHK_REG_IDX) if (srcIndex >= vm.registers.length) return vm.setTrap(VmStatus.ERR_REGISTER_OOB, srcIndex);
 	VmReg* src = &vm.registers[srcIndex];
 
 	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_STORE_NOT_PTR);

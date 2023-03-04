@@ -11,5 +11,3 @@ enum CONSISTENCY_CHECKS = true;
 
 // Initializes all newly pushed registers
 enum INIT_REGISTERS = false;
-// Runtime check of register index
-enum CHK_REG_IDX = true;
