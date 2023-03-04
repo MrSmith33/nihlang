@@ -197,6 +197,7 @@ void test_mov_3(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId);
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_mov_4(ref VmTestContext c) {
 	// Test mov OOB dst register
@@ -209,6 +210,7 @@ void test_mov_4(ref VmTestContext c) {
 	assert(c.vm.errData == 0); // r0
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_mov_5(ref VmTestContext c) {
 	// Test mov OOB src register
@@ -233,6 +235,7 @@ void test_cmp_0(ref VmTestContext c) {
 	assert(c.vm.status == VmStatus.ERR_COND_OOB);
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_cmp_1(ref VmTestContext c) {
 	// Test cmp OOB dst register
@@ -245,6 +248,7 @@ void test_cmp_1(ref VmTestContext c) {
 	assert(c.vm.errData == 0); // r0
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_cmp_2(ref VmTestContext c) {
 	// Test cmp OOB src0 register
@@ -257,6 +261,7 @@ void test_cmp_2(ref VmTestContext c) {
 	assert(c.vm.errData == 1); // r1
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_cmp_3(ref VmTestContext c) {
 	// Test cmp OOB src1 register
@@ -580,6 +585,7 @@ void test_add_i64_3(ref VmTestContext c) {
 	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_add_i64_4(ref VmTestContext c) {
 	// Test add_i64 OOB dst register
@@ -592,6 +598,7 @@ void test_add_i64_4(ref VmTestContext c) {
 	assert(c.vm.errData == 0); // r0
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_add_i64_5(ref VmTestContext c) {
 	// Test add_i64 OOB src0 register
@@ -604,6 +611,7 @@ void test_add_i64_5(ref VmTestContext c) {
 	assert(c.vm.errData == 1); // r1
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_add_i64_6(ref VmTestContext c) {
 	// Test add_i64 OOB src1 register
@@ -630,6 +638,7 @@ void test_const_s8_0(ref VmTestContext c) {
 	assert(res[1] == VmReg( 1));
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 void test_const_s8_4(ref VmTestContext c) {
 	// Test const_s8 OOB dst register
@@ -643,6 +652,7 @@ void test_const_s8_4(ref VmTestContext c) {
 }
 
 
+static if (CHK_REG_IDX)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_0(ref VmTestContext c) {
@@ -657,6 +667,7 @@ void test_load_mXX_0(ref VmTestContext c) {
 	assert(c.vm.errData == 0); // r0
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_1(ref VmTestContext c) {
@@ -833,6 +844,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 }
 
 
+static if (CHK_REG_IDX)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
 void test_store_mXX_0(ref VmTestContext c) {
@@ -847,6 +859,7 @@ void test_store_mXX_0(ref VmTestContext c) {
 	assert(c.vm.errData == 0); // r0
 }
 
+static if (CHK_REG_IDX)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
 void test_store_mXX_1(ref VmTestContext c) {
@@ -1185,6 +1198,8 @@ void test_call_2(ref VmTestContext c) {
 	b.emit_ret();
 
 	c.vm.functions[funcId.index].code = b.code;
+
+	//disasm(stdoutSink, b.code[]);
 
 	VmReg[] res = c.call(funcId, VmReg(6));
 	assert(res[0] == VmReg(8));
