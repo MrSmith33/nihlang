@@ -18,7 +18,7 @@ version(EXECUTABLE) {
 		                  char* lpCmdLine, i32 nCmdShow)
 		{
 			initDbgHelp;
-			__init_time();
+			vox_init();
 			i32 ret = vox_main(null);
 			vox_exit_process(ret);
 		}
@@ -28,14 +28,14 @@ version(EXECUTABLE) {
 			asm @nogc nothrow {
 				sub RSP, 8;
 			}
-			__init_time();
+			vox_init();
 			i32 ret = vox_main(null);
 			vox_exit_process(ret);
 		}
 
 		version(OSX) export extern(C)
 		noreturn main() {
-			__init_time();
+			vox_init();
 			i32 ret = vox_main(null);
 			vox_exit_process(ret);
 		}
@@ -44,25 +44,29 @@ version(EXECUTABLE) {
 			version(WASI) {
 				export extern(C)
 				void _start() {
-					__init_time();
+					vox_init();
 					i32 ret = vox_main(null);
 					proc_exit(ret);
 				}
 			} else {
 				export extern(C)
 				void _start() {
-					__init_time();
+					vox_init();
 					i32 ret = vox_main(null);
 				}
 			}
-
 		}
 	}
 
 	version(VANILLA_D)
 	i32 main(string[] args) {
+		vox_init();
 		return vox_main(args);
 	}
+}
+
+export extern(C) void vox_init() {
+	version(NO_DEPS) __init_time();
 }
 
 version(SHARED_LIB) {
