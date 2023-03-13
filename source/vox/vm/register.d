@@ -32,6 +32,7 @@ struct VmReg {
 	AllocId pointer;
 
 	bool opEquals(VmReg other) {
+		pragma(inline, true);
 		return as_u64 == other.as_u64 && pointer == other.pointer;
 	}
 

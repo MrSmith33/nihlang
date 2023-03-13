@@ -17,7 +17,9 @@ void vmStep(ref VmState vm) {
 		case trap: return instr_trap(vm);
 		case jump: return instr_jump(vm);
 		case branch: return instr_branch(vm);
+		case branch_zero: return instr_branch_zero(vm);
 		case call: return instr_call(vm);
+		case tail_call: return instr_tail_call(vm);
 		case mov: return instr_mov(vm);
 		case cmp: return instr_cmp(vm);
 		case add_i64: return instr_add_i64(vm);
@@ -79,6 +81,20 @@ void instr_branch(ref VmState vm) {
 
 	vm.frameIp += 6;
 }
+void instr_branch_zero(ref VmState vm) {
+	pragma(inline, true);
+	u32 srcIndex = vm.frameFirstReg + vm.frameCode[vm.frameIp+1];
+	VmReg* src = &vm.registers[srcIndex];
+
+	i32 offset = *cast(i32*)&vm.frameCode[vm.frameIp+2];
+
+	if (src.as_u64 == 0 && src.pointer.isUndefined) {
+		vm.frameIp += offset + 6;
+		return;
+	}
+
+	vm.frameIp += 6;
+}
 void instr_call(ref VmState vm) {
 	pragma(inline, true);
 	u8  arg0_idx = vm.frameCode[vm.frameIp+1];
@@ -119,13 +135,39 @@ void instr_call(ref VmState vm) {
 			// call
 			callee.external(vm, callee.externalUserData);
 			// restore
-			VmFrame* frame = &vm.callerFrames.back();
-			vm.frameFirstReg = frame.firstRegister;
-			vm.frameFuncIndex = frame.funcIndex;
-			vm.frameIp = frame.ip;
-			vm.frameCode = caller.code[].ptr;
-			vm.popRegisters(vm.registers.length - vm.frameFirstReg - 256);
-			vm.callerFrames.unput(1);
+			instr_ret(vm);
+			return;
+	}
+}
+void instr_tail_call(ref VmState vm) {
+	pragma(inline, true);
+	u8  num_args = vm.frameCode[vm.frameIp+1];
+	u32 funcIndex = *cast(i32*)&vm.frameCode[vm.frameIp+2];
+
+	VmFunction* caller = &vm.functions[vm.frameFuncIndex];
+
+	if(funcIndex >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", funcIndex, vm.functions.length);
+	VmFunction* callee = &vm.functions[funcIndex];
+
+	if(num_args > 256) panic("Invalid stack setup"); // TODO validation
+	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
+
+	// frame is not pushed
+	// vm.frameFirstReg remains the same
+	vm.frameFuncIndex = funcIndex;
+	vm.frameIp = 0;
+
+	final switch(callee.kind) {
+		case VmFuncKind.bytecode:
+			vm.frameCode = callee.code[].ptr;
+			return;
+
+		case VmFuncKind.external:
+			vm.frameCode = null;
+			// call
+			callee.external(vm, callee.externalUserData);
+			// restore
+			instr_ret(vm);
 			return;
 	}
 }

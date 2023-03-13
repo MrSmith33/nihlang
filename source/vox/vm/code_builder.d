@@ -37,6 +37,15 @@ struct CodeBuilder {
 		code.put(*allocator, (funcIndex >> 24) & 0xFF);
 	}
 
+	void emit_tail_call(u8 num_args, u32 funcIndex) {
+		code.put(*allocator, VmOpcode.tail_call);
+		code.put(*allocator, num_args);
+		code.put(*allocator, (funcIndex >>  0) & 0xFF);
+		code.put(*allocator, (funcIndex >>  8) & 0xFF);
+		code.put(*allocator, (funcIndex >> 16) & 0xFF);
+		code.put(*allocator, (funcIndex >> 24) & 0xFF);
+	}
+
 	u32 emit_jump() {
 		code.put(*allocator, VmOpcode.jump);
 		code.put(*allocator, 0);
@@ -48,6 +57,16 @@ struct CodeBuilder {
 
 	u32 emit_branch(u8 src) {
 		code.put(*allocator, VmOpcode.branch);
+		code.put(*allocator, src);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		code.put(*allocator, 0);
+		return code.length;
+	}
+
+	u32 emit_branch_zero(u8 src) {
+		code.put(*allocator, VmOpcode.branch_zero);
 		code.put(*allocator, src);
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);

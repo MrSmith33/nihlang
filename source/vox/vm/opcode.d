@@ -29,12 +29,24 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	branch,
 
+	// u8 op, u8 src, s32 offset
+	// if reg[src] is zero jumps
+	// jumps relative to the address of the next instruction
+	branch_zero,
+
 	// u8 op, u8 arg0_idx, u8 num_args, u32 func_id
 	// Calls a function {func_id}
 	// arg0_idx becomes new reg[0] in the callee frame
 	// num_args must be equal or greater than number of parameters of {func_id}
 	// arg0_idx + num_args <= 256
 	call,
+
+	// u8 op, u8 num_args, u32 func_id
+	// Calls a function {func_id}
+	// reg[0] of the caller becomes reg[0] of the callee
+	// num_args must be equal or greater than number of parameters of {func_id}
+	// num_args <= 256
+	tail_call,
 
 	// u8 op, u8 dst, u8 src
 	// reg[dst] = reg[src]
@@ -72,9 +84,9 @@ enum VmOpcode : u8 {
 	load_m64,
 
 	// u8 op, u8 dst, s8 src
-	// s64 offset = reg[u8.dst].ptr + reg[u8.dst].s64
+	// s64 offset = reg[dst].ptr + reg[dst].s64
 	// mem[offset].uXX = reg[src].uXX
-	// if (reg[src].ptr.defined && offset.ptr_aligned) reg[u8.dst].ptr = mem[offset].ptr
+	// if (reg[src].ptr.defined && offset.ptr_aligned) reg[dst].ptr = mem[offset].ptr
 	store_m8,
 	store_m16,
 	store_m32,

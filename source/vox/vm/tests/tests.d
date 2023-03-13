@@ -114,13 +114,40 @@ void test_jump_0(ref VmTestContext c) {
 
 @VmTest
 void test_branch_0(ref VmTestContext c) {
-	// Test jump
+	// Test branch
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	u32 patch_addr = b.emit_branch(0);
 	b.emit_const_s8(0, 0);
 	b.emit_ret();
 	u32 true_addr = b.next_addr;
 	b.emit_const_s8(0, 1);
+	b.emit_ret();
+	b.patch_rip(patch_addr, true_addr);
+	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	VmReg[] res;
+
+	res = c.call(funcId, VmReg(0));
+	assert(res[0] == VmReg(0));
+	res = c.call(funcId, VmReg(10));
+	assert(res[0] == VmReg(1));
+
+	// branch on pointer
+	res = c.call(funcId, VmReg(funcId, 0));
+	assert(res[0] == VmReg(1));
+	res = c.call(funcId, VmReg(funcId, 10));
+	assert(res[0] == VmReg(1));
+}
+
+
+@VmTest
+void test_branch_zero_0(ref VmTestContext c) {
+	// Test branch zero
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	u32 patch_addr = b.emit_branch_zero(0);
+	b.emit_const_s8(0, 1);
+	b.emit_ret();
+	u32 true_addr = b.next_addr;
+	b.emit_const_s8(0, 0);
 	b.emit_ret();
 	b.patch_rip(patch_addr, true_addr);
 	AllocId funcId = c.vm.addFunction(1, 1, b.code);
@@ -828,8 +855,6 @@ static extern(C) void externPrint(ref VmState state, void* userData) {
 
 
 @VmTest
-//@VmTestOnly
-//@TestPtrSize64
 void test_call_0(ref VmTestContext c) {
 	// External function call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
@@ -850,81 +875,97 @@ void test_call_0(ref VmTestContext c) {
 	assert(res[0] == VmReg(42));
 }
 
-
 @VmTest
-//@VmTestOnly
-//@TestPtrSize64
 void test_call_1(ref VmTestContext c) {
 	// Bytecode function call
 
-	AllocId funcId = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcA = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcB = c.vm.addFunction(1, 1, Array!u8.init);
 
-	//AllocId extPrint = c.vm.addExternalFunction(0, 1, &externPrint);
-
-	// u64 fib(u64 number) {
-	//     if (number < 1) return 0;
-	//     if (number < 3) return 1;
-	//     return fib(number-1) + fib(number-2);
+	// u64 a(u64 number) {
+	//     return b(number) + 10;
 	// }
-	// r0: result
-	// r0: number
-	// r1: temp1
-	// r2: temp2
-	// r3: callee result
-	// r3: callee number
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_call(0, 1, funcB.index);
+	a.emit_const_s8(1, 10);
+	a.emit_add_i64(0, 0, 1);
+	a.emit_ret();
+
+	c.vm.functions[funcA.index].code = a.code;
+
+	// u64 b(u64 number) {
+	//     return number + 42;
+	// }
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	// if (number < 1)
-	b.emit_const_s8(1, 1);
-	b.emit_cmp(VmBinCond.s64_gt, 1, 1, 0);
-	u32 patch_addr1 = b.emit_branch(1);
-	// if (number < 3)
-	b.emit_const_s8(1, 3);
-	b.emit_cmp(VmBinCond.s64_gt, 1, 1, 0);
-	u32 patch_addr2 = b.emit_branch(1);
-	// fib(number-1)
-	b.emit_const_s8(2, 1);
-	b.emit_sub_i64(3, 0, 2);
-	b.emit_call(3, 1, funcId.index);
-	b.emit_mov(1, 3);
-	// fib(number-2)
-	b.emit_const_s8(2, 2);
-	b.emit_sub_i64(3, 0, 2);
-	b.emit_call(3, 1, funcId.index);
-	b.emit_mov(2, 3);
-	// fib(number-1) + fib(number-2)
-	b.emit_add_i64(0, 1, 2);
-	//b.emit_mov(3, 0);
-	//b.emit_call(3, 1, extPrint.index);
-	b.emit_ret();
-	// return 0
-	b.patch_rip(patch_addr1, b.next_addr);
-	b.emit_const_s8(0, 0);
-	//b.emit_mov(3, 0);
-	//b.emit_call(3, 1, extPrint.index);
-	b.emit_ret();
-	// return 1
-	b.patch_rip(patch_addr2, b.next_addr);
-	b.emit_const_s8(0, 1);
-	//b.emit_mov(3, 0);
-	//b.emit_call(3, 1, extPrint.index);
+	b.emit_const_s8(1, 42);
+	b.emit_add_i64(0, 0, 1);
 	b.emit_ret();
 
-	c.vm.functions[funcId.index].code = b.code;
+	c.vm.functions[funcB.index].code = b.code;
 
-	VmReg[] res = c.call(funcId, VmReg(6));
-	assert(res[0] == VmReg(8));
+	VmReg[] res = c.call(funcA, VmReg(5));
+	assert(res[0] == VmReg(57));
+}
+
+
+@VmTest
+void test_tail_call_0(ref VmTestContext c) {
+	// External function call
+	static extern(C) void externFunc(ref VmState state, void* userData) {
+		VmReg* reg0 = &state.registers[state.frameFirstReg+0];
+		assert(*reg0 == VmReg(10));
+		*reg0 = VmReg(42);
+	}
+
+	AllocId extFuncId = c.vm.addExternalFunction(1, 1, &externFunc);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(0, 10);
+	b.emit_tail_call(0, extFuncId.index);
+	b.emit_ret();
+
+	AllocId funcId = c.vm.addFunction(1, 0, b.code);
+	VmReg[] res = c.call(funcId);
+	assert(res[0] == VmReg(42));
+}
+
+@VmTest
+void test_tail_call_1(ref VmTestContext c) {
+	// Bytecode function tail call
+
+	AllocId funcA = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcB = c.vm.addFunction(1, 1, Array!u8.init);
+
+	// u64 a(u64 number) {
+	//     return b(number);
+	// }
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_tail_call(0, funcB.index);
+
+	c.vm.functions[funcA.index].code = a.code;
+
+	// u64 b(u64 number) {
+	//     return number + 42;
+	// }
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(1, 42);
+	b.emit_add_i64(0, 0, 1);
+	b.emit_ret();
+
+	c.vm.functions[funcB.index].code = b.code;
+
+	VmReg[] res = c.call(funcA, VmReg(5));
+	assert(res[0] == VmReg(47));
 }
 
 
 @VmTest
 //@VmTestOnly
 //@TestPtrSize64
-void test_call_2(ref VmTestContext c) {
-	// Benchmark
+void bench_0(ref VmTestContext c) {
+	// Benchmark fib
 
 	AllocId funcId = c.vm.addFunction(1, 1, Array!u8.init);
-
-	//AllocId extPrint = c.vm.addExternalFunction(0, 1, &externPrint);
 
 	// u64 fib(u64 number) {
 	//     if (number <= 1) return number;
