@@ -40,6 +40,8 @@ void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefini
 			def.attrPtrSize64 = true;
 		} else static if (is(attr == VmTestOnly)) {
 			def.onlyThis = true;
+		} else static if (is(attr == VmTestIgnore)) {
+			def.ignore = true;
 		} else static if (is(typeof(attr) == VmTestParam)) {
 			static __gshared u32[] attr_values = attr.values;
 			def.parameters.put(allocator, TestDefinition.Param(attr.id, attr_values));
@@ -60,11 +62,14 @@ struct TestDefinition {
 	bool attrPtrSize32;
 	bool attrPtrSize64;
 	bool onlyThis;
+	bool ignore;
 	Array!Param parameters;
 	void function(ref VmTestContext) test_handler;
 }
 
 void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
+	if (def.ignore) return;
+
 	if (def.onlyThis) {
 		if (suite.filter.enabled) {
 			auto otherDef = suite.definitions[suite.filter.definition];

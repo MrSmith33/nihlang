@@ -11,6 +11,7 @@ import vox.vm.tests.infra;
 @nogc nothrow:
 
 enum VmTest;
+enum VmTestIgnore;
 enum VmTestOnly;
 enum TestPtrSize32;
 enum TestPtrSize64;

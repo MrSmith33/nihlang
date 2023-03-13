@@ -850,7 +850,7 @@ void test_store_mXX_10(ref VmTestContext c) {
 
 
 static extern(C) void externPrint(ref VmState state, void* userData) {
-	writeln(state.registers[state.frameFirstReg]);
+	writeln(state.regs[0]);
 }
 
 
@@ -858,9 +858,8 @@ static extern(C) void externPrint(ref VmState state, void* userData) {
 void test_call_0(ref VmTestContext c) {
 	// External function call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
-		VmReg* reg0 = &state.registers[state.frameFirstReg+0];
-		assert(*reg0 == VmReg(10));
-		*reg0 = VmReg(42);
+		assert(state.regs[0] == VmReg(10));
+		state.regs[0] = VmReg(42);
 	}
 
 	AllocId extFuncId = c.vm.addExternalFunction(1, 1, &externFunc);
@@ -912,9 +911,8 @@ void test_call_1(ref VmTestContext c) {
 void test_tail_call_0(ref VmTestContext c) {
 	// External function call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
-		VmReg* reg0 = &state.registers[state.frameFirstReg+0];
-		assert(*reg0 == VmReg(10));
-		*reg0 = VmReg(42);
+		assert(state.regs[0] == VmReg(10));
+		state.regs[0] = VmReg(42);
 	}
 
 	AllocId extFuncId = c.vm.addExternalFunction(1, 1, &externFunc);
@@ -960,8 +958,9 @@ void test_tail_call_1(ref VmTestContext c) {
 
 
 @VmTest
-//@VmTestOnly
-//@TestPtrSize64
+@VmTestIgnore
+@VmTestOnly
+@TestPtrSize64
 void bench_0(ref VmTestContext c) {
 	// Benchmark fib
 
@@ -1002,7 +1001,51 @@ void bench_0(ref VmTestContext c) {
 
 	//disasm(stdoutSink, b.code[]);
 
-	VmReg[] res = c.call(funcId, VmReg(6));
-	//writefln("%s", res[0].as_u64);
-	assert(res[0] == VmReg(8));
+	VmReg[] res = c.call(funcId, VmReg(40));
+	writefln("%s", res[0].as_u64);
+	assert(res[0] == VmReg(102334155));
+}
+
+
+@VmTest
+@VmTestIgnore
+@VmTestOnly
+@TestPtrSize64
+void bench_1(ref VmTestContext c) {
+	// Benchmark fib (special opcodes)
+
+	AllocId funcId = c.vm.addFunction(1, 1, Array!u8.init);
+
+	// u64 fib(u64 number) {
+	//     if (number <= 1) return number;
+	//     return fib(number-1) + fib(number-2);
+	// }
+	// r0: result
+	// r0: number
+	// r1: temp1
+	// r2: temp2
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	// if (number <= 1)
+	//b.emit_const_s8(1, 1);
+	u32 patch_addr1 = b.emit_branch_gt_imm8(0, 1);
+	b.emit_ret();
+	// fib(number-1)
+	b.patch_rip(patch_addr1, b.next_addr);
+	b.emit_add_i64_imm8(1, 0, -1);
+	b.emit_call(1, 1, funcId.index);
+	// fib(number-2)
+	b.emit_add_i64_imm8(2, 0, -2);
+	b.emit_call(2, 1, funcId.index);
+	// fib(number-1) + fib(number-2)
+	b.emit_add_i64(0, 1, 2);
+	// return number
+	b.emit_ret();
+
+	c.vm.functions[funcId.index].code = b.code;
+
+	//disasm(stdoutSink, b.code[]);
+
+	VmReg[] res = c.call(funcId, VmReg(40));
+	writefln("%s", res[0].as_u64);
+	assert(res[0] == VmReg(102334155));
 }

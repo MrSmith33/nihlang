@@ -30,10 +30,13 @@ struct VmState {
 
 	u32 numCalls;
 
-	u32 frameFuncIndex;
-	u32 frameFirstReg;
-	u32 frameIp;
-	u8* frameCode;
+	FuncId func;
+	u32 ip;
+	u8* code;
+	VmReg* regs;
+	u32 frameFirstReg() const {
+		return cast(u32)(regs - &registers[0]);
+	}
 
 	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
 		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
@@ -55,13 +58,13 @@ struct VmState {
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 
 		numCalls = 0;
-		frameFuncIndex = 0;
-		frameFirstReg = 0;
-		frameIp = 0;
-		frameCode = null;
+		func = 0;
+		ip = 0;
+		code = null;
 
 		// Each function can access top 256 registers
 		pushRegisters(256);
+		regs = &registers[0];
 	}
 
 	bool isMemoryReadable(MemoryKind kind) {
@@ -115,12 +118,9 @@ struct VmState {
 	void beginCall(AllocId funcId) {
 		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
 		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
-		VmFunction* func = &functions[funcId.index];
-
-		frameFuncIndex = funcId.index;
-		frameFirstReg = 0;
-		frameIp = 0;
-		frameCode = func.code[].ptr;
+		func = FuncId(funcId.index);
+		regs = &registers[0];
+		code = functions[func].code[].ptr;
 	}
 
 	void run() {
@@ -137,8 +137,8 @@ struct VmState {
 		sink("---\n");
 		printRegs(sink);
 		while(isRunning) {
-			u32 ipCopy = frameIp;
-			disasmOne(sink, functions[frameFuncIndex].code[], ipCopy);
+			u32 ipCopy = ip;
+			disasmOne(sink, functions[func].code[], ipCopy);
 			vmStep(this);
 			if (status != VmStatus.OK) {
 				sink("Error: ");
@@ -229,10 +229,9 @@ struct VmState {
 
 	void printRegs(scope SinkDelegate sink) {
 		u32 numTotalRegs = registers.length;
-		u32 firstReg = frameFirstReg;
 
 		sink("     [");
-		foreach(i, reg; registers[firstReg..$]) {
+		foreach(i, reg; regs[0..256]) {
 			if (i > 0) {
 				if (i == numTotalRegs) sink("; ");
 				else sink(", ");
@@ -325,8 +324,14 @@ alias VmExternalFn = extern(C) void function(ref VmState state, void* userData);
 struct VmFrame {
 	@nogc nothrow:
 
-	u32 funcIndex;
+	FuncId func;
 	u32 ip;
-	// index of the first register
-	u32 firstRegister;
+	// Number of registers pushed during call
+	u32 regOffset;
+}
+
+struct FuncId {
+	@nogc nothrow:
+	u32 index;
+	alias index this;
 }

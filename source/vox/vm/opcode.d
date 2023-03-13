@@ -34,6 +34,11 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	branch_zero,
 
+	//
+	branch_ge,
+	branch_le_imm8,
+	branch_gt_imm8,
+
 	// u8 op, u8 arg0_idx, u8 num_args, u32 func_id
 	// Calls a function {func_id}
 	// arg0_idx becomes new reg[0] in the callee frame
@@ -59,6 +64,7 @@ enum VmOpcode : u8 {
 	//
 	// Pointer can only occur in first argument
 	add_i64,
+	add_i64_imm8,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
 	sub_i64,

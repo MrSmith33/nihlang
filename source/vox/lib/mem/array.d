@@ -40,7 +40,7 @@ struct Array(T)
 	ref T back() { return this[$-1]; }
 	void clear() { _length = 0; }
 
-	ref T opIndex(size_t index)
+	ref inout(T) opIndex(size_t index) inout
 	{
 		enforce(index < _capacity, "opIndex(%s), capacity %s", index, _capacity);
 		static if (NUM_INLINE_ITEMS > 0) {
