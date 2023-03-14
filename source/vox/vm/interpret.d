@@ -46,7 +46,7 @@ void vmStep(ref VmState vm) {
 void instr_ret(ref VmState vm) {
 	pragma(inline, true);
 	if (vm.callerFrames.length == 0) {
-		vm.isRunning = false;
+		vm.status = VmStatus.FINISHED;
 		vm.func = 0;
 		vm.ip = 0;
 		vm.code = null;

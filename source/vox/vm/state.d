@@ -15,11 +15,10 @@ struct VmState {
 	PtrSize ptrSize;
 	u8 readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_R;
 
-	bool isRunning = true;
-
 	// must be checked on return
-	VmStatus status;
+	VmStatus status = VmStatus.RUNNING;
 	u64 errData;
+	u64 budget = u64.max;
 
 	VoxAllocator* allocator;
 	Memory[3] memories;
@@ -57,6 +56,7 @@ struct VmState {
 			mem.clear(*allocator, ptrSize);
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 
+		budget = u64.max;
 		numCalls = 0;
 		func = 0;
 		ip = 0;
@@ -124,23 +124,33 @@ struct VmState {
 	}
 
 	void run() {
-		isRunning = true;
-		status = VmStatus.OK;
+		status = VmStatus.RUNNING;
 
-		while(isRunning) vmStep(this);
+		while (status == VmStatus.RUNNING) {
+			if (budget == 0) {
+				status = VmStatus.ERR_BUDGET;
+				return;
+			}
+			vmStep(this);
+			--budget;
+		}
 	}
 
 	void runVerbose(scope SinkDelegate sink) {
-		isRunning = true;
-		status = VmStatus.OK;
+		status = VmStatus.RUNNING;
 
 		sink("---\n");
 		printRegs(sink);
-		while(isRunning) {
+		scope(exit) sink("---\n");
+		while (status == VmStatus.RUNNING) {
+			if (budget == 0) {
+				status = VmStatus.ERR_BUDGET;
+				return;
+			}
 			u32 ipCopy = ip;
 			disasmOne(sink, functions[func].code[], ipCopy);
 			vmStep(this);
-			if (status != VmStatus.OK) {
+			if (status.isError) {
 				sink("Error: ");
 				vmFormatError(this, sink);
 				sink("\n");
@@ -148,12 +158,11 @@ struct VmState {
 			}
 			printRegs(sink);
 			// writefln("stack: %s", frames.length+1);
+			--budget;
 		}
-		sink("---\n");
 	}
 
 	void setTrap(VmStatus status, u64 data = 0) {
-		isRunning = false;
 		this.status = status;
 		this.errData = data;
 	}

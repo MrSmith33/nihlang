@@ -67,7 +67,7 @@ struct VmTestContext {
 		vm.run();
 		// vm.runVerbose(sink);
 
-		if (vm.status != VmStatus.OK) {
+		if (vm.status.isError) {
 			sink("  ---\n");
 			sink.formattedWrite("  Test %s failed\n", test.name);
 			sink("  Function expected to finish successfully\n");
@@ -87,7 +87,7 @@ struct VmTestContext {
 		setupCall(funcId, params);
 		vm.run();
 		//vm.runVerbose(sink);
-		if (vm.status == VmStatus.OK) {
+		if (!vm.status.isError) {
 			panic("Function expected to trap");
 		}
 		//vm.format_vm_error(sink);

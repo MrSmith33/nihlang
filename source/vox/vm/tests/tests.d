@@ -97,6 +97,27 @@ void test_trap_0(ref VmTestContext c) {
 
 
 @VmTest
+void test_budget_0(ref VmTestContext c) {
+	// Test budget
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+
+	// check that budget of 0 is not enough to run single instruction
+	c.vm.budget = 0;
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_BUDGET);
+
+	// check that budget of 1 is enough to run single instruction
+	c.vm.budget = 1;
+	c.call(funcId);
+
+	// check that budget gets reset per test
+	c.vm.budget = 0;
+}
+
+
+@VmTest
 void test_jump_0(ref VmTestContext c) {
 	// Test jump
 	CodeBuilder b = CodeBuilder(c.vm.allocator);

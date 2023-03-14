@@ -9,7 +9,9 @@ import vox.vm;
 @nogc nothrow:
 
 enum VmStatus : u8 {
-	OK,
+	RUNNING,
+	FINISHED,
+	ERR_BUDGET,
 	ERR_TRAP,
 	ERR_COND_OOB,
 	ERR_CMP_DIFFERENT_PTR,
@@ -26,15 +28,23 @@ enum VmStatus : u8 {
 	ERR_LOAD_INVALID_POINTER,
 }
 
+bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
+
 // No new line or dot at the end of the message
 void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
-	if (vm.status == VmStatus.OK) return;
-
 	u8* code = vm.code;
 
 	final switch(vm.status) with(VmStatus) {
-		case OK:
-			sink("ok");
+		case RUNNING:
+			sink("running");
+			break;
+
+		case FINISHED:
+			sink("finished");
+			break;
+
+		case ERR_BUDGET:
+			sink("execution budget exceeded");
 			break;
 
 		case ERR_TRAP:
