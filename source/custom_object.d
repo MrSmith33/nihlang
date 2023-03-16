@@ -1,5 +1,7 @@
 module object;
 
+// _tls_index breaks fuzzing
+version(FUZZER) {} else
 version(Windows) {
 	// druntime/src/core/sys/windows/threadaux.d
 	extern(C) __gshared int _tls_index;

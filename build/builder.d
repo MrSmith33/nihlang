@@ -20,7 +20,7 @@
 // https://webassembly.org/roadmap/
 // ldc2 -mtriple=wasm32-wasi -mattr=help
 //
-// source ~/dlang/ldc-1.30.0/activate
+// source ~/dlang/ldc-1.32.0/activate
 module builder;
 
 import core.time : MonoTime, Duration;
@@ -36,15 +36,16 @@ int main(string[] args)
 	string artifactDir = thisExePath.dirName.dirName.buildPath("bin").makeCanonicalPath;
 	string srcDir = thisExePath.dirName.dirName.buildPath("source").makeCanonicalPath;
 
-	auto nihcli  = Config("nih-cli",    "nihcli.d", artifactDir, srcDir, TargetType.executable, "nih");
-	auto nihslib = Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary, "nih");
-	auto nihdlib = Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.sharedLibrary, "nih");
-	auto vbeslib = Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe");
-	auto vbedlib = Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.sharedLibrary, "vbe");
-	auto testone = Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable);
-	auto testsuite = Config("testsuite", "testsuite.d", artifactDir, srcDir, TargetType.executable);
-
-	Config[] configs = [nihcli, nihslib, nihdlib, vbeslib, vbedlib, testone, testsuite];
+	Config[] configs = [
+		Config("nih-cli",    "nihcli.d", artifactDir, srcDir, TargetType.executable, "nih"),
+		Config("nih-static", "libnih.d", artifactDir, srcDir, TargetType.staticLibrary, "nih"),
+		Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.sharedLibrary, "nih"),
+		Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe"),
+		Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.sharedLibrary, "vbe"),
+		Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable),
+		Config("testsuite", "testsuite.d", artifactDir, srcDir, TargetType.executable),
+		Config("fuzzer", "fuzzer.d", artifactDir, srcDir, TargetType.executable),
+	];
 
 	bool needsHelp;
 	GlobalSettings gs = args.parseSettings(needsHelp, configs);
@@ -102,9 +103,10 @@ int runConfig(in GlobalSettings gs, in Config config)
 	JobResult res1 = gs.runJob(compileJob);
 
 	if (res1.status != 0) {
-		if (gs.compiler == Compiler.dmd && res1.output.canFind("-1073741819")) {
+		if (res1.output.canFind("-1073741819")) {
 			// This is a link.exe bug, where it crashes when previous compilation was done with ldc2, and old .pdb file is present
 			// delete that file and retry
+			// Happens to ldc after ldc too
 			gs.deletePdbArtifacts(compileJob);
 			stderr.writeln("Retrying");
 			JobResult retryRes = gs.runJob(compileJob);
@@ -204,6 +206,7 @@ struct GlobalSettings
 		nolibc = true;
 		customobject = true;
 	}
+	bool fuzzer;
 	bool betterc;
 	bool nolibc;
 	bool customobject; // Use custom object.d from source/druntime/object.d
@@ -241,6 +244,7 @@ void printOptions() {
 	stderr.writeln("   --print-callees    Print output of callee programs");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
 	stderr.writeln("   --print-total-time Print time of all run commands");
+	stderr.writeln("   --fuzzer           Enable fuzzing");
 	stderr.writeln("   --no-deps          --betterc + --no-libc + --customobject");
 	stderr.writeln("     --betterc        Compile in betterC mode");
 	stderr.writeln("     --no-libc        Compile without libc dependency");
@@ -292,6 +296,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"verbose-callees", "", &settings.verboseCallees,
 			"print-total-time", "", &settings.printTotalTime,
 			"no-deps", "", &settings.nodeps,
+			"fuzzer", "", &settings.fuzzer,
 			"betterc", "", &settings.betterc,
 			"no-libc", "", &settings.nolibc,
 			"customobject", "", &settings.customobject,
@@ -636,6 +641,10 @@ Compiler selectCompiler(in GlobalSettings gs, in string providedCompiler) {
 		return Compiler.ldc;
 	}
 
+	if (gs.fuzzer) {
+		return Compiler.ldc;
+	}
+
 	if (gs.buildType == BuildType.dbg)
 		return Compiler.dmd;
 	else
@@ -673,6 +682,7 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 
 	if (g.verboseCallees) flags |= Flags.f_verbose;
 	if (g.betterc) flags |= Flags.f_better_c;
+	if (g.fuzzer) flags |= Flags.f_fuzzer;
 	if (g.nolibc) flags |= Flags.f_no_libc;
 	if (g.color) flags |= Flags.f_msg_color;
 
@@ -757,16 +767,19 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				}
 				break;
 			case f_executable:
-				versions ~= "EXECUTABLE";
-				if (gs.targetOs == TargetOs.windows) {
-					if (bits & Flags.f_no_libc) {
-						linkerFlags ~= "/entry:" ~ osExecutableEntry[gs.targetOs];
-					}
-					linkerFlags ~= "/subsystem:console";
-				} else if (gs.targetOs == TargetOs.linux) {
-					if (gs.compiler == Compiler.ldc) {
+				if ((bits & Flags.f_fuzzer) == 0) {
+					versions ~= "EXECUTABLE";
+
+					if (gs.targetOs == TargetOs.windows) {
 						if (bits & Flags.f_no_libc) {
-							linkerFlags ~= "--entry=" ~ osExecutableEntry[gs.targetOs];
+							linkerFlags ~= "/entry:" ~ osExecutableEntry[gs.targetOs];
+						}
+						linkerFlags ~= "/subsystem:console";
+					} else if (gs.targetOs == TargetOs.linux) {
+						if (gs.compiler == Compiler.ldc) {
+							if (bits & Flags.f_no_libc) {
+								linkerFlags ~= "--entry=" ~ osExecutableEntry[gs.targetOs];
+							}
 						}
 					}
 				}
@@ -830,6 +843,14 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				break;
 			case f_compile_imported:
 				flags ~= "-i";
+				break;
+			case f_coverage:
+				flags ~= "-cov";
+				break;
+			case f_fuzzer:
+				versions ~= "FUZZER";
+				flags ~= "-fsanitize=fuzzer";
+				flags ~= "-fsanitize=address";
 				break;
 		}
 
@@ -932,6 +953,8 @@ enum Flags : uint {
 	f_opt                = 1 << 17,
 	f_link_debug_full    = 1 << 18,
 	f_compile_imported   = 1 << 19,
+	f_coverage           = 1 << 20,
+	f_fuzzer             = 1 << 21,
 }
 
 enum TargetOs : ubyte {
@@ -1162,7 +1185,7 @@ int calcScale10(Num)(Num val) {
 int calcScale2(Num)(Num val) {
 	import std.math: abs, round, log2;
 
-	auto lg = log2(abs(val));
+	auto lg = log2(cast(double)abs(val));
 	double absLog = abs(lg);
 
 	int scale = cast(int)(round(absLog/10.0))*10;
