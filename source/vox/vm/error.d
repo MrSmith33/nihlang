@@ -32,23 +32,21 @@ bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
 
 // No new line or dot at the end of the message
 void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
-	u8* code = vm.code;
-
 	final switch(vm.status) with(VmStatus) {
 		case RUNNING:
-			sink("running");
+			sink("Running");
 			break;
 
 		case FINISHED:
-			sink("finished");
+			sink("Finished");
 			break;
 
 		case ERR_BUDGET:
-			sink("execution budget exceeded");
+			sink("Execution budget exceeded");
 			break;
 
 		case ERR_TRAP:
-			sink("trap instruction reached");
+			sink("Trap instruction reached");
 			break;
 
 		case ERR_COND_OOB:
@@ -56,76 +54,76 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_CMP_DIFFERENT_PTR:
-			VmReg* dst  = &vm.regs[code[vm.ip+2]];
-			VmReg* src0 = &vm.regs[code[vm.ip+3]];
-			VmReg* src1 = &vm.regs[code[vm.ip+4]];
+			VmReg* dst  = &vm.regs[vm.code[vm.ip+2]];
+			VmReg* src0 = &vm.regs[vm.code[vm.ip+3]];
+			VmReg* src1 = &vm.regs[vm.code[vm.ip+4]];
 			sink.formattedWrite("Cannot compare different pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-				code[vm.ip+2], *dst,
-				code[vm.ip+3], *src0,
-				code[vm.ip+4], *src1);
+				vm.code[vm.ip+2], *dst,
+				vm.code[vm.ip+3], *src0,
+				vm.code[vm.ip+4], *src1);
 			break;
 
 		case ERR_CMP_REQUIRES_NO_PTR:
-			VmReg* dst  = &vm.regs[code[vm.ip+2]];
-			VmReg* src0 = &vm.regs[code[vm.ip+3]];
-			VmReg* src1 = &vm.regs[code[vm.ip+4]];
+			VmReg* dst  = &vm.regs[vm.code[vm.ip+2]];
+			VmReg* src0 = &vm.regs[vm.code[vm.ip+3]];
+			VmReg* src1 = &vm.regs[vm.code[vm.ip+4]];
 			sink.formattedWrite("Compare operation expects no pointers\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-				code[vm.ip+2], *dst,
-				code[vm.ip+3], *src0,
-				code[vm.ip+4], *src1);
+				vm.code[vm.ip+2], *dst,
+				vm.code[vm.ip+3], *src0,
+				vm.code[vm.ip+4], *src1);
 			break;
 
 		case ERR_PTR_SRC1:
-			VmReg* dst  = &vm.regs[code[vm.ip+1]];
-			VmReg* src0 = &vm.regs[code[vm.ip+2]];
-			VmReg* src1 = &vm.regs[code[vm.ip+3]];
+			VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+			VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
 
 			sink.formattedWrite("add.i64 can only contain pointers in the first argument.\n  r%s: %s\n  r%s: %s\n  r%s: %s",
-				code[vm.ip+1], *dst,
-				code[vm.ip+2], *src0,
-				code[vm.ip+3], *src1);
+				vm.code[vm.ip+1], *dst,
+				vm.code[vm.ip+2], *src0,
+				vm.code[vm.ip+3], *src1);
 			break;
 
 		case ERR_STORE_NO_WRITE_PERMISSION:
-			VmReg* dst = &vm.regs[code[vm.ip+1]];
-			VmReg* src = &vm.regs[code[vm.ip+2]];
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 
 			sink.formattedWrite("Writing to %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 				memoryKindString[dst.pointer.kind],
-				code[vm.ip+1], *dst,
-				code[vm.ip+2], *src);
+				vm.code[vm.ip+1], *dst,
+				vm.code[vm.ip+2], *src);
 			break;
 
 		case ERR_LOAD_NO_READ_PERMISSION:
-			VmReg* dst = &vm.regs[code[vm.ip+1]];
-			VmReg* src = &vm.regs[code[vm.ip+2]];
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 
 			sink.formattedWrite("Reading from %s pointer is disabled.\n  r%s: %s\n  r%s: %s",
 				memoryKindString[src.pointer.kind],
-				code[vm.ip+1], *dst,
-				code[vm.ip+2], *src);
+				vm.code[vm.ip+1], *dst,
+				vm.code[vm.ip+2], *src);
 			break;
 
 		case ERR_STORE_NOT_PTR:
-			VmReg* dst = &vm.regs[code[vm.ip+1]];
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 
-			sink.formattedWrite("Writing to non-pointer value (r%s:%s)", code[vm.ip+1], *dst);
+			sink.formattedWrite("Writing to non-pointer value (r%s:%s)", vm.code[vm.ip+1], *dst);
 			break;
 
 		case ERR_LOAD_NOT_PTR:
-			VmReg* src = &vm.regs[code[vm.ip+2]];
-			sink.formattedWrite("Reading from non-pointer value (r%s:%s)", code[vm.ip+2], *src);
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+			sink.formattedWrite("Reading from non-pointer value (r%s:%s)", vm.code[vm.ip+2], *src);
 			break;
 
 		case ERR_LOAD_INVALID_POINTER:
-			VmReg* src = &vm.regs[code[vm.ip+2]];
-			sink.formattedWrite("Reading from invalid pointer (r%s:%s)", code[vm.ip+2], *src);
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+			sink.formattedWrite("Reading from invalid pointer (r%s:%s)", vm.code[vm.ip+2], *src);
 			break;
 
 		case ERR_STORE_OOB:
-			u8 op = code[vm.ip+0];
+			u8 op = vm.code[vm.ip+0];
 			u32 size = 1 << (op - VmOpcode.store_m8);
-			VmReg* dst = &vm.regs[code[vm.ip+1]];
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 			Memory* mem = &vm.memories[dst.pointer.kind];
 			Allocation* alloc = &mem.allocations[dst.pointer.index];
 
@@ -139,23 +137,23 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_STORE_PTR_UNALIGNED:
-			u8 op = code[vm.ip+0];
+			u8 op = vm.code[vm.ip+0];
 			u32 size = 1 << (op - VmOpcode.store_m8);
-			VmReg* dst = &vm.regs[code[vm.ip+1]];
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 			Memory* mem = &vm.memories[dst.pointer.kind];
 			Allocation* alloc = &mem.allocations[dst.pointer.index];
 
 			u64 offset = dst.as_u64;
 
 			sink.formattedWrite("Writing pointer value (r%s:%s) to an unaligned offset (0x%X)",
-				code[vm.ip+1], *dst,
+				vm.code[vm.ip+1], *dst,
 				offset);
 			break;
 
 		case ERR_LOAD_OOB:
-			u8 op = code[vm.ip+0];
+			u8 op = vm.code[vm.ip+0];
 			u32 size = 1 << (op - VmOpcode.load_m8);
-			VmReg* src = &vm.regs[code[vm.ip+2]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			Memory* mem = &vm.memories[src.pointer.kind];
 			Allocation* alloc = &mem.allocations[src.pointer.index];
 
@@ -169,16 +167,16 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_LOAD_UNINIT:
-			u8 op = code[vm.ip+0];
+			u8 op = vm.code[vm.ip+0];
 			u32 size = 1 << (op - VmOpcode.load_m8);
-			VmReg* src = &vm.regs[code[vm.ip+2]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			Memory* mem = &vm.memories[src.pointer.kind];
 			Allocation* alloc = &mem.allocations[src.pointer.index];
 
 			u64 offset = src.as_u64;
 
 			sink.formattedWrite("Reading uninitialized memory from allocation (r%s:%s)\n  Reading %s bytes at offset %s",
-				code[vm.ip+2], *src,
+				vm.code[vm.ip+2], *src,
 				size,
 				offset);
 
