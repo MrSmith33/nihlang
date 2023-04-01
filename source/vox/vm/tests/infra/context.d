@@ -38,7 +38,7 @@ struct VmTestContext {
 		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
 	}
 
-	private VmFunction* setupCall(AllocId funcId, VmReg[] params) {
+	private VmFunction* setupCall(AllocId funcId, VmReg[] regParams) {
 		if(funcId.index >= vm.functions.length) {
 			panic("Invalid function index (%s), only %s functions exist",
 				funcId.index, vm.functions.length);
@@ -48,22 +48,22 @@ struct VmTestContext {
 				memoryKindString[funcId.kind]);
 		}
 		VmFunction* func = &vm.functions[funcId.index];
-		if(func.numParameters < params.length) {
+		if(func.numRegParams < regParams.length) {
 			panic("Invalid number of parameters provided, expected at least %s, got %s",
-				func.numParameters, params.length);
+				func.numRegParams, regParams.length);
 		}
 
 		vm.beginCall(funcId);
 		// set parameters
-		foreach(i; 0..func.numParameters) {
-			vm.registers[i] = params[i];
+		foreach(i; 0..func.numRegParams) {
+			vm.registers[i] = regParams[i];
 		}
 
 		return func;
 	}
 
-	VmReg[] call(AllocId funcId, VmReg[] params...) {
-		VmFunction* func = setupCall(funcId, params);
+	VmReg[] call(AllocId funcId, VmReg[] regParams...) {
+		VmFunction* func = setupCall(funcId, regParams);
 		vm.run();
 		// vm.runVerbose(sink);
 
@@ -83,8 +83,8 @@ struct VmTestContext {
 		return vm.registers[0..func.numResults];
 	}
 
-	void callFail(AllocId funcId, VmReg[] params...) {
-		setupCall(funcId, params);
+	void callFail(AllocId funcId, VmReg[] regParams...) {
+		setupCall(funcId, regParams);
 		vm.run();
 		//vm.runVerbose(sink);
 		if (!vm.status.isError) {

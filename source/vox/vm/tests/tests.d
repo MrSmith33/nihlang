@@ -32,7 +32,7 @@ void test_warmup(ref VmTestContext c) {
 	b.emit_mov(0, 1);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	c.call(funcId);
 }
 
@@ -53,7 +53,7 @@ void test_ret_0(ref VmTestContext c) {
 	// Test return with 0 results 0 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId);
 	assert(res.length == 0);
 	assert(c.vm.frameFirstReg == 0);
@@ -65,7 +65,7 @@ void test_ret_1(ref VmTestContext c) {
 	// Test return with 0 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
 	assert(res.length == 0);
 	assert(c.vm.frameFirstReg == 0);
@@ -77,7 +77,7 @@ void test_ret_2(ref VmTestContext c) {
 	// Test return with 2 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(2, 2, b.code);
+	AllocId funcId = c.vm.addFunction(2.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
 	assert(res.length == 2);
 	assert(c.vm.frameFirstReg == 0);
@@ -90,7 +90,7 @@ void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId);
 	assert(c.vm.status == VmStatus.ERR_TRAP);
 }
@@ -101,7 +101,7 @@ void test_budget_0(ref VmTestContext c) {
 	// Test budget
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 
 	// check that budget of 0 is not enough to run single instruction
 	c.vm.budget = 0;
@@ -127,7 +127,7 @@ void test_jump_0(ref VmTestContext c) {
 	u32 ret_addr = b.next_addr;
 	b.emit_ret();
 	b.patch_rip(patch_addr, ret_addr);
-	AllocId funcId = c.vm.addFunction(1, 0, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(0));
 }
@@ -144,7 +144,7 @@ void test_branch_0(ref VmTestContext c) {
 	b.emit_const_s8(0, 1);
 	b.emit_ret();
 	b.patch_rip(patch_addr, true_addr);
-	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
@@ -171,7 +171,7 @@ void test_branch_zero_0(ref VmTestContext c) {
 	b.emit_const_s8(0, 0);
 	b.emit_ret();
 	b.patch_rip(patch_addr, true_addr);
-	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
@@ -193,7 +193,7 @@ void test_mov_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(42));
 	assert(res[0] == VmReg(42));
 }
@@ -204,7 +204,7 @@ void test_mov_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId));
 	assert(res[0] == VmReg(funcId));
 }
@@ -215,7 +215,7 @@ void test_mov_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId, 42));
 	assert(res[0] == VmReg(funcId, 42));
 }
@@ -227,7 +227,7 @@ void test_mov_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(0));
 }
 
@@ -238,7 +238,7 @@ void test_cmp_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(cast(VmBinCond)(VmBinCond.max+1), 0, 1, 2);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0, 0, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId);
 	assert(c.vm.status == VmStatus.ERR_COND_OOB);
 }
@@ -252,7 +252,7 @@ void test_cmp_4(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	// ptr is null
@@ -280,7 +280,7 @@ void test_cmp_5(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	// ptr is null
@@ -307,7 +307,7 @@ void test_cmp_6(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.u64_gt, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	// ptr is null
@@ -334,7 +334,7 @@ void test_cmp_7(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.u64_ge, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	// ptr is null
@@ -364,7 +364,7 @@ void test_cmp_8(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
 	assert(c.vm.status == VmStatus.ERR_CMP_DIFFERENT_PTR);
 }
@@ -379,7 +379,7 @@ void test_cmp_9(ref VmTestContext c) {
 	b.emit_cmp(cond, 0, 0, 1);
 	b.emit_trap();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
 	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(10));
@@ -395,7 +395,7 @@ void test_cmp_10(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.s64_gt, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
@@ -419,7 +419,7 @@ void test_cmp_11(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.s64_ge, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
@@ -448,7 +448,7 @@ void test_cmp_12(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f32_ge, 3, 4, 5);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(4, 2, b.code);
+	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(cast(f32)100.0), VmReg(cast(f32)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
 	assert(res[1] == VmReg(1)); // 100 >= 50
@@ -468,7 +468,7 @@ void test_cmp_13(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f64_ge, 3, 4, 5);
 	b.emit_ret();
 	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(4, 2, b.code);
+	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(cast(f64)100.0), VmReg(cast(f64)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
 	assert(res[1] == VmReg(1)); // 100 >= 50
@@ -483,7 +483,7 @@ void test_add_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(10), VmReg(20));
 	assert(res[0] == VmReg(30));
 }
@@ -494,7 +494,7 @@ void test_add_i64_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId, VmReg(funcId, 10), VmReg(20));
 	assert(res[0] == VmReg(funcId, 30));
 }
@@ -505,7 +505,7 @@ void test_add_i64_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(funcId, 10), VmReg(funcId, 20));
 	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
 }
@@ -516,7 +516,7 @@ void test_add_i64_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
 	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
 }
@@ -529,7 +529,7 @@ void test_const_s8_0(ref VmTestContext c) {
 	b.emit_const_s8(0, -1);
 	b.emit_const_s8(1,  1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(2, 0, b.code);
+	AllocId funcId = c.vm.addFunction(2.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(-1));
 	assert(res[1] == VmReg( 1));
@@ -544,7 +544,7 @@ void test_load_mXX_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(0), VmReg(0));
 	assert(c.vm.status == VmStatus.ERR_LOAD_NOT_PTR);
 }
@@ -564,7 +564,7 @@ void test_load_mXX_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	if (memKind == MemoryKind.func_id) memId = funcId;
 	c.vm.readWriteMask = 0; // everything is non-readable
 	c.callFail(funcId, VmReg(0), VmReg(memId));
@@ -582,7 +582,7 @@ void test_load_mXX_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(0), VmReg(memId, -1));
 	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
 }
@@ -598,7 +598,7 @@ void test_load_mXX_5(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
 	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
 }
@@ -614,7 +614,7 @@ void test_load_mXX_6(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 0));
 	assert(c.vm.status == VmStatus.ERR_LOAD_UNINIT);
 }
@@ -636,7 +636,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b.code);
 
 	foreach(offset; 0..9) {
 		u64 shiftSize  = offset * 8;
@@ -676,7 +676,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 1, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b.code);
 
 	foreach(offset; 0..9) {
 		u64 shiftSize  = offset * 8;
@@ -704,7 +704,7 @@ void test_store_mXX_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(0), VmReg(0));
 	assert(c.vm.status == VmStatus.ERR_STORE_NOT_PTR);
 }
@@ -723,7 +723,7 @@ void test_store_mXX_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	if (memKind == MemoryKind.func_id) memId = funcId;
 	c.vm.readWriteMask = 0; // everything is non-writable
 	c.callFail(funcId, VmReg(memId), VmReg(0));
@@ -741,7 +741,7 @@ void test_store_mXX_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(memId, -1), VmReg(0));
 	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
 }
@@ -757,7 +757,7 @@ void test_store_mXX_5(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
 	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
 }
@@ -781,7 +781,7 @@ void test_store_mXX_6(ref VmTestContext c) {
 	b.emit_binop(store_op, 0, 1);
 	b.emit_binop(load_op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 
 	foreach(offset; 0..9) {
 		VmReg[] res = c.call(funcId, VmReg(memId, offset), VmReg(value));
@@ -804,7 +804,7 @@ void test_store_mXX_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0, 2, b.code);
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 
 	foreach(offset; 1..c.vm.ptrSize.inBytes) {
 		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
@@ -826,7 +826,7 @@ void test_store_mXX_8(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 0); // store memId
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0); //   load memId
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 2, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b.code);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId));
 	assert(res[0] == VmReg(memId));
@@ -845,7 +845,7 @@ void test_store_mXX_9(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 2); // store memId2 (overwrites memId1)
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  load memId2
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 3, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b.code);
 
 	VmReg[] res = c.call(funcId, VmReg(memId1), VmReg(memId1), VmReg(memId2));
 	assert(res[0] == VmReg(memId2));
@@ -863,7 +863,7 @@ void test_store_mXX_10(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 2); // store 0
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  load 0
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1, 3, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b.code);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId), VmReg(0));
 	assert(res[0] == VmReg(0));
@@ -883,14 +883,14 @@ void test_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1, 1, &externFunc);
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
 	b.emit_call(0, 1, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1, 0, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(42));
 }
@@ -899,8 +899,8 @@ void test_call_0(ref VmTestContext c) {
 void test_call_1(ref VmTestContext c) {
 	// Bytecode function call
 
-	AllocId funcA = c.vm.addFunction(1, 1, Array!u8.init);
-	AllocId funcB = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 a(u64 number) {
 	//     return b(number) + 10;
@@ -936,14 +936,14 @@ void test_tail_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1, 1, &externFunc);
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
 	b.emit_tail_call(0, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1, 0, b.code);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b.code);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(42));
 }
@@ -952,8 +952,8 @@ void test_tail_call_0(ref VmTestContext c) {
 void test_tail_call_1(ref VmTestContext c) {
 	// Bytecode function tail call
 
-	AllocId funcA = c.vm.addFunction(1, 1, Array!u8.init);
-	AllocId funcB = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 a(u64 number) {
 	//     return b(number);
@@ -985,7 +985,7 @@ void test_tail_call_1(ref VmTestContext c) {
 void bench_0(ref VmTestContext c) {
 	// Benchmark fib
 
-	AllocId funcId = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 fib(u64 number) {
 	//     if (number <= 1) return number;
@@ -1035,7 +1035,7 @@ void bench_0(ref VmTestContext c) {
 void bench_1(ref VmTestContext c) {
 	// Benchmark fib (special opcodes)
 
-	AllocId funcId = c.vm.addFunction(1, 1, Array!u8.init);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 fib(u64 number) {
 	//     if (number <= 1) return number;

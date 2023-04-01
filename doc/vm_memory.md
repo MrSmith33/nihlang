@@ -143,7 +143,7 @@ I decided to use 4 pointer kinds:
        ptr - int  
        ptr - ptr (pointer bases must be equal, otherwise trap)  
        int - ptr trap
-    7. memcopy
+    7. memcopy, memmove, memcmp
     8. cmp
        eq, ne also check the pointer
        gt, ge trap if pointer is not the same
@@ -169,7 +169,18 @@ VM limitations:
 - Pointers are only copied by the pointer-sized load/store or memcopy that covers whole pointer
 - Each allocation is in its own address space. You cannot subtract pointer to one allocation from pointer to a different one.
 
+I can choose the definition of safety for my lang. Accessing a dangling pointer is definitely a problem. Having dangling pointers in memory after the end of CTFE is also a problem. But triggering on programs that have some sort of allocator, where there can be some stale memory with old pointers feels not practical. At the same time triggering as early as possible seems the most convenient when trying to find the cause of a problem.
+Maybe the middle ground is to trigger conservatively. Then rerun all the computation looking for particular free operation and report it. I can do this if I make all the side-effects idempotent.
 
+Possible fix is to insert some sort of clear/clear_shadow_pointers/mark_uninitialized call, when running in CTFE. This means that for some code that needs to run in both CTFE and native target, it needs this special call added. Pretty practical I would say.
+```d
+void clearBuffer() {
+    length = 0;
+    // clears all shadow pointers in memory slice when run in VM
+    // no-op in native code
+    __mark_uninitialized(bufPtr, capacity);
+}
+```
 
 Open questions:
 1. Should we allow static memory to contain uninitialized bytes?

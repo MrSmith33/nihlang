@@ -79,18 +79,30 @@ struct VmState {
 		return kind < MemoryKind.func_id;
 	}
 
-	AllocId addFunction(u8 numResults, u8 numParameters, Array!u8 code) {
+	AllocId addFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		Array!u8 code)
+	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults, numParameters, code));
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, code));
 		return AllocId(index, MemoryKind.func_id);
 	}
 
-	AllocId addExternalFunction(u8 numResults, u8 numParameters, VmExternalFn fn, void* userData = null) {
+	AllocId addExternalFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		VmExternalFn fn,
+		void* userData = null)
+	{
 		u32 index = functions.length;
 		VmFunction f = {
 			kind : VmFuncKind.external,
-			numResults : numResults,
-			numParameters : numParameters,
+			numResults : numResults.val,
+			numRegParams : numRegParams.val,
+			numStackParams : numStackParams.val,
 			external : fn,
 			externalUserData : userData,
 		};
@@ -303,7 +315,8 @@ struct VmFunction {
 
 	VmFuncKind kind;
 	u8 numResults;
-	u8 numParameters;
+	u8 numRegParams;
+	u8 numStackParams;
 
 	union {
 		Array!u8 code;
@@ -322,6 +335,10 @@ struct VmFunction {
 		}
 	}
 }
+
+struct NumResults { u8 val; }
+struct NumRegParams { u8 val; }
+struct NumStackParams { u8 val; }
 
 enum VmFuncKind : u8 {
 	bytecode,
