@@ -603,6 +603,7 @@ void test_load_mXX_5(ref VmTestContext c) {
 	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
 }
 
+static if (MEM_INIT_CHECKS)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
@@ -632,7 +633,9 @@ void test_load_mXX_7(ref VmTestContext c) {
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
 	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
 	c.vm.memWrite!u64(memId, 8, value1); // fill memory with data
-	c.vm.markInitialized(memId, 0, 16);  // make memory initialized
+	static if (MEM_INIT_CHECKS) {
+		c.vm.markInitialized(memId, 0, 16);  // make memory initialized
+	}
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 0);
 	b.emit_ret();
@@ -670,7 +673,9 @@ void test_load_mXX_8(ref VmTestContext c) {
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
 	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
 	c.vm.memWrite!u64(memId, 8, value1); // fill memory with data
-	c.vm.markInitialized(memId, 0, 16);  // make memory initialized
+	static if (MEM_INIT_CHECKS) {
+		c.vm.markInitialized(memId, 0, 16);  // make memory initialized
+	}
 	c.memWritePtr(memId, 0, memId);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -785,12 +790,16 @@ void test_store_mXX_6(ref VmTestContext c) {
 
 	foreach(offset; 0..9) {
 		VmReg[] res = c.call(funcId, VmReg(memId, offset), VmReg(value));
-		// should not init unrelated bytes
-		assert(c.countAllocInitBits(memId) == size);
+		static if (MEM_INIT_CHECKS) {
+			// should not init unrelated bytes
+			assert(c.countAllocInitBits(memId) == size);
+		}
 		assert(res[0] == VmReg(value & sizeMask));
 
-		// mark whole allocation as uninitialized
-		c.setAllocInitBits(memId, false);
+		static if (MEM_INIT_CHECKS) {
+			// mark whole allocation as uninitialized
+			c.setAllocInitBits(memId, false);
+		}
 	}
 }
 
@@ -810,8 +819,10 @@ void test_store_mXX_7(ref VmTestContext c) {
 		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
 		assert(c.vm.status == VmStatus.ERR_STORE_PTR_UNALIGNED);
 
-		// memory was not touched by unsuccessful store
-		assert(c.countAllocInitBits(memId) == 0);
+		static if (MEM_INIT_CHECKS) {
+			// memory was not touched by unsuccessful store
+			assert(c.countAllocInitBits(memId) == 0);
+		}
 	}
 }
 

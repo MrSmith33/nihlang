@@ -61,9 +61,11 @@ struct Memory {
 	// Pointers must be aligned in memory
 	// Each allocation is aligned at least to a pointer size
 	Array!u8 pointerBitmap;
-	// 1 bit per byte in memory
-	// 1 means byte is initialized, 0 uninitialized
-	Array!u8 initBitmap;
+	static if (MEM_INIT_CHECKS) {
+		// 1 bit per byte in memory
+		// 1 means byte is initialized, 0 uninitialized
+		Array!u8 initBitmap;
+	}
 	// Stores pointer data for every pointer in memory
 	// This maps memory offset to AllocId
 	static if (MEMORY_RELOCATIONS_PER_MEMORY) {
@@ -77,9 +79,11 @@ struct Memory {
 		// By default no pointers are in memory
 		u8[] data1 = pointerBitmap.voidPut(allocator, size / ptrSize.inBits);
 		data1[] = 0;
-		// By default all bytes are uninitialized
-		u8[] data2 = initBitmap.voidPut(allocator, size / 8);
-		data2[] = 0;
+		static if (MEM_INIT_CHECKS) {
+			// By default all bytes are uninitialized
+			u8[] data2 = initBitmap.voidPut(allocator, size / 8);
+			data2[] = 0;
+		}
 	}
 
 	void clear(ref VoxAllocator allocator, PtrSize ptrSize) {
@@ -90,7 +94,9 @@ struct Memory {
 		} else {
 			relocations.clear;
 		}
-		markInitBits(0, bytesUsed, false);
+		static if (MEM_INIT_CHECKS) {
+			markInitBits(0, bytesUsed, false);
+		}
 		allocations.clear;
 		bytesUsed = 0;
 	}
@@ -104,6 +110,7 @@ struct Memory {
 		return AllocId(index, allocKind);
 	}
 
+	static if (MEM_INIT_CHECKS)
 	void markInitBits(u32 offset, u32 size, bool value) {
 		size_t* ptr = cast(size_t*)&initBitmap.front();
 		setBitRange(ptr, offset, offset+size, value);

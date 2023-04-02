@@ -226,6 +226,7 @@ struct VmState {
 		*cast(T*)(memory + alloc.offset + offset) = value;
 	}
 
+	static if (MEM_INIT_CHECKS)
 	void markInitialized(AllocId dstMem, u32 offset, u32 size) {
 		Memory* mem = &memories[dstMem.kind];
 		Allocation* alloc = &mem.allocations[dstMem.index];
@@ -279,19 +280,30 @@ struct VmState {
 		Memory* mem = &memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
 		u8[] bytes = mem.memory[offset..offset+length];
-		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
+
+		static if (MEM_INIT_CHECKS) {
+			size_t* initBits = cast(size_t*)&mem.initBitmap.front();
+		}
 
 		size_t index = 0;
 
-		if (bytesPerLine) {
-			while (index + bytesPerLine <= bytes.length) {
-				printIndent(sink, indentation);
-				foreach(i, b; bytes[index..index+bytesPerLine]) {
+		void printBytes(u8[] bytes) {
+			foreach(i, b; bytes) {
+				static if (MEM_INIT_CHECKS) {
 					if (getBitAt(initBits, index+i))
 						sink.formattedWrite("%02X ", b);
 					else
 						sink("?? ");
+				} else {
+					sink.formattedWrite("%02X ", b);
 				}
+			}
+		}
+
+		if (bytesPerLine) {
+			while (index + bytesPerLine <= bytes.length) {
+				printIndent(sink, indentation);
+				printBytes(bytes[index..index+bytesPerLine]);
 				sink("\n");
 				index += bytesPerLine;
 			}
@@ -299,12 +311,7 @@ struct VmState {
 
 		if (index < bytes.length) {
 			printIndent(sink, indentation);
-			foreach(i, b; bytes[index..$]) {
-				if (getBitAt(initBits, index+i))
-					sink.formattedWrite("%02X ", b);
-				else
-					sink("?? ");
-			}
+			printBytes(bytes[index..index+bytesPerLine]);
 			sink("\n");
 		}
 	}

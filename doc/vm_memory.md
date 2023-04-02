@@ -151,21 +151,30 @@ I decided to use 4 pointer kinds:
     9. branch
        jumps if either data or pointer is not zero
 
-10. What if we memcopy a chunk of memory containing a pointer?  
-    Memcopy must be aware of shadow pointers, but checking each word in the hashmap for potential pointer seems slow.  
+10. What should be done about padding within structs/arrays?
+    I track initialization for each memory byte.
+    Memory reads check that data being read is initialized.
+    I can assume that reading individual fields always hits initialized data (1 bit per byte) for valid programs, but memcopy just needs to copy bytes.
+    1. memcopy also copies the initialization data. 
+    2. padding must be initialized. Or marked as initialized. memcopy marks target memory as initialized (should be faster)
+    
+    Option 1 seems to be equal to what happens in native code
+
+11. What if we memcopy a chunk of memory containing a pointer?  
+    Memcopy must be aware of shadow pointers, but checking each word in the hashmap for potential pointer seems slow.
     I think of using a bitmap, with one bit per pointer slot. This implies supporting aligned pointers only.  
     Then memcopy would copy a bitmap too. Plus for each 1 in the bitmap it would also look into the hashmap and copy the entry.  
     When memcopy copies a pointer, the pointer must land into aligned memory location. (Same with a store of a pointer)
 
-11. What happens when load_m64 tries to load two 32-bit pointers?
+12. What happens when load_m64 tries to load two 32-bit pointers?
     - Only load raw bytes (current solution)
     - trap
     - Somehow support 2 pointers per register. This would probably mean supporting several arithmetic operations, like shifting left/right by 32.
 
-12. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes)
+13. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes)
 
 VM limitations:
-- Only aligned pointers
+- Only aligned pointers (aligned by pointer size)
 - Pointers are only copied by the pointer-sized load/store or memcopy that covers whole pointer
 - Each allocation is in its own address space. You cannot subtract pointer to one allocation from pointer to a different one.
 
