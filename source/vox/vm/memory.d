@@ -106,7 +106,10 @@ struct Memory {
 	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
-		bytesUsed += sizeAlign.size;
+		// allocate in multiple of 8 bytes
+		// so that pointers are always aligned in memory and we can use pointer bitmap
+		u32 alignedSize = alignValue(sizeAlign.size, 8);
+		bytesUsed += alignedSize;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign.size));
 		return AllocId(index, allocKind);
