@@ -262,3 +262,73 @@ struct BitsSet(T)
 		return 0;
 	}
 }
+
+BitsSetRange!T bitsSetRange(T)(T* bitmap, u32 from, u32 to) { return BitsSetRange!T(bitmap, from, to); }
+struct BitsSetRange(T) {
+	@nogc nothrow:
+
+	T* ptr;
+	u32 from;
+	u32 to;
+
+	import core.bitop : bsf;
+
+	int opApply(scope int delegate(size_t) @nogc nothrow dg) {
+		enum BITS_PER_SLOT = T.sizeof * 8;
+
+		size_t fromBit  = from % BITS_PER_SLOT;
+		size_t toBit    =   to % BITS_PER_SLOT;
+
+		size_t fromSlot = from / BITS_PER_SLOT;
+		size_t toSlot   =   to / BITS_PER_SLOT;
+
+		// All bits are in the same size_t slot
+		if (fromSlot == toSlot) {
+			size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+			size_t toSlotMask =    (size_t(1) << toBit) - 1;
+			size_t mask = fromSlotMask & toSlotMask;
+			T slotBits = ptr[fromSlot] & mask;
+			while (slotBits != 0) {
+				T lowestSetBit = slotBits & -slotBits;
+				if (int res = dg(fromSlot * BITS_PER_SLOT + bsf(slotBits))) return res;
+				slotBits ^= lowestSetBit;
+			}
+			return 0;
+		}
+
+		// Incomplete slot at the beginning
+		if (fromBit != 0) {
+			size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+			T slotBits = ptr[fromSlot] & fromSlotMask;
+			while (slotBits != 0) {
+				T lowestSetBit = slotBits & -slotBits;
+				if (int res = dg(fromSlot * BITS_PER_SLOT + bsf(slotBits))) return res;
+				slotBits ^= lowestSetBit;
+			}
+			++fromSlot;
+		}
+
+		// Range of full slots can be counted faster
+		foreach(i, T slotBits; ptr[fromSlot .. toSlot]) {
+			size_t baseIndex = (fromSlot + i) * BITS_PER_SLOT;
+			while (slotBits != 0) {
+				T lowestSetBit = slotBits & -slotBits;
+				if (int res = dg(baseIndex + bsf(slotBits))) return res;
+				slotBits ^= lowestSetBit;
+			}
+		}
+
+		// Incomplete slot at the end
+		if (toBit != 0) {
+			size_t toSlotMask = (size_t(1) << toBit) - 1;
+			T slotBits = ptr[toSlot] & toSlotMask;
+			while (slotBits != 0) {
+				T lowestSetBit = slotBits & -slotBits;
+				if (int res = dg(toSlot * BITS_PER_SLOT + bsf(slotBits))) return res;
+				slotBits ^= lowestSetBit;
+			}
+		}
+
+		return 0;
+	}
+}
