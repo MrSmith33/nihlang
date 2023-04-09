@@ -14,6 +14,7 @@ struct CodeBuilder {
 
 	VoxAllocator* allocator;
 	Array!u8 code;
+	Array!SizeAndAlign stack;
 
 	u32 next_addr() {
 		return code.length;
@@ -31,6 +32,10 @@ struct CodeBuilder {
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);
 		code.put(*allocator, 0);
+	}
+
+	void add_stack_slot(SizeAndAlign sizeAlign) {
+		stack.put(*allocator, sizeAlign);
 	}
 
 	void emit_ret() { U8(VmOpcode.ret); }
