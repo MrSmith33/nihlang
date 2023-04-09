@@ -225,7 +225,7 @@ size_t popcntBitRange(size_t* ptr, size_t from, size_t to) {
 	// Incomplete slot at the end
 	if (toBit != 0) {
 		size_t toSlotMask = (size_t(1) << toBit) - 1;
-		count += popcnt(ptr[fromSlot] & toSlotMask);
+		count += popcnt(ptr[toSlot] & toSlotMask);
 	}
 
 	return count;
