@@ -15,10 +15,3 @@ alias i64 = long;
 alias isize = typeof(cast(void*)0 - cast(void*)0);
 alias f32 = float;
 alias f64 = double;
-
-struct SizeAndAlign {
-	@nogc nothrow:
-
-	u32 size;
-	u32 alignment;
-}

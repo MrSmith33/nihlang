@@ -40,6 +40,30 @@ T nextPOT(T)(T x) pure {
 	return x;
 }
 
+struct SizeAndAlign {
+	@nogc nothrow:
+
+	enum ALIGN_BITS = 5;
+	enum ALIGN_MASK = (1 << ALIGN_BITS) - 1;
+	enum SIZE_BITS = 32 - ALIGN_BITS;
+	enum SIZE_MASK = (1 << SIZE_BITS) - 1;
+
+	this(u32 size, u32 alignment) {
+		import core.bitop : bsf;
+		assert(isPowerOfTwo(alignment), "Alignment must be power of two");
+		assert((size & SIZE_MASK) == size, "Size must fit into 27 bits");
+		u32 alignmentPower = bsf(alignment);
+		assert((alignmentPower & ALIGN_MASK) == alignmentPower, "Alignment power must fit into 5 bits");
+		payload = (size & SIZE_MASK) | (alignmentPower << SIZE_BITS);
+	}
+
+	u32 payload;
+
+	u32 size() { return payload & SIZE_MASK; }
+	u32 alignmentPower() { return payload >> SIZE_BITS; }
+	u32 alignment() { return 1 << cast(u32)alignmentPower; }
+}
+
 bool isPowerOfTwo(T)(T x) pure {
 	return (x != 0) && ((x & (~x + 1)) == x);
 }
