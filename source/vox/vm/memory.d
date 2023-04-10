@@ -79,11 +79,11 @@ struct Memory {
 	void reserve(ref VoxAllocator allocator, u32 size, PtrSize ptrSize) {
 		memory.voidPut(allocator, size);
 		// By default no pointers are in memory
-		u8[] data1 = pointerBitmap.voidPut(allocator, size / ptrSize.inBits);
+		u8[] data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
 		data1[] = 0;
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
-			u8[] data2 = initBitmap.voidPut(allocator, size / 8);
+			u8[] data2 = initBitmap.voidPut(allocator, divCeil(size, 8));
 			data2[] = 0;
 		}
 	}
