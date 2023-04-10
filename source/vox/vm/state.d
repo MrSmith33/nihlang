@@ -29,12 +29,20 @@ struct VmState {
 
 	u32 numCalls;
 
+	// stack frame data
 	FuncId func;
 	u32 ip;
 	u8* code;
 	VmReg* regs;
+	Allocation* stackSlots() {
+		return &memories[MemoryKind.stack_mem].allocations[frameFirstStackSlot];
+	}
 	u32 frameFirstReg() const {
 		return cast(u32)(regs - &registers[0]);
+	}
+	u32 frameFirstStackSlot;
+	u8 numFrameStackSlots() const {
+		return cast(u8)(memories[MemoryKind.stack_mem].allocations.length - frameFirstStackSlot);
 	}
 
 	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
@@ -52,8 +60,10 @@ struct VmState {
 		functions.clear;
 		callerFrames.clear;
 		registers.clear;
-		foreach(ref mem; memories)
+		foreach(ref mem; memories) {
 			mem.clear(*allocator, ptrSize);
+		}
+		// null allocation
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 
 		budget = u64.max;
@@ -61,6 +71,7 @@ struct VmState {
 		func = 0;
 		ip = 0;
 		code = null;
+		frameFirstStackSlot = 0;
 
 		// Each function can access top 256 registers
 		pushRegisters(256);

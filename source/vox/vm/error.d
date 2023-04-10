@@ -26,6 +26,8 @@ enum VmStatus : u8 {
 	ERR_LOAD_OOB,
 	ERR_LOAD_UNINIT,
 	ERR_LOAD_INVALID_POINTER,
+	ERR_CALL_INSUFFICIENT_STACK_ARGS,
+	ERR_CALL_INVALID_STACK_ARG_SIZES,
 }
 
 bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
@@ -181,6 +183,30 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 				offset);
 
 			vm.printMem(sink, src.pointer, cast(u32)offset, size, 16, 2);
+			break;
+
+		case ERR_CALL_INSUFFICIENT_STACK_ARGS:
+			u8 numStackParams = cast(u8)vm.errData;
+			sink.formattedWrite("Insufficient stack slots on the caller stack\nCallee has %s stack parameters\nCaller frame has %s stack allocations",
+				numStackParams,
+				vm.numFrameStackSlots);
+			break;
+
+		case ERR_CALL_INVALID_STACK_ARG_SIZES:
+			FuncId calleeId = *cast(FuncId*)&vm.code[vm.ip+3];
+			VmFunction* callee = &vm.functions[calleeId];
+			SizeAndAlign* slotSizes = &callee.stackSlotSizes.front();
+			u8 numStackParams = callee.numStackParams;
+
+			sink("Invalid stack slots sizes of stack arguments on the caller stack\n");
+			foreach(i; 0..numStackParams) {
+				if (slotSizes[i].size != vm.stackSlots[i].size) {
+					sink.formattedWrite("arg %s: arg size %s != parameter size %s",
+						i,
+						slotSizes[i].size,
+						vm.stackSlots[i].size);
+				}
+			}
 			break;
 	}
 }
