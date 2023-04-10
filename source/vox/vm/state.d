@@ -86,7 +86,7 @@ struct VmState {
 		Array!u8 code)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, code));
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, Array!SizeAndAlign.init, code));
 		return AllocId(index, MemoryKind.func_id);
 	}
 
@@ -97,7 +97,7 @@ struct VmState {
 		ref CodeBuilder builder)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.code));
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code));
 		return AllocId(index, MemoryKind.func_id);
 	}
 
@@ -335,6 +335,7 @@ struct VmFunction {
 	u8 numResults;
 	u8 numRegParams;
 	u8 numStackParams;
+	Array!SizeAndAlign stackSlotSizes;
 
 	union {
 		Array!u8 code;
@@ -348,6 +349,7 @@ struct VmFunction {
 		final switch (kind) {
 			case VmFuncKind.bytecode:
 				code.free(allocator);
+				stackSlotSizes.free(allocator);
 				break;
 			case VmFuncKind.external: break;
 		}
