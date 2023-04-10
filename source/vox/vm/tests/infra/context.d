@@ -133,14 +133,14 @@ struct VmTestContext {
 		}
 	}
 
-	static if (MEM_INIT_CHECKS)
+	static if (SANITIZE_UNINITIALIZED_MEM)
 	void setAllocInitBits(AllocId allocId, bool value) {
 		Memory* mem = &vm.memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
 		mem.markInitBits(alloc.offset, alloc.size, value);
 	}
 
-	static if (MEM_INIT_CHECKS)
+	static if (SANITIZE_UNINITIALIZED_MEM)
 	size_t countAllocInitBits(AllocId allocId) {
 		Memory* mem = &vm.memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];

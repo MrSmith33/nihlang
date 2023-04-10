@@ -341,7 +341,7 @@ void instr_load(ref VmState vm) {
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
 	if (offset + size > alloc.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
 
-	static if (MEM_INIT_CHECKS) {
+	static if (SANITIZE_UNINITIALIZED_MEM) {
 		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
 		size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
 		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_LOAD_UNINIT);
@@ -385,7 +385,7 @@ void instr_load_m8(ref VmState vm) {
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
 	if (offset + size > alloc.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
 
-	static if (MEM_INIT_CHECKS) {
+	static if (SANITIZE_UNINITIALIZED_MEM) {
 		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
 		size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
 		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_LOAD_UNINIT);
@@ -447,7 +447,7 @@ void instr_store(ref VmState vm) {
 		default: assert(false);
 	}
 
-	static if (MEM_INIT_CHECKS) {
+	static if (SANITIZE_UNINITIALIZED_MEM) {
 		// mark bytes as initialized
 		mem.markInitBits(cast(u32)(alloc.offset + offset), size, true);
 	}

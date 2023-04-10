@@ -237,7 +237,7 @@ struct VmState {
 		*cast(T*)(memory + alloc.offset + offset) = value;
 	}
 
-	static if (MEM_INIT_CHECKS)
+	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitialized(AllocId dstMem, u32 offset, u32 size) {
 		Memory* mem = &memories[dstMem.kind];
 		Allocation* alloc = &mem.allocations[dstMem.index];
@@ -292,7 +292,7 @@ struct VmState {
 		Allocation* alloc = &mem.allocations[allocId.index];
 		u8[] bytes = mem.memory[offset..offset+length];
 
-		static if (MEM_INIT_CHECKS) {
+		static if (SANITIZE_UNINITIALIZED_MEM) {
 			size_t* initBits = cast(size_t*)&mem.initBitmap.front();
 		}
 
@@ -300,7 +300,7 @@ struct VmState {
 
 		void printBytes(u8[] bytes) {
 			foreach(i, b; bytes) {
-				static if (MEM_INIT_CHECKS) {
+				static if (SANITIZE_UNINITIALIZED_MEM) {
 					if (getBitAt(initBits, index+i))
 						sink.formattedWrite("%02X ", b);
 					else

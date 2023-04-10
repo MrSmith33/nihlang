@@ -63,7 +63,7 @@ struct Memory {
 	// Pointers must be aligned in memory
 	// Each allocation is aligned at least to a pointer size
 	Array!u8 pointerBitmap;
-	static if (MEM_INIT_CHECKS) {
+	static if (SANITIZE_UNINITIALIZED_MEM) {
 		// 1 bit per byte in memory
 		// 1 means byte is initialized, 0 uninitialized
 		Array!u8 initBitmap;
@@ -81,7 +81,7 @@ struct Memory {
 		// By default no pointers are in memory
 		u8[] data1 = pointerBitmap.voidPut(allocator, size / ptrSize.inBits);
 		data1[] = 0;
-		static if (MEM_INIT_CHECKS) {
+		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
 			u8[] data2 = initBitmap.voidPut(allocator, size / 8);
 			data2[] = 0;
@@ -96,7 +96,7 @@ struct Memory {
 		} else {
 			relocations.clear;
 		}
-		static if (MEM_INIT_CHECKS) {
+		static if (SANITIZE_UNINITIALIZED_MEM) {
 			markInitBits(0, bytesUsed, false);
 		}
 		allocations.clear;
@@ -115,7 +115,7 @@ struct Memory {
 		return AllocId(index, allocKind);
 	}
 
-	static if (MEM_INIT_CHECKS)
+	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitBits(u32 offset, u32 size, bool value) {
 		size_t* ptr = cast(size_t*)&initBitmap.front();
 		setBitRange(ptr, offset, offset+size, value);
