@@ -90,6 +90,17 @@ struct VmState {
 		return AllocId(index, MemoryKind.func_id);
 	}
 
+	AllocId addFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		ref CodeBuilder builder)
+	{
+		u32 index = functions.length;
+		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.code));
+		return AllocId(index, MemoryKind.func_id);
+	}
+
 	AllocId addExternalFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
