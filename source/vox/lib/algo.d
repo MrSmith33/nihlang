@@ -3,6 +3,8 @@
 /// Authors: Andrey Penechko
 module vox.lib.algo;
 
+import vox.lib;
+
 @nogc nothrow:
 
 
@@ -238,9 +240,11 @@ BitsSet!T bitsSet(T)(T[] bitmap) { return BitsSet!T(bitmap); }
 
 struct BitsSet(T)
 {
+	@nogc nothrow:
+
 	T[] bitmap;
 
-	int opApply(scope int delegate(size_t) dg)
+	int opApply(scope int delegate(size_t) @nogc nothrow dg)
 	{
 		foreach (size_t slotIndex, T slotBits; bitmap)
 		{

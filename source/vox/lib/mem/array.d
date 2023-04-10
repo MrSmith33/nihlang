@@ -32,10 +32,10 @@ struct Array(T)
 		private T* externalArray;
 	}
 
-	bool empty() { return _length == 0; }
-	uint length() { return _length; }
-	uint opDollar() { return _length; }
-	uint capacity() { return _capacity; }
+	bool empty() const { return _length == 0; }
+	uint length() const { return _length; }
+	uint opDollar() const { return _length; }
+	uint capacity() const { return _capacity; }
 	ref T front() { return this[0]; }
 	ref T back() { return this[$-1]; }
 	void clear() { _length = 0; }

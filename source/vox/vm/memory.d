@@ -38,6 +38,8 @@ struct AllocId {
 }
 
 struct Allocation {
+	@nogc nothrow:
+
 	// Start in parent Memory
 	u32 offset;
 	// Size in bytes
