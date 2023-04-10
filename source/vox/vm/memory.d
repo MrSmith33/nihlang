@@ -163,13 +163,26 @@ enum PtrSize : u8 {
 }
 
 u32 as_u32(PtrSize s) {
+	pragma(inline, true);
 	return s;
 }
 
 u32 inBytes(PtrSize s) {
+	pragma(inline, true);
 	return (s+1) * 4;
 }
 
 u32 inBits(PtrSize s) {
+	pragma(inline, true);
 	return (s+1) * 32;
+}
+
+u32 memOffsetToPtrIndex(u32 offset, PtrSize ptrSize) {
+	pragma(inline, true);
+	return offset >> (ptrSize + 2);
+}
+
+u32 ptrIndexToMemOffset(u32 val, PtrSize ptrSize) {
+	pragma(inline, true);
+	return val << (ptrSize + 2);
 }
