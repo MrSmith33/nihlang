@@ -120,6 +120,16 @@ struct Memory {
 		size_t* ptr = cast(size_t*)&initBitmap.front();
 		setBitRange(ptr, offset, offset+size, value);
 	}
+
+	void setPtrBit(u32 offset) {
+		size_t* ptr = cast(size_t*)&pointerBitmap.front();
+		setBitAt(ptr, offset);
+	}
+
+	void resetPtrBit(u32 offset) {
+		size_t* ptr = cast(size_t*)&pointerBitmap.front();
+		resetBitAt(ptr, offset);
+	}
 }
 
 enum MemoryKind : u8 {
