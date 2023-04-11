@@ -43,22 +43,51 @@ void vmStep(ref VmState vm) {
 	}
 }
 
+// Also called at the end of native function call
 void instr_ret(ref VmState vm) {
 	pragma(inline, true);
-	if (vm.callerFrames.length == 0) {
+
+	if (vm.numFrameStackSlots) {
+		Memory* mem = &vm.memories[MemoryKind.stack_mem];
+		Allocation[] stackAllocs = mem.allocations[vm.frameFirstStackSlot..$];
+		foreach(ref Allocation alloc; stackAllocs) {
+			//writefln("alloc %s refs %s", alloc.size, alloc.numReferences);
+			static if (MEMORY_RELOCATIONS_PER_MEMORY) {
+				foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+					//writefln("  offset %s target %s", offset, target);
+					vm.pointerRemove(mem, &alloc, offset);
+				}
+			}
+			static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+				alloc.relocations.free(*vm.allocator);
+			}
+		}
+		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
+		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
+		// TODO: check return registers, they should not return ptr to released stack
+	}
+
+	// we always have at least 1 frame, because initial native caller has its own frame
+	assert(vm.callerFrames.length);
+	VmFrame* frame = &vm.callerFrames.back();
+	if (vm.callerFrames.length == 1) {
 		vm.status = VmStatus.FINISHED;
 		vm.func = 0;
 		vm.ip = 0;
 		vm.code = null;
 	} else {
-		VmFrame* frame = &vm.callerFrames.back();
-		vm.regs -= frame.regOffset;
+		vm.regs -= frame.regDelta;
 		vm.func = frame.func;
 		vm.ip = frame.ip;
 		vm.code = vm.functions[vm.func].code[].ptr;
-		vm.callerFrames.unput(1);
-		vm.popRegisters(frame.regOffset);
 	}
+
+	vm.popRegisters(frame.regDelta);
+	vm.frameFirstStackSlot -= frame.numStackSlots;
+
+	// don't touch frame after unput
+	vm.callerFrames.unput(1);
+
 	//++vm.numCalls;
 }
 
@@ -144,23 +173,54 @@ void instr_call(ref VmState vm) {
 	u8  arg0_idx = vm.code[vm.ip+1];
 	u8  num_args = vm.code[vm.ip+2];
 	FuncId calleeId = *cast(FuncId*)&vm.code[vm.ip+3];
+	if(calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
+	if(arg0_idx + num_args > 256) panic("Invalid stack setup"); // TODO validation
+	// modify current frame here, before pushing new one, as reallocation of callerFrames might happen
+	// Don't increment in instr_call_impl, because it is also used from native code
+	vm.ip += 7;
+	instr_call_impl(vm, calleeId, arg0_idx);
+}
+
+// this function can be called from both bytecode function and from native function
+void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
+	// Must be checked by the caller
+	assert(calleeId < vm.functions.length);
 
 	VmFunction* caller = &vm.functions[vm.func];
-
-	if(calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
 	VmFunction* callee = &vm.functions[calleeId];
-
-	if(arg0_idx + num_args > 256) panic("Invalid stack setup"); // TODO validation
-
-	// modify current frame here, before pushing new one, as reallocation of callerFrames might happen
-	vm.ip += 7;
 
 	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
 
+	u8 numStackParams = callee.numStackParams;
+	// vm.numFrameStackSlots will be modified by pushStackAlloc below
+	u8 numCallerStackSlots = cast(u8)(vm.numFrameStackSlots - numStackParams);
+	if (numStackParams) {
+		if (vm.numFrameStackSlots < numStackParams) {
+			return vm.setTrap(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS, numStackParams);
+		}
+		SizeAndAlign* slotSizes = &callee.stackSlotSizes.front();
+		// parameters: verify sizes
+		bool sizesValid = true;
+		foreach(i; 0..numStackParams) {
+			// In the future we may allow bigger allocation than what was requested
+			sizesValid = sizesValid && (slotSizes[i].size == vm.stackSlots[i].size);
+		}
+		if (!sizesValid) {
+			return vm.setTrap(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+		}
+		// locals: allocate slots
+		u8 numCalleeStackLocals = cast(u8)callee.stackSlotSizes.length;
+		foreach(i; numStackParams..numCalleeStackLocals) {
+			vm.pushStackAlloc(slotSizes[i]);
+		}
+	}
+
+	// vm.ip already points to the next instruction for bytecode function
 	VmFrame callerFrame = {
 		func : vm.func,
 		ip : vm.ip,
-		regOffset : arg0_idx,
+		regDelta : arg0_idx,
+		numStackSlots : numCallerStackSlots,
 	};
 	vm.callerFrames.put(*vm.allocator, callerFrame);
 
@@ -168,6 +228,7 @@ void instr_call(ref VmState vm) {
 	vm.ip = 0;
 	u32 regIndex = vm.frameFirstReg;
 	vm.pushRegisters(arg0_idx);
+	vm.frameFirstStackSlot += numCallerStackSlots;
 	// calculate regs from scratch in case of reallocation
 	vm.regs = &vm.registers[regIndex + arg0_idx];
 

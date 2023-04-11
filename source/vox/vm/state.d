@@ -35,13 +35,16 @@ struct VmState {
 	u8* code;
 	VmReg* regs;
 	Allocation* stackSlots() {
+		pragma(inline, true);
 		return &memories[MemoryKind.stack_mem].allocations[frameFirstStackSlot];
 	}
 	u32 frameFirstReg() const {
+		pragma(inline, true);
 		return cast(u32)(regs - &registers[0]);
 	}
 	u32 frameFirstStackSlot;
 	u8 numFrameStackSlots() const {
+		pragma(inline, true);
 		return cast(u8)(memories[MemoryKind.stack_mem].allocations.length - frameFirstStackSlot);
 	}
 
@@ -54,6 +57,7 @@ struct VmState {
 	}
 
 	void reset() {
+		status = VmStatus.RUNNING;
 		errData = 0;
 		foreach(ref func; functions)
 			func.free(*allocator);
@@ -65,10 +69,15 @@ struct VmState {
 		}
 		// null allocation
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+		// native caller function
+		VmFunction f = {
+			kind : VmFuncKind.external,
+		};
+		functions.put(*allocator, f);
 
 		budget = u64.max;
 		numCalls = 0;
-		func = 0;
+		func = FuncId(0); // native caller function
 		ip = 0;
 		code = null;
 		frameFirstStackSlot = 0;
@@ -132,6 +141,11 @@ struct VmState {
 		return AllocId(index, MemoryKind.func_id);
 	}
 
+	AllocId pushStackAlloc(SizeAndAlign sizeAlign) {
+		assert(numFrameStackSlots < u8.max);
+		return memories[MemoryKind.stack_mem].allocate(*allocator, sizeAlign, MemoryKind.stack_mem);
+	}
+
 	void pushRegisters(u32 numRegisters) {
 		auto regs = registers.voidPut(*allocator, numRegisters);
 		static if (INIT_REGISTERS) {
@@ -158,8 +172,6 @@ struct VmState {
 	}
 
 	void run() {
-		status = VmStatus.RUNNING;
-
 		while (status == VmStatus.RUNNING) {
 			if (budget == 0) {
 				status = VmStatus.ERR_BUDGET;
@@ -171,10 +183,8 @@ struct VmState {
 	}
 
 	void runVerbose(scope SinkDelegate sink) {
-		status = VmStatus.RUNNING;
-
 		sink("---\n");
-		printRegs(sink);
+		// printRegs(sink);
 		scope(exit) sink("---\n");
 		while (status == VmStatus.RUNNING) {
 			if (budget == 0) {
@@ -183,14 +193,14 @@ struct VmState {
 			}
 			u32 ipCopy = ip;
 			disasmOne(sink, functions[func].code[], ipCopy);
+			sink("\n");
 			vmStep(this);
 			if (status.isError) {
 				sink("Error: ");
 				vmFormatError(this, sink);
 				sink("\n");
-				break;
 			}
-			printRegs(sink);
+			//printRegs(sink);
 			// writefln("stack: %s", frames.length+1);
 			--budget;
 		}
@@ -211,6 +221,7 @@ struct VmState {
 	}
 
 	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
+		assert(value.isDefined);
 		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
@@ -360,10 +371,10 @@ struct VmFunction {
 		final switch (kind) {
 			case VmFuncKind.bytecode:
 				code.free(allocator);
-				stackSlotSizes.free(allocator);
 				break;
 			case VmFuncKind.external: break;
 		}
+		stackSlotSizes.free(allocator);
 	}
 }
 
@@ -384,7 +395,9 @@ struct VmFrame {
 	FuncId func;
 	u32 ip;
 	// Number of registers pushed during call
-	u32 regOffset;
+	u8 regDelta;
+	// Number of stack parameters in the frame (stackSlotSizes.length)
+	u8 numStackSlots;
 }
 
 struct FuncId {

@@ -38,7 +38,10 @@ struct VmTestContext {
 		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
 	}
 
-	private VmFunction* setupCall(AllocId funcId, VmReg[] regParams) {
+	// Sets vm.status
+	private VmFunction* setupCall(AllocId funcId, u8 arg0_idx, VmReg[] regParams) {
+		vm.status = VmStatus.RUNNING;
+
 		if(funcId.index >= vm.functions.length) {
 			panic("Invalid function index (%s), only %s functions exist",
 				funcId.index, vm.functions.length);
@@ -48,22 +51,25 @@ struct VmTestContext {
 				memoryKindString[funcId.kind]);
 		}
 		VmFunction* func = &vm.functions[funcId.index];
-		if(func.numRegParams < regParams.length) {
-			panic("Invalid number of parameters provided, expected at least %s, got %s",
+		if(regParams.length < func.numRegParams) {
+			panic("Invalid number of register parameters provided, expected at least %s, got %s",
 				func.numRegParams, regParams.length);
 		}
 
-		vm.beginCall(funcId);
-		// set parameters
-		foreach(i; 0..func.numRegParams) {
-			vm.registers[i] = regParams[i];
+		// set register parameters (skip excess register parameters)
+		foreach(i; arg0_idx..arg0_idx+func.numRegParams) {
+			vm.regs[i] = regParams[i];
 		}
+
+		// Sets vm.status
+		instr_call_impl(vm, FuncId(funcId.index), arg0_idx);
 
 		return func;
 	}
 
+	// Takes exactly VmFunction.numStackParams arguments from the stack
 	VmReg[] call(AllocId funcId, VmReg[] regParams...) {
-		VmFunction* func = setupCall(funcId, regParams);
+		VmFunction* func = setupCall(funcId, 0, regParams);
 		vm.run();
 		// vm.runVerbose(sink);
 
@@ -76,7 +82,7 @@ struct VmTestContext {
 			u32 ipCopy = vm.ip;
 			sink("\n  ---\n  ");
 			disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
-			sink("  ---\n");
+			sink("\n  ---\n");
 			panic("  Function expected to finish successfully");
 		}
 
@@ -84,9 +90,9 @@ struct VmTestContext {
 	}
 
 	void callFail(AllocId funcId, VmReg[] regParams...) {
-		setupCall(funcId, regParams);
+		setupCall(funcId, 0, regParams);
 		vm.run();
-		//vm.runVerbose(sink);
+		// vm.runVerbose(sink);
 		if (!vm.status.isError) {
 			panic("Function expected to trap");
 		}
@@ -115,7 +121,11 @@ struct VmTestContext {
 	}
 
 	AllocId genericMemAlloc(MemoryKind kind, SizeAndAlign sizeAlign) {
-		return vm.memories[kind].allocate(*vm.allocator, sizeAlign, kind);
+		final switch(kind) with(MemoryKind) {
+			case stack_mem: return vm.pushStackAlloc(sizeAlign);
+			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, kind);
+			case func_id: assert(false, "Cannot allocate function id");
+		}
 	}
 
 	// Assumes that non-pointer data was already written

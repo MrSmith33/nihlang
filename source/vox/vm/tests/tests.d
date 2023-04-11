@@ -86,6 +86,83 @@ void test_ret_2(ref VmTestContext c) {
 
 
 @VmTest
+void test_stack_0(ref VmTestContext c) {
+	// Test insufficient stack slot args
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+}
+
+@VmTest
+void test_stack_1(ref VmTestContext c) {
+	// Test incorrect stack slot size of an argument
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(16, 1));
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+}
+
+@VmTest
+void test_stack_2(ref VmTestContext c) {
+	// Test that native memory stack is preserved after return
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(8, 1));
+	assert(c.vm.numFrameStackSlots == 1);
+
+	VmReg[] res = c.call(funcId);
+
+	assert(c.vm.numFrameStackSlots == 1);
+}
+
+@VmTest
+void test_stack_3(ref VmTestContext c) {
+	// Test local stack slots
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(8, 1));
+	assert(c.vm.numFrameStackSlots == 1);
+
+	VmReg[] res = c.call(funcId);
+
+	assert(c.vm.numFrameStackSlots == 1);
+}
+
+@VmTest
+void test_stack_4(ref VmTestContext c) {
+	// Should not leak stack slots from previous test
+	assert(c.vm.numFrameStackSlots == 0);
+	// Test local stack slots + parameter
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	b.add_stack_slot(SizeAndAlign(8, 1));  // parameter
+	b.add_stack_slot(SizeAndAlign(16, 1)); // local
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	AllocId local = c.vm.pushStackAlloc(SizeAndAlign(8, 1)); // native local
+	AllocId param = c.vm.pushStackAlloc(SizeAndAlign(8, 1)); // native parameter
+	assert(c.vm.numFrameStackSlots == 2);
+
+	VmReg[] res = c.call(funcId);
+
+	assert(c.vm.numFrameStackSlots == 1); // parameter was consumed by the callee
+}
+
+
+@VmTest
 void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -98,7 +175,13 @@ void test_trap_0(ref VmTestContext c) {
 
 @VmTest
 void test_budget_0(ref VmTestContext c) {
-	// Test budget
+	// check that budget gets reset per test
+	c.vm.budget = 0;
+}
+
+@VmTest
+void test_budget_1(ref VmTestContext c) {
+	// Test budget error
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
@@ -107,13 +190,18 @@ void test_budget_0(ref VmTestContext c) {
 	c.vm.budget = 0;
 	c.callFail(funcId);
 	assert(c.vm.status == VmStatus.ERR_BUDGET);
+}
 
-	// check that budget of 1 is enough to run single instruction
+@VmTest
+void test_budget_2(ref VmTestContext c) {
+	// Check that budget of 1 is enough to run a single instruction
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
 	c.vm.budget = 1;
 	c.call(funcId);
-
-	// check that budget gets reset per test
-	c.vm.budget = 0;
+	assert(c.vm.budget == 0);
 }
 
 

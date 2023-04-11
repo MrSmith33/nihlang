@@ -115,6 +115,21 @@ struct Memory {
 		return AllocId(index, allocKind);
 	}
 
+	// only for stack allocations
+	// assumes all allocations to be in sequential order in memory
+	// Doesn't clear relocations or pointer bitmap
+	void popAllocations(ref VoxAllocator allocator, u32 howMany) {
+		assert(allocations.length >= howMany);
+		allocations.unput(howMany);
+
+		if (allocations.length) {
+			u32 alignedSize = alignValue(allocations.back.size, 8);
+			bytesUsed = allocations.back.offset + alignedSize;
+		} else {
+			bytesUsed = 0;
+		}
+	}
+
 	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitBits(u32 offset, u32 size, bool value) {
 		size_t* ptr = cast(size_t*)&initBitmap.front();
@@ -129,6 +144,36 @@ struct Memory {
 	void resetPtrBit(u32 offset) {
 		size_t* ptr = cast(size_t*)&pointerBitmap.front();
 		resetBitAt(ptr, offset);
+	}
+}
+
+struct AllocationRefIterator {
+	@nogc nothrow:
+
+	Memory* mem;
+	Allocation* alloc;
+	// in bytes
+	PtrSize ptrSize;
+
+	i32 opApply(scope i32 delegate(u32 offset, AllocId target) @nogc nothrow del) {
+		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+			foreach(const u32 k, ref AllocId v; alloc.relocations) {
+				if (i32 ret = del(k, v)) return ret;
+			}
+		} else {
+			size_t* ptr = cast(size_t*)&mem.pointerBitmap.front();
+			u32 alignedSize = alignValue(alloc.size, 8);
+			u32 from = memOffsetToPtrIndex(alloc.offset, ptrSize);
+			u32 to   = memOffsetToPtrIndex(alloc.offset + alignedSize, ptrSize);
+			foreach(size_t slot; bitsSetRange(ptr, from, to)) {
+				u32 memOffset = ptrIndexToMemOffset(cast(u32)slot, ptrSize);
+				AllocId val = mem.relocations.get(memOffset);
+				assert(val.isDefined);
+				u32 localOffset = memOffset - alloc.offset;
+				if (i32 ret = del(localOffset, val)) return ret;
+			}
+		}
+		return 0;
 	}
 }
 
