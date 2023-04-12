@@ -40,15 +40,21 @@ struct AllocId {
 struct Allocation {
 	@nogc nothrow:
 
-	// Start in parent Memory
+	// Start in parent Memory.memory
+	// All allocations are aligned to 8 bytes in Memory buffer
 	u32 offset;
 	// Size in bytes
 	u32 size;
 	// How many pointers to this allocation exist in other allocations
-	// Pointers in registers do not increment the refcount
-	u32 refcount;
-	static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-		HashMap!(u32, AllocId, u32.max) relocations;
+	// Pointers in registers do not increment the numInRefs
+	u32 numInRefs;
+	static if (OUT_REFS_PER_ALLOCATION) {
+		HashMap!(u32, AllocId, u32.max) outRefs;
+		u32 numOutRefs() { return outRefs.length; }
+	} else {
+		// How many pointers to this allocation contains.
+		// Equivalent to Allocation.outRefs.length.
+		u32 numOutRefs;
 	}
 }
 
@@ -70,8 +76,8 @@ struct Memory {
 	}
 	// Stores pointer data for every pointer in memory
 	// This maps memory offset to AllocId
-	static if (MEMORY_RELOCATIONS_PER_MEMORY) {
-		HashMap!(u32, AllocId, u32.max) relocations;
+	static if (OUT_REFS_PER_MEMORY) {
+		HashMap!(u32, AllocId, u32.max) outRefs;
 	}
 	// How many bytes are used out of memory.reserved bytes
 	u32 bytesUsed;
@@ -89,12 +95,12 @@ struct Memory {
 	}
 
 	void clear(ref VoxAllocator allocator, PtrSize ptrSize) {
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
+		static if (OUT_REFS_PER_ALLOCATION) {
 			foreach(ref alloc; allocations) {
-				alloc.relocations.free(allocator);
+				alloc.outRefs.free(allocator);
 			}
 		} else {
-			relocations.clear;
+			outRefs.clear;
 		}
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			markInitBits(0, bytesUsed, false);
@@ -117,7 +123,7 @@ struct Memory {
 
 	// only for stack allocations
 	// assumes all allocations to be in sequential order in memory
-	// Doesn't clear relocations or pointer bitmap
+	// Doesn't clear outRefs or pointer bitmap
 	void popAllocations(ref VoxAllocator allocator, u32 howMany) {
 		assert(allocations.length >= howMany);
 		allocations.unput(howMany);
@@ -156,18 +162,19 @@ struct AllocationRefIterator {
 	PtrSize ptrSize;
 
 	i32 opApply(scope i32 delegate(u32 offset, AllocId target) @nogc nothrow del) {
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-			foreach(const u32 k, ref AllocId v; alloc.relocations) {
+		static if (OUT_REFS_PER_ALLOCATION) {
+			foreach(const u32 k, ref AllocId v; alloc.outRefs) {
 				if (i32 ret = del(k, v)) return ret;
 			}
 		} else {
+			if (alloc.numOutRefs == 0) return 0;
 			size_t* ptr = cast(size_t*)&mem.pointerBitmap.front();
 			u32 alignedSize = alignValue(alloc.size, 8);
 			u32 from = memOffsetToPtrIndex(alloc.offset, ptrSize);
 			u32 to   = memOffsetToPtrIndex(alloc.offset + alignedSize, ptrSize);
 			foreach(size_t slot; bitsSetRange(ptr, from, to)) {
 				u32 memOffset = ptrIndexToMemOffset(cast(u32)slot, ptrSize);
-				AllocId val = mem.relocations.get(memOffset);
+				AllocId val = mem.outRefs.get(memOffset);
 				assert(val.isDefined);
 				u32 localOffset = memOffset - alloc.offset;
 				if (i32 ret = del(localOffset, val)) return ret;

@@ -9,7 +9,7 @@ import vox.vm.memory;
 @nogc nothrow:
 
 
-// Register can contain 0 or 1 pointer, so instead of storing a hashmap of relocations
+// Register can contain 0 or 1 pointer, so instead of storing a hashmap of outRefs
 // we store a single AllocId
 // vector registers are forbidden to store pointers
 //

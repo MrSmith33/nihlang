@@ -50,35 +50,37 @@ void instr_ret(ref VmState vm) {
 	if (vm.numFrameStackSlots) {
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
 		Allocation[] stackAllocs = mem.allocations[vm.frameFirstStackSlot..$];
+		// step 1: remove references in deleted stack slots
 		foreach(ref Allocation alloc; stackAllocs) {
-			//writefln("alloc %s refs %s", alloc.size, alloc.numReferences);
-			static if (MEMORY_RELOCATIONS_PER_MEMORY) {
+			//writefln("alloc %s refs %s", alloc.size, alloc.numOutRefs);
+			static if (OUT_REFS_PER_MEMORY) {
+				if (alloc.numOutRefs == 0) continue;
 				foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
 					//writefln("  offset %s target %s", offset, target);
 					vm.pointerRemove(mem, &alloc, offset);
 				}
 			}
-			static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-				alloc.relocations.free(*vm.allocator);
+			static if (OUT_REFS_PER_ALLOCATION) {
+				// Don't skip this one, as there may be reserved memory to be freed
+				// even with length == 0
+				alloc.outRefs.free(*vm.allocator);
 			}
 		}
 		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
 		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
-		// TODO: check return registers, they should not return ptr to released stack
+		// TODO: tail call needs to execute these checks too, but also need to check argument registers
 	}
 
 	// we always have at least 1 frame, because initial native caller has its own frame
 	assert(vm.callerFrames.length);
 	VmFrame* frame = &vm.callerFrames.back();
+	vm.ip = frame.ip;
+	vm.func = frame.func;
+	vm.regs -= frame.regDelta;
 	if (vm.callerFrames.length == 1) {
 		vm.status = VmStatus.FINISHED;
-		vm.func = 0;
-		vm.ip = 0;
 		vm.code = null;
 	} else {
-		vm.regs -= frame.regDelta;
-		vm.func = frame.func;
-		vm.ip = frame.ip;
 		vm.code = vm.functions[vm.func].code[].ptr;
 	}
 
@@ -247,6 +249,7 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	}
 }
 void instr_tail_call(ref VmState vm) {
+	// TODO: stack slots
 	pragma(inline, true);
 	u8  num_args = vm.code[vm.ip+1];
 	u32 calleeId = *cast(i32*)&vm.code[vm.ip+2];

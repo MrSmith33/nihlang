@@ -125,10 +125,11 @@ I decided to use 4 pointer kinds:
    For now it an absense of pointer, so when null is written to memory, we just remove pointer from the destination if any.
 
 8. Reading from uninitialized register
+   Reading from old register may expose a pointer
    - trap
    - conservative check in validation
    - allow and return garbage (potentially insecure and undeterministic)
-   - allow and return zero
+   - allow and return zero (initialize to zero)
 
 9. What opcodes must be aware of shadow pointers?
     1. Any register assignment must erase the pointer

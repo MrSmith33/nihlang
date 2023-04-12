@@ -68,7 +68,7 @@ struct VmState {
 			mem.clear(*allocator, ptrSize);
 		}
 		// null allocation
-		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+		memories[MemoryKind.heap_mem].allocations.put(*allocator, Allocation());
 		// native caller function
 		VmFunction f = {
 			kind : VmFuncKind.external,
@@ -213,10 +213,11 @@ struct VmState {
 
 	AllocId pointerGet(Memory* mem, Allocation* alloc, u32 offset) {
 		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-			return alloc.relocations.get(offset);
+		static if (OUT_REFS_PER_ALLOCATION) {
+			return alloc.outRefs.get(offset);
 		} else {
-			return mem.relocations.get(cast(u32)(alloc.offset + offset));
+			if (alloc.numOutRefs == 0) return AllocId.init;
+			return mem.outRefs.get(cast(u32)(alloc.offset + offset));
 		}
 	}
 
@@ -224,23 +225,56 @@ struct VmState {
 		assert(value.isDefined);
 		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-			alloc.relocations.put(*allocator, cast(u32)offset, value, oldPtr);
+		static if (OUT_REFS_PER_ALLOCATION) {
+			alloc.outRefs.put(*allocator, cast(u32)offset, value, oldPtr);
 		} else {
-			mem.relocations.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
+			mem.outRefs.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
 		}
+		if (oldPtr.isDefined) {
+			decAllocInRef(oldPtr);
+		} else {
+			static if (OUT_REFS_PER_MEMORY) {
+				++alloc.numOutRefs;
+			}
+			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
+			mem.setPtrBit(ptrSlotIndex);
+		}
+		incAllocInRef(value);
 		return oldPtr;
 	}
 
 	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
 		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
-		static if (MEMORY_RELOCATIONS_PER_ALLOCATION) {
-			alloc.relocations.remove(*allocator, cast(u32)offset, oldPtr);
+		static if (OUT_REFS_PER_ALLOCATION) {
+			alloc.outRefs.remove(*allocator, cast(u32)offset, oldPtr);
 		} else {
-			mem.relocations.remove(*allocator, cast(u32)(alloc.offset + offset), oldPtr);
+			mem.outRefs.remove(*allocator, cast(u32)(alloc.offset + offset), oldPtr);
+		}
+		if (oldPtr.isDefined) {
+			static if (OUT_REFS_PER_MEMORY) {
+				--alloc.numOutRefs;
+			}
+			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
+			mem.resetPtrBit(ptrSlotIndex);
+			decAllocInRef(oldPtr);
 		}
 		return oldPtr;
+	}
+
+	void incAllocInRef(AllocId allocId) {
+		if (!isMemoryRefcounted(allocId.kind)) return;
+		Memory* mem = &memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		++alloc.numInRefs;
+	}
+
+	void decAllocInRef(AllocId allocId) {
+		if (!isMemoryRefcounted(allocId.kind)) return;
+		Memory* mem = &memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		assert(alloc.numInRefs > 0);
+		--alloc.numInRefs;
 	}
 
 	bool isPointerValid(AllocId ptr) {
