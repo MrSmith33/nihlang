@@ -20,10 +20,6 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 	auto addr = ip + offset;
 	VmOpcode op = cast(VmOpcode)code[ip++];
 	final switch(op) with(VmOpcode) {
-		case ret:
-			sink.formattedWrite("%04X ret", addr);
-			break;
-
 		case trap:
 			sink.formattedWrite("%04X trap", addr);
 			break;
@@ -91,6 +87,10 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			i32 func_id = *cast(i32*)&code[ip];
 			ip += 4;
 			sink.formattedWrite("%04X tail_call r0 %s f%s", addr, num_args, func_id);
+			break;
+
+		case ret:
+			sink.formattedWrite("%04X ret", addr);
 			break;
 
 		case mov:

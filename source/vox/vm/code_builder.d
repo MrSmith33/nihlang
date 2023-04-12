@@ -38,7 +38,6 @@ struct CodeBuilder {
 		stack.put(*allocator, sizeAlign);
 	}
 
-	void emit_ret() { U8(VmOpcode.ret); }
 	void emit_trap() { U8(VmOpcode.trap); }
 
 	void emit_stack_addr(u8 dst, u8 slot_index) {
@@ -54,6 +53,8 @@ struct CodeBuilder {
 		U8(VmOpcode.tail_call, num_args);
 		U32(funcIndex);
 	}
+
+	void emit_ret() { U8(VmOpcode.ret); }
 
 	u32 emit_jump() {
 		U8(VmOpcode.jump);

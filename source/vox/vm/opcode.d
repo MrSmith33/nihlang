@@ -17,7 +17,6 @@ import vox.lib;
 
 enum VmOpcode : u8 {
 	// u8 op
-	ret,
 	trap,
 
 	// u8 op, s32 offset
@@ -55,6 +54,9 @@ enum VmOpcode : u8 {
 	// num_args must be equal or greater than number of parameters of {func_id}
 	// num_args <= 256
 	tail_call,
+
+	// u8 op
+	ret,
 
 	// u8 op, u8 dst, u8 src
 	// reg[dst] = reg[src]
