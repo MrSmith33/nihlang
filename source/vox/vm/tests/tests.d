@@ -180,6 +180,37 @@ void test_stack_addr_0(ref VmTestContext c) {
 
 
 @VmTest
+void test_refs_0(ref VmTestContext c) {
+	// Check stack reference escape via result register
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // local
+	b.emit_stack_addr(0, 0); // escape
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	c.callFail(funcId);
+	assert(c.vm.status == VmStatus.ERR_STACK_REF_IN_RESULT);
+}
+
+@VmTest
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_refs_1(ref VmTestContext c) {
+	// Check stack reference escape via pointer in memory
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // local
+	b.emit_stack_addr(1, 0);
+	b.emit_store_ptr(c.vm.ptrSize, 0, 1); // store pointer to local slot into ptr
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+
+	c.callFail(funcId, VmReg(memId));
+	assert(c.vm.status == VmStatus.ERR_STACK_REF_IN_MEMORY);
+}
+
+
+@VmTest
 void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);

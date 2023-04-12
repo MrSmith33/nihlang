@@ -49,9 +49,20 @@ void instr_ret(ref VmState vm) {
 	pragma(inline, true);
 
 	if (vm.numFrameStackSlots) {
+		// step 1: Check return regs for stack refs
+		VmFunction* callee = &vm.functions[vm.func];
+		foreach(i; 0..callee.numResults) {
+			VmReg val = vm.regs[i];
+			if (val.pointer.isUndefined) continue;
+			if (val.pointer.kind != MemoryKind.stack_mem) continue;
+			if (val.pointer.index < vm.frameFirstStackSlot) continue;
+
+			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_RESULT, i);
+		}
+
+		// step 2: Remove references in deleted stack slots
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
 		Allocation[] stackAllocs = mem.allocations[vm.frameFirstStackSlot..$];
-		// step 1: remove references in deleted stack slots
 		foreach(ref Allocation alloc; stackAllocs) {
 			//writefln("alloc %s refs %s", alloc.size, alloc.numOutRefs);
 			static if (OUT_REFS_PER_MEMORY) {
@@ -66,6 +77,13 @@ void instr_ret(ref VmState vm) {
 				// even with length == 0
 				alloc.outRefs.free(*vm.allocator);
 			}
+		}
+
+		// step 3: Check that all stack slots have 0 references
+		foreach(i, ref Allocation alloc; stackAllocs) {
+			if (alloc.numInRefs == 0) continue;
+
+			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_MEMORY, i);
 		}
 		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
 		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
