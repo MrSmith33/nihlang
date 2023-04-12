@@ -72,6 +72,12 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X branch r%s > %s %04X", addr, src0, src1, addr + jump_offset + 7);
 			break;
 
+		case stack_addr:
+			u8 dst = code[ip++];
+			u8 slot_index = code[ip++];
+			sink.formattedWrite("%04X stack_addr r%s s%s", addr, dst, slot_index);
+			break;
+
 		case call:
 			u8 arg0_idx = code[ip++];
 			u8 num_args = code[ip++];

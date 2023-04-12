@@ -22,6 +22,7 @@ void vmStep(ref VmState vm) {
 		case branch_ge: return instr_branch_ge(vm);
 		case branch_le_imm8: return instr_branch_le_imm8(vm);
 		case branch_gt_imm8: return instr_branch_gt_imm8(vm);
+		case stack_addr: return instr_stack_addr(vm);
 		case call: return instr_call(vm);
 		case tail_call: return instr_tail_call(vm);
 		case mov: return instr_mov(vm);
@@ -170,6 +171,14 @@ void instr_branch_gt_imm8(ref VmState vm) {
 
 	vm.ip += 7;
 }
+void instr_stack_addr(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+	u8 slot_index = vm.code[vm.ip+2];
+	assert(slot_index < vm.numFrameStackSlots);
+	*dst = VmReg(AllocId(vm.frameFirstStackSlot + slot_index, MemoryKind.stack_mem));
+	vm.ip += 3;
+}
 void instr_call(ref VmState vm) {
 	pragma(inline, true);
 	u8  arg0_idx = vm.code[vm.ip+1];
@@ -196,7 +205,7 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	u8 numStackParams = callee.numStackParams;
 	// vm.numFrameStackSlots will be modified by pushStackAlloc below
 	u8 numCallerStackSlots = cast(u8)(vm.numFrameStackSlots - numStackParams);
-	if (numStackParams) {
+	if (callee.stackSlotSizes.length) {
 		if (vm.numFrameStackSlots < numStackParams) {
 			return vm.setTrap(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS, numStackParams);
 		}

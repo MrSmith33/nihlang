@@ -41,6 +41,10 @@ struct CodeBuilder {
 	void emit_ret() { U8(VmOpcode.ret); }
 	void emit_trap() { U8(VmOpcode.trap); }
 
+	void emit_stack_addr(u8 dst, u8 slot_index) {
+		U8(VmOpcode.stack_addr, dst, slot_index);
+	}
+
 	void emit_call(u8 arg0_idx, u8 num_args, u32 funcIndex) {
 		U8(VmOpcode.call, arg0_idx, num_args);
 		U32(funcIndex);

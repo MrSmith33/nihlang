@@ -163,6 +163,23 @@ void test_stack_4(ref VmTestContext c) {
 
 
 @VmTest
+void test_stack_addr_0(ref VmTestContext c) {
+	assert(c.vm.numFrameStackSlots == 0);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	b.emit_stack_addr(1, 0);
+	b.emit_store_m64(1, 0);
+	b.emit_load_m64(0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+
+	VmReg[] res = c.call(funcId, VmReg(42));
+
+	assert(res[0] == VmReg(42));
+}
+
+
+@VmTest
 void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
