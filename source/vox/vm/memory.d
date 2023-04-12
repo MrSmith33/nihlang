@@ -20,7 +20,7 @@ struct AllocId {
 		return cast(u32)(payload & ((1 << 30) - 1));
 	}
 
-	// kind: heap, static, function, stack
+	// kind: heap, stack, static, function
 	MemoryKind kind() const {
 		return cast(MemoryKind)(payload >> 30);
 	}
@@ -48,6 +48,7 @@ struct Allocation {
 	// How many pointers to this allocation exist in other allocations
 	// Pointers in registers do not increment the numInRefs
 	u32 numInRefs;
+
 	static if (OUT_REFS_PER_ALLOCATION) {
 		HashMap!(u32, AllocId, u32.max) outRefs;
 		u32 numOutRefs() { return outRefs.length; }

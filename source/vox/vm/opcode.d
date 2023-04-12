@@ -41,6 +41,9 @@ enum VmOpcode : u8 {
 	// u8 op, u8 dst, u8 slot_index
 	stack_addr,
 
+	// u8 op, SizeAndAlign size_align
+	stack_alloc,
+
 	// u8 op, u8 arg0_idx, u8 num_args, u32 func_id
 	// Calls a function {func_id}
 	// arg0_idx becomes new reg[0] in the callee frame

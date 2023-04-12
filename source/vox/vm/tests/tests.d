@@ -164,6 +164,7 @@ void test_stack_4(ref VmTestContext c) {
 
 @VmTest
 void test_stack_addr_0(ref VmTestContext c) {
+	// Test stack_addr
 	assert(c.vm.numFrameStackSlots == 0);
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.add_stack_slot(SizeAndAlign(8, 1));
@@ -176,6 +177,28 @@ void test_stack_addr_0(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId, VmReg(42));
 
 	assert(res[0] == VmReg(42));
+}
+
+
+@VmTest
+void test_stack_alloc_0(ref VmTestContext c) {
+	// Test stack_alloc
+	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		assert(vm.stackSlots[0].size == 8);
+	}
+
+	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, &externFunc);
+	Array!SizeAndAlign stack;
+	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
+	c.vm.functions[extFuncId.index].stackSlotSizes = stack;
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_stack_alloc(SizeAndAlign(8, 1));
+	b.emit_call(0, 1, extFuncId.index);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	VmReg[] res = c.call(funcId);
 }
 
 
@@ -207,6 +230,20 @@ void test_refs_1(ref VmTestContext c) {
 
 	c.callFail(funcId, VmReg(memId));
 	assert(c.vm.status == VmStatus.ERR_STACK_REF_IN_MEMORY);
+}
+
+@VmTest
+void test_refs_2(ref VmTestContext c) {
+	// Check that pointers are removed from stack allocation and references are correctly decremented
+	// If they were not removed, escape error occurs
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // local
+	b.emit_stack_addr(0, 0);
+	b.emit_store_ptr(c.vm.ptrSize, 0, 0); // store pointer to local slot into local
+	b.emit_ret(); // must remove pointer to local from local
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	c.call(funcId);
 }
 
 

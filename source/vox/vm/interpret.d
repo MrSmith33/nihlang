@@ -22,6 +22,7 @@ void vmStep(ref VmState vm) {
 		case branch_le_imm8: return instr_branch_le_imm8(vm);
 		case branch_gt_imm8: return instr_branch_gt_imm8(vm);
 		case stack_addr: return instr_stack_addr(vm);
+		case stack_alloc: return instr_stack_alloc(vm);
 		case call: return instr_call(vm);
 		case tail_call: return instr_tail_call(vm);
 		case ret: return instr_ret(vm);
@@ -129,6 +130,14 @@ void instr_stack_addr(ref VmState vm) {
 	*dst = VmReg(AllocId(vm.frameFirstStackSlot + slot_index, MemoryKind.stack_mem));
 	vm.ip += 3;
 }
+void instr_stack_alloc(ref VmState vm) {
+	pragma(inline, true);
+	SizeAndAlign sizeAlign = *cast(SizeAndAlign*)&vm.code[vm.ip+1];
+	// TODO validation
+	if(vm.numFrameStackSlots == u8.max) panic("Too many stack slots for single stack frame");
+	vm.pushStackAlloc(sizeAlign);
+	vm.ip += 5;
+}
 void instr_call(ref VmState vm) {
 	pragma(inline, true);
 	u8  arg0_idx = vm.code[vm.ip+1];
@@ -136,9 +145,6 @@ void instr_call(ref VmState vm) {
 	FuncId calleeId = *cast(FuncId*)&vm.code[vm.ip+3];
 	if(calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
 	if(arg0_idx + num_args > 256) panic("Invalid stack setup"); // TODO validation
-	// modify current frame here, before pushing new one, as reallocation of callerFrames might happen
-	// Don't increment in instr_call_impl, because it is also used from native code
-	vm.ip += 7;
 	instr_call_impl(vm, calleeId, arg0_idx);
 }
 
@@ -179,7 +185,8 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	// vm.ip already points to the next instruction for bytecode function
 	VmFrame callerFrame = {
 		func : vm.func,
-		ip : vm.ip,
+		// native functions do not care about ip
+		ip : vm.ip+7,
 		regDelta : arg0_idx,
 		numStackSlots : numCallerStackSlots,
 	};
@@ -256,31 +263,49 @@ void instr_ret(ref VmState vm) {
 			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_RESULT, i);
 		}
 
+		static void changeInRef(ref VmState vm, Allocation[] stackAllocs, int delta) {
+			Memory* mem = &vm.memories[MemoryKind.stack_mem];
+			foreach(ref Allocation alloc; stackAllocs) {
+				if (alloc.numOutRefs == 0) continue;
+				foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+					vm.changeAllocInRef(target, delta);
+				}
+			}
+		}
+
 		// step 2: Remove references in deleted stack slots
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
 		Allocation[] stackAllocs = mem.allocations[vm.frameFirstStackSlot..$];
-		foreach(ref Allocation alloc; stackAllocs) {
-			//writefln("alloc %s refs %s", alloc.size, alloc.numOutRefs);
-			static if (OUT_REFS_PER_MEMORY) {
-				if (alloc.numOutRefs == 0) continue;
-				foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
-					//writefln("  offset %s target %s", offset, target);
-					vm.pointerRemove(mem, &alloc, offset);
-				}
-			}
-			static if (OUT_REFS_PER_ALLOCATION) {
-				// Don't skip this one, as there may be reserved memory to be freed
-				// even with length == 0
-				alloc.outRefs.free(*vm.allocator);
-			}
-		}
+		// Decrement references
+		changeInRef(vm, stackAllocs, -1);
 
 		// step 3: Check that all stack slots have 0 references
 		foreach(i, ref Allocation alloc; stackAllocs) {
 			if (alloc.numInRefs == 0) continue;
 
+			// Restore state
+			changeInRef(vm, stackAllocs, 1);
+
 			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_MEMORY, i);
 		}
+
+		// step 4: actually delete the references now
+		// Restore refs, because pointerRemove decrements them
+		changeInRef(vm, stackAllocs, 1);
+
+		foreach(ref Allocation alloc; stackAllocs) {
+			static if (OUT_REFS_PER_MEMORY) {
+				if (alloc.numOutRefs == 0) continue;
+			}
+			foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+				vm.pointerRemove(mem, &alloc, offset);
+			}
+			static if (OUT_REFS_PER_ALLOCATION) {
+				// Release memory buffer. Even when length == 0
+				alloc.outRefs.free(*vm.allocator);
+			}
+		}
+
 		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
 		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
 		// TODO: tail call needs to execute these checks too, but also need to check argument registers

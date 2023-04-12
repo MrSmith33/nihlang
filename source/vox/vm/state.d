@@ -231,7 +231,7 @@ struct VmState {
 			mem.outRefs.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
 		}
 		if (oldPtr.isDefined) {
-			decAllocInRef(oldPtr);
+			changeAllocInRef(oldPtr, -1);
 		} else {
 			static if (OUT_REFS_PER_MEMORY) {
 				++alloc.numOutRefs;
@@ -239,7 +239,7 @@ struct VmState {
 			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
 			mem.setPtrBit(ptrSlotIndex);
 		}
-		incAllocInRef(value);
+		changeAllocInRef(value, 1);
 		return oldPtr;
 	}
 
@@ -257,24 +257,19 @@ struct VmState {
 			}
 			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
 			mem.resetPtrBit(ptrSlotIndex);
-			decAllocInRef(oldPtr);
+			changeAllocInRef(oldPtr, -1);
 		}
 		return oldPtr;
 	}
 
-	void incAllocInRef(AllocId allocId) {
+	// delta should be -1 or 1
+	void changeAllocInRef(AllocId allocId, int delta) {
+		assert(delta == 1 || delta == -1);
 		if (!isMemoryRefcounted(allocId.kind)) return;
 		Memory* mem = &memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
-		++alloc.numInRefs;
-	}
-
-	void decAllocInRef(AllocId allocId) {
-		if (!isMemoryRefcounted(allocId.kind)) return;
-		Memory* mem = &memories[allocId.kind];
-		Allocation* alloc = &mem.allocations[allocId.index];
-		assert(alloc.numInRefs > 0);
-		--alloc.numInRefs;
+		alloc.numInRefs += delta;
+		assert(alloc.numInRefs != typeof(alloc.numInRefs).max);
 	}
 
 	bool isPointerValid(AllocId ptr) {

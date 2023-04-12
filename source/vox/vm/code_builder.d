@@ -44,6 +44,11 @@ struct CodeBuilder {
 		U8(VmOpcode.stack_addr, dst, slot_index);
 	}
 
+	void emit_stack_alloc(SizeAndAlign sizeAlign) {
+		U8(VmOpcode.stack_alloc);
+		U32(sizeAlign.payload);
+	}
+
 	void emit_call(u8 arg0_idx, u8 num_args, u32 funcIndex) {
 		U8(VmOpcode.call, arg0_idx, num_args);
 		U32(funcIndex);
