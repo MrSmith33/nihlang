@@ -579,7 +579,7 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	void printCalleeOutput() {
 		auto stripped = result.output.strip;
 		if (stripped.empty) return;
-		foreach(line; stripped.lineSplitter.filter!(l => !l.empty)) {
+		foreach(line; result.output.lineSplitter.filter!(l => !l.empty)) {
 			stderr.writeln("  ", line);
 		}
 	}
