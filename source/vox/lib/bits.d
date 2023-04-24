@@ -27,35 +27,19 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 	isize dstLastSlot  = cast(isize)(dst + length - 1) / 8;
 	isize dstLastBit   = cast(isize)(dst + length - 1) % 8;
 
-	ref T atSrc(isize index) { pragma(inline, true);
-		debug if (index < srcFirstSlot || index > srcLastSlot) {
-			writefln("index (%s) >= srcFirstSlot (%s) && index (%s) <= srcLastSlot (%s)", index, srcFirstSlot, index, srcLastSlot);
-			printTestCase(*cast(u64*)ptr, dst, src, length);
-			assert(false);
-		}
-		return ptr[index];
-	}
+	ref T atSrc(isize i) { pragma(inline, true); assert(i >= srcFirstSlot && i <= srcLastSlot); return ptr[i]; }
+	ref T atDst(isize i) { pragma(inline, true); assert(i >= dstFirstSlot && i <= dstLastSlot); return ptr[i]; }
 
-	ref T atDst(isize index) { pragma(inline, true);
-		debug if (index < dstFirstSlot || index > dstLastSlot) {
-			writefln("index (%s) >= dstFirstSlot (%s) && index (%s) <= dstLastSlot (%s)", index, dstFirstSlot, index, dstLastSlot);
-			printTestCase(*cast(u64*)ptr, dst, src, length);
-			assert(false);
-		}
-		return ptr[index];
-	}
-
-	static T mergeSlots(const usize bitDeficit, const T lowSlot, const T highSlot) {
-		pragma(inline, true);
+	static T mergeSlots(const isize bitDeficit, const T lowSlot, const T highSlot) { pragma(inline, true);
 		const T lowData  = lowSlot.shiftDown(bitDeficit);
 		const T highData = highSlot.shiftUp(BITS_PER_SLOT - bitDeficit);
 		const T srcData  = lowData | highData;
 		return srcData;
 	}
 
-	const usize bitDeficit = (srcFirstBit - dstFirstBit) & (BITS_PER_SLOT-1);
-
-	if (dstFirstSlot == dstLastSlot) { // single dst slot, 1 or 2 src slots
+	const isize bitDeficit = (srcFirstBit - dstFirstBit) & (BITS_PER_SLOT-1);
+	// single dst slot, 1 or 2 src slots
+	if (dstFirstSlot == dstLastSlot) {
 		const T srcLow          = atSrc(srcFirstSlot);
 		const T srcHigh         = atSrc(srcLastSlot);
 		const T srcData         = mergeSlots(bitDeficit, srcLow, srcHigh);
@@ -66,8 +50,8 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 		atDst(dstFirstSlot)     = origData | srcData & combineMask;
 		return;
 	}
-
-	if (srcFirstSlot == srcLastSlot) { // 2 dst slots, 1 src slot
+	// 2 dst slots, 1 src slot
+	if (srcFirstSlot == srcLastSlot) {
 		const T srcSlot        = atSrc(srcFirstSlot);
 		const T srcData        = rotateDown(srcSlot, bitDeficit);
 		const T origData0      = atDst(dstFirstSlot+0);
@@ -76,17 +60,16 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 		atDst(dstFirstSlot+1)  = combineBits(srcData, origData1, dstLastBit+1);
 		return;
 	}
-
 	// below, both dst and src are at least 2 slots in size
-	if (dst < src && srcFirstBit == dstFirstBit) { // direct copy
-		atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
-		memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
-		atDst(dstLastSlot) = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
-		return;
-	}
-
 	if (dst < src) {
-		const usize srcSlotIndex  = srcFirstSlot + (srcFirstBit > dstFirstBit);
+		if (bitDeficit == 0) { // can use memmove for full slots
+			atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
+			memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
+			atDst(dstLastSlot) = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
+			return;
+		}
+
+		const isize srcSlotIndex  = srcFirstSlot + (srcFirstBit > dstFirstBit);
 		T srcLow  = atSrc(srcFirstSlot);
 		T srcHigh = atSrc(srcSlotIndex);
 		{	// first dst slot
@@ -107,18 +90,15 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 			const T origData      = atDst(dstLastSlot);
 			atDst(dstLastSlot)    = combineBits(srcData, origData, dstLastBit+1);
 		}
-		return;
-	}
+	} else {
+		if (bitDeficit == 0) { // can use memmove for full slots
+			atDst(dstLastSlot)  = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
+			memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
+			atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
+			return;
+		}
 
-	if (dst > src && srcFirstBit == dstFirstBit) {
-		atDst(dstLastSlot)  = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
-		memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
-		atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
-		return;
-	}
-
-	if (dst > src) {
-		const usize srcSlotIndex  = srcLastSlot - (srcLastBit < dstLastBit);
+		const isize srcSlotIndex  = srcLastSlot - (srcLastBit < dstLastBit);
 		T srcHigh = atSrc(srcLastSlot);
 		T srcLow  = atSrc(srcSlotIndex);
 		{	// last dst slot
@@ -139,7 +119,6 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 			const T origData      = atDst(dstFirstSlot);
 			atDst(dstFirstSlot)   = combineBits(origData, srcData, dstFirstBit);
 		}
-		return;
 	}
 }
 
