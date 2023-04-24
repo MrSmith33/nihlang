@@ -6,6 +6,9 @@ module vox.lib.error;
 @nogc nothrow:
 
 noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line = __LINE__) {
+	panic(line, file, 0, fmt, args);
+}
+noreturn panic(Args...)(int line, string file, int topFramesToSkip, string fmt, Args args) {
 	import vox.lib.io : writefln, writef, writeln;
 	import vox.lib.system.entrypoint : vox_exit_process;
 	//writefln("\033[1;31mPanic:\033[0m %s:%s", file, line);
@@ -15,7 +18,7 @@ noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line 
 	version(Windows) {
 		writeln("Stack trace:");
 		import vox.lib.stacktrace : simpleNamedStackTrace;
-		simpleNamedStackTrace(3,2);
+		simpleNamedStackTrace(3,2+topFramesToSkip);
 	}
 	vox_exit_process(1);
 }

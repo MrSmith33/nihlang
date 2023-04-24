@@ -3,7 +3,7 @@
 /// Authors: Andrey Penechko
 module vox.lib.math;
 
-public import core.bitop : bsr;
+public import core.bitop : bsr, bsf, ror, rol;
 import vox.lib;
 
 @nogc nothrow:

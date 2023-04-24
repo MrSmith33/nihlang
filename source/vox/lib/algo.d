@@ -89,7 +89,7 @@ extern(C) int memcmp(const(void)* buf1, const(void)* buf2, size_t len) {
 
 
 pragma(inline, true)
-bool getBitAt(size_t* ptr, size_t bitIndex) {
+bool getBitAt(const(size_t)* ptr, size_t bitIndex) {
 	static if (size_t.sizeof == 8)
 		return ((ptr[bitIndex >> 6] & (1L << (bitIndex & 63)))) != 0;
 	else

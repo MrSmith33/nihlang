@@ -12,6 +12,8 @@ pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
 {
 	runVmTests();
+	// import vox.lib.bitcopy_test;
+	// test_copyBitRange;
 	//testFormatting;
 	//testDemangler;
 	//testStackTrace;
