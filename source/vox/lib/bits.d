@@ -80,9 +80,7 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 	// below, both dst and src are at least 2 slots in size
 	if (dst < src && srcFirstBit == dstFirstBit) { // direct copy
 		atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
-		foreach (i; 1..dstLastSlot - dstFirstSlot) {
-			atDst(dstFirstSlot+i) = atSrc(srcFirstSlot+i);
-		}
+		memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
 		atDst(dstLastSlot) = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
 		return;
 	}
@@ -114,9 +112,7 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 
 	if (dst > src && srcFirstBit == dstFirstBit) {
 		atDst(dstLastSlot)  = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
-		foreach (i; 1..dstLastSlot - dstFirstSlot) {
-			atDst(dstLastSlot-i) = atSrc(srcLastSlot-i);
-		}
+		memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
 		atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
 		return;
 	}
