@@ -37,6 +37,12 @@ struct AllocId {
 	}
 }
 
+struct PointerId {
+	@nogc nothrow:
+	u32 index;
+	alias index this;
+}
+
 struct Allocation {
 	@nogc nothrow:
 
@@ -137,20 +143,87 @@ struct Memory {
 		}
 	}
 
+	void popAndShiftAllocations(ref VoxAllocator allocator, u32 from, u32 to, PtrSize ptrSize) {
+		assert(to <= allocations.length);
+		assert(from <= to);
+		if (from == to) return;
+		if (to == allocations.length) return popAllocations(allocator, to - from);
+
+		const u32 fromByte = allocations[from].offset;
+		const u32 toByte   = allocations[to - 1].offset + alignValue(allocations[to - 1].size, 8);
+		const u32 lastByte = allocations.back.offset + alignValue(allocations.back.size, 8);
+		const u32 shiftedBytes = lastByte - toByte;
+
+		// move allocations
+		Allocation* allocationsDst = &allocations[from];
+		const Allocation* allocationsSrc = &allocations[to];
+		const u32 shiftedAllocations = allocations.length - to;
+		memmove(allocationsDst, allocationsSrc, shiftedAllocations * Allocation.sizeof);
+
+		// move memory
+		u8* memoryDst = &memory[from];
+		const u8* memorySrc = &memory[to];
+		memmove(memoryDst, memorySrc, shiftedBytes);
+
+		// update allocations
+		const u32 byteOffset = toByte - fromByte;
+		foreach(ref alloc; allocations[from..from + shiftedAllocations]) {
+			alloc.offset -= byteOffset;
+		}
+
+		usize* pointerBits = cast(usize*)&pointerBitmap.front();
+		const PointerId fromSlot = memOffsetToPtrIndex(fromByte, ptrSize);
+		const PointerId toSlot   = memOffsetToPtrIndex(toByte, ptrSize);
+		const PointerId lastSlot = memOffsetToPtrIndex(lastByte, ptrSize);
+		const u32 shiftedSlots   = lastSlot - toSlot;
+
+		// check that all pointers were removed
+		static if (CONSISTENCY_CHECKS) {
+			assert(popcntBitRange(pointerBits, fromSlot, toSlot) == 0);
+		}
+
+		// move pointer bits
+		copyBitRange(pointerBits, fromSlot, toSlot, shiftedSlots);
+
+		// update outRefs in shifted allocations
+		static if (OUT_REFS_PER_MEMORY) {
+			foreach(usize slot; bitsSetRange(pointerBits, fromSlot, fromSlot + shiftedSlots)) {
+				const u32 newOffset = ptrIndexToMemOffset(PointerId(cast(u32)slot), ptrSize);
+				const u32 oldOffset = newOffset + byteOffset;
+				AllocId val;
+				assert(outRefs.remove(allocator, oldOffset, val));
+				outRefs.put(allocator, newOffset, val);
+			}
+		}
+
+		// move init bits
+		static if (SANITIZE_UNINITIALIZED_MEM) {
+			usize* initBits = cast(usize*)&initBitmap.front();
+			copyBitRange(initBits, fromByte, toByte, shiftedBytes);
+		}
+
+		if (allocations.length) {
+			const u32 alignedSize = alignValue(allocations.back.size, 8);
+			bytesUsed = allocations.back.offset + alignedSize;
+		} else {
+			bytesUsed = 0;
+		}
+	}
+
 	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitBits(u32 offset, u32 size, bool value) {
 		size_t* ptr = cast(size_t*)&initBitmap.front();
 		setBitRange(ptr, offset, offset+size, value);
 	}
 
-	void setPtrBit(u32 offset) {
+	void setPtrBit(PointerId index) {
 		size_t* ptr = cast(size_t*)&pointerBitmap.front();
-		setBitAt(ptr, offset);
+		setBitAt(ptr, index);
 	}
 
-	void resetPtrBit(u32 offset) {
+	void resetPtrBit(PointerId index) {
 		size_t* ptr = cast(size_t*)&pointerBitmap.front();
-		resetBitAt(ptr, offset);
+		resetBitAt(ptr, index);
 	}
 }
 
@@ -171,10 +244,10 @@ struct AllocationRefIterator {
 			if (alloc.numOutRefs == 0) return 0;
 			size_t* ptr = cast(size_t*)&mem.pointerBitmap.front();
 			u32 alignedSize = alignValue(alloc.size, 8);
-			u32 from = memOffsetToPtrIndex(alloc.offset, ptrSize);
-			u32 to   = memOffsetToPtrIndex(alloc.offset + alignedSize, ptrSize);
+			PointerId from = memOffsetToPtrIndex(alloc.offset, ptrSize);
+			PointerId to   = memOffsetToPtrIndex(alloc.offset + alignedSize, ptrSize);
 			foreach(size_t slot; bitsSetRange(ptr, from, to)) {
-				u32 memOffset = ptrIndexToMemOffset(cast(u32)slot, ptrSize);
+				u32 memOffset = ptrIndexToMemOffset(PointerId(cast(u32)slot), ptrSize);
 				AllocId val = mem.outRefs.get(memOffset);
 				assert(val.isDefined);
 				u32 localOffset = memOffset - alloc.offset;
@@ -240,12 +313,12 @@ u32 inBits(PtrSize s) {
 	return (s+1) * 32;
 }
 
-u32 memOffsetToPtrIndex(u32 offset, PtrSize ptrSize) {
+PointerId memOffsetToPtrIndex(u32 offset, PtrSize ptrSize) {
 	pragma(inline, true);
-	return offset >> (ptrSize + 2);
+	return PointerId(offset >> (ptrSize + 2));
 }
 
-u32 ptrIndexToMemOffset(u32 val, PtrSize ptrSize) {
+u32 ptrIndexToMemOffset(PointerId ptr, PtrSize ptrSize) {
 	pragma(inline, true);
-	return val << (ptrSize + 2);
+	return ptr.index << (ptrSize + 2);
 }

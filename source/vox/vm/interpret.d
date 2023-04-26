@@ -215,7 +215,6 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	}
 }
 void instr_tail_call(ref VmState vm) {
-	// TODO: stack slots
 	pragma(inline, true);
 	u8  arg0_idx = vm.code[vm.ip+1];
 	u8  num_args = vm.code[vm.ip+2];
@@ -223,11 +222,66 @@ void instr_tail_call(ref VmState vm) {
 
 	VmFunction* caller = &vm.functions[vm.func];
 
-	if(calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
+	if (calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
 	VmFunction* callee = &vm.functions[calleeId];
 
-	if(num_args > 256) panic("Invalid stack setup"); // TODO validation
+	if (arg0_idx.u32 + num_args.u32 > 256) panic("Invalid stack setup"); // TODO validation
 	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
+
+	u8 numStackParams = callee.numStackParams;
+	// vm.numFrameStackSlots will be modified by pushStackAlloc below
+	u8 numCallerStackSlots = cast(u8)(vm.numFrameStackSlots - numStackParams);
+
+	if (callee.stackSlotSizes.length) {
+		if (vm.numFrameStackSlots < numStackParams) {
+			return vm.setTrap(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS, numStackParams);
+		}
+		SizeAndAlign* slotSizes = &callee.stackSlotSizes.front();
+		// parameters: verify sizes
+		foreach(i; 0..numStackParams) {
+			// In the future we may allow bigger allocation than what was requested
+			if (slotSizes[i].size == vm.stackSlots[i].size) continue;
+			return vm.setTrap(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+		}
+	}
+
+	if (numCallerStackSlots) {
+		// Caller stack slots are dropped
+		DroppedStackSlots dropped = {
+			// Argument regs are preserved
+			preserve_regs_from  : arg0_idx,
+			preserve_regs_to    : cast(u8)(arg0_idx + num_args),
+			// Dropped stack slots
+			slots_from : 0,
+			slots_to   : numCallerStackSlots,
+		};
+		pre_drop_stack_range(vm, dropped);
+		if (vm.status != VmStatus.RUNNING) return;
+
+		Memory* mem = &vm.memories[MemoryKind.stack_mem];
+		mem.popAndShiftAllocations(
+			*vm.allocator,
+			vm.frameFirstStackSlot,
+			vm.frameFirstStackSlot + numCallerStackSlots,
+			vm.ptrSize);
+	}
+
+	u8 numCallerRegisters = arg0_idx;
+	if (numCallerRegisters) {
+		// Shift registers
+		foreach(i; 0..callee.numRegParams) {
+			vm.regs[i] = vm.regs[arg0_idx + i];
+		}
+	}
+
+	if (callee.stackSlotSizes.length) {
+		// locals: allocate slots
+		u8 numCalleeStackLocals = cast(u8)callee.stackSlotSizes.length;
+		SizeAndAlign* slotSizes = &callee.stackSlotSizes.front();
+		foreach(i; numStackParams..numCalleeStackLocals) {
+			vm.pushStackAlloc(slotSizes[i]);
+		}
+	}
 
 	// frame is not pushed
 	// vm.regs remains the same
@@ -248,68 +302,25 @@ void instr_tail_call(ref VmState vm) {
 			return;
 	}
 }
+
 // Also called at the end of native function call
 void instr_ret(ref VmState vm) {
 	pragma(inline, true);
 
 	if (vm.numFrameStackSlots) {
-		// step 1: Check return regs for stack refs
 		VmFunction* callee = &vm.functions[vm.func];
-		foreach(i; 0..callee.numResults) {
-			VmReg val = vm.regs[i];
-			if (val.pointer.isUndefined) continue;
-			if (val.pointer.kind != MemoryKind.stack_mem) continue;
-			if (val.pointer.index < vm.frameFirstStackSlot) continue;
+		DroppedStackSlots dropped = {
+			preserve_regs_from  : 0,
+			preserve_regs_to    : callee.numResults,
+			slots_from : 0,
+			slots_to   : vm.numFrameStackSlots,
+		};
+		pre_drop_stack_range(vm, dropped);
+		if (vm.status != VmStatus.RUNNING) return;
 
-			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_RESULT, i);
-		}
-
-		static void changeInRef(ref VmState vm, Allocation[] stackAllocs, int delta) {
-			Memory* mem = &vm.memories[MemoryKind.stack_mem];
-			foreach(ref Allocation alloc; stackAllocs) {
-				if (alloc.numOutRefs == 0) continue;
-				foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
-					vm.changeAllocInRef(target, delta);
-				}
-			}
-		}
-
-		// step 2: Remove references in deleted stack slots
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
-		Allocation[] stackAllocs = mem.allocations[vm.frameFirstStackSlot..$];
-		// Decrement references
-		changeInRef(vm, stackAllocs, -1);
-
-		// step 3: Check that all stack slots have 0 references
-		foreach(i, ref Allocation alloc; stackAllocs) {
-			if (alloc.numInRefs == 0) continue;
-
-			// Restore state
-			changeInRef(vm, stackAllocs, 1);
-
-			return vm.setTrap(VmStatus.ERR_STACK_REF_IN_MEMORY, i);
-		}
-
-		// step 4: actually delete the references now
-		// Restore refs, because pointerRemove decrements them
-		changeInRef(vm, stackAllocs, 1);
-
-		foreach(ref Allocation alloc; stackAllocs) {
-			static if (OUT_REFS_PER_MEMORY) {
-				if (alloc.numOutRefs == 0) continue;
-			}
-			foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
-				vm.pointerRemove(mem, &alloc, offset);
-			}
-			static if (OUT_REFS_PER_ALLOCATION) {
-				// Release memory buffer. Even when length == 0
-				alloc.outRefs.free(*vm.allocator);
-			}
-		}
-
 		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
 		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
-		// TODO: tail call needs to execute these checks too, but also need to check argument registers
 	}
 
 	// we always have at least 1 frame, because initial native caller has its own frame
@@ -330,9 +341,95 @@ void instr_ret(ref VmState vm) {
 
 	// don't touch frame after unput
 	vm.callerFrames.unput(1);
-
-	//++vm.numCalls;
 }
+
+struct DroppedStackSlots {
+	// Preserved registers
+	// These registers are the ones that are to be preserved
+	// arguments or results. They are checked to not contain
+	// references to dropped stack slots
+	u8 preserve_regs_from;
+	u8 preserve_regs_to;
+	// Dropped stack slots
+	// These slots are checked for escaped refs
+	// and then the references are removed from them
+	u8 slots_from;
+	u8 slots_to;
+}
+
+private void pre_drop_stack_range(ref VmState vm, DroppedStackSlots dropped) {
+	// step 1: Check preserved regs for stack refs
+	foreach(i; dropped.preserve_regs_from..dropped.preserve_regs_to) {
+		VmReg val = vm.regs[i];
+		if (val.pointer.isUndefined) continue;
+		if (val.pointer.kind != MemoryKind.stack_mem) continue;
+		if (val.pointer.index < vm.frameFirstStackSlot) continue;
+
+		return vm.setTrap(VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG, i);
+	}
+
+	// step 2: Remove references in deleted stack slots
+	u32 fromSlot = vm.frameFirstStackSlot + dropped.slots_from;
+	u32 toSlot   = vm.frameFirstStackSlot + dropped.slots_to;
+	Memory* mem = &vm.memories[MemoryKind.stack_mem];
+	Allocation[] stackAllocs = mem.allocations[fromSlot..toSlot];
+	// Decrement references from stackAllocs to stackAllocs
+	changeLocalPointeeInRefs(vm, stackAllocs, -1, fromSlot, toSlot);
+
+	// step 3: Check that all stack slots have 0 references
+	foreach(i, ref Allocation alloc; stackAllocs) {
+		if (alloc.numInRefs == 0) continue;
+
+		// Restore references from stackAllocs to stackAllocs
+		changeLocalPointeeInRefs(vm, stackAllocs, 1, fromSlot, toSlot);
+
+		return vm.setTrap(VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM, i);
+	}
+
+	// step 4: actually delete the references now
+	// Restore refs, because pointerRemove decrements them
+	changePointeeInRefs(vm, stackAllocs, 1);
+
+	foreach(ref Allocation alloc; stackAllocs) {
+		static if (OUT_REFS_PER_MEMORY) {
+			if (alloc.numOutRefs == 0) continue;
+		}
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+			vm.pointerRemove(mem, &alloc, offset);
+		}
+		static if (OUT_REFS_PER_ALLOCATION) {
+			// Release memory buffer. Even when length == 0
+			alloc.outRefs.free(*vm.allocator);
+		}
+	}
+}
+
+// Only modify inRef count of stackAllocs
+private void changeLocalPointeeInRefs(ref VmState vm, Allocation[] stackAllocs, int delta, u32 fromSlot, u32 toSlot) {
+	Memory* mem = &vm.memories[MemoryKind.stack_mem];
+	foreach(ref Allocation alloc; stackAllocs) {
+		if (alloc.numOutRefs == 0) continue;
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+			// skip non-stack targets
+			if (target.kind != MemoryKind.stack_mem) continue;
+			// skip targets outside of destroyed stack slot range
+			if (target.index < fromSlot) continue;
+			if (target.index >= toSlot) continue;
+			vm.changeAllocInRef(target, delta);
+		}
+	}
+}
+
+private void changePointeeInRefs(ref VmState vm, Allocation[] stackAllocs, int delta) {
+	Memory* mem = &vm.memories[MemoryKind.stack_mem];
+	foreach(ref Allocation alloc; stackAllocs) {
+		if (alloc.numOutRefs == 0) continue;
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+			vm.changeAllocInRef(target, delta);
+		}
+	}
+}
+
 void instr_mov(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];

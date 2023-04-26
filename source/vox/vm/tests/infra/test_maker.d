@@ -122,7 +122,7 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 		// gather parameters
 		Array!(Test.Param) testParameters;
 		testParameters.voidPut(allocator, parameters.length);
-			foreach(i, ref param; parameters) {
+		foreach(i, ref param; parameters) {
 			testParameters[i] = Test.Param(param.id, param.values[param.currentIndex]);
 			//writef(" (%s %s)", param.id, param.values[param.currentIndex]);
 		}

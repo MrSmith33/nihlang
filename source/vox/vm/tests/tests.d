@@ -87,7 +87,7 @@ void test_ret_2(ref VmTestContext c) {
 
 @VmTest
 void test_stack_0(ref VmTestContext c) {
-	// Test insufficient stack slot args
+	// Test insufficient stack slot args (native -> bytecode)
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));
@@ -99,7 +99,47 @@ void test_stack_0(ref VmTestContext c) {
 
 @VmTest
 void test_stack_1(ref VmTestContext c) {
-	// Test incorrect stack slot size of an argument
+	// Test insufficient stack slot args call (bytecode -> bytecode)
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_call(0, 0, funcB.index);
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	c.callFail(funcA);
+	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+}
+
+@VmTest
+void test_stack_2(ref VmTestContext c) {
+	// Test insufficient stack slot args tailcall (bytecode -> bytecode)
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_tail_call(0, 0, funcB.index);
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	c.callFail(funcA);
+	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+}
+
+@VmTest
+void test_stack_3(ref VmTestContext c) {
+	// Test incorrect stack slot size of an argument (native -> bytecode)
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));
@@ -111,7 +151,49 @@ void test_stack_1(ref VmTestContext c) {
 }
 
 @VmTest
-void test_stack_2(ref VmTestContext c) {
+void test_stack_4(ref VmTestContext c) {
+	// Test incorrect stack slot size of an argument (bytecode -> bytecode)
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_stack_alloc(SizeAndAlign(8, 1));
+	a.emit_call(0, 0, funcB.index);
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	b.add_stack_slot(SizeAndAlign(16, 1));
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	c.callFail(funcA);
+	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+}
+
+@VmTest
+void test_stack_5(ref VmTestContext c) {
+	// Test incorrect stack slot size of an argument tailcall (bytecode -> bytecode)
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_stack_alloc(SizeAndAlign(8, 1));
+	a.emit_tail_call(0, 0, funcB.index);
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	b.add_stack_slot(SizeAndAlign(16, 1));
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	c.callFail(funcA);
+	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+}
+
+@VmTest
+void test_stack_6(ref VmTestContext c) {
 	// Test that native memory stack is preserved after return
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
@@ -126,7 +208,7 @@ void test_stack_2(ref VmTestContext c) {
 }
 
 @VmTest
-void test_stack_3(ref VmTestContext c) {
+void test_stack_7(ref VmTestContext c) {
 	// Test local stack slots
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
@@ -142,7 +224,7 @@ void test_stack_3(ref VmTestContext c) {
 }
 
 @VmTest
-void test_stack_4(ref VmTestContext c) {
+void test_stack_8(ref VmTestContext c) {
 	// Should not leak stack slots from previous test
 	assert(c.vm.numFrameStackSlots == 0);
 	// Test local stack slots + parameter
@@ -212,12 +294,45 @@ void test_refs_0(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_STACK_REF_IN_RESULT);
+	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG);
+}
+
+@VmTest
+void test_refs_1(ref VmTestContext c) {
+	// Check stack reference doesn't escape via local register
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // local
+	b.emit_stack_addr(0, 0); // set non-result register
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	c.call(funcId);
+}
+
+@VmTest
+void test_refs_2(ref VmTestContext c) {
+	// Check stack reference escape via result register, tail call
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.add_stack_slot(SizeAndAlign(8, 1)); // local
+	a.emit_stack_addr(0, 0); // escape through first parameter
+	a.emit_tail_call(0, 1, funcB.index); // must trigger here
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	c.vm.setFunction(funcB, 0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+
+	c.callFail(funcA);
+	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG);
 }
 
 @VmTest
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_refs_1(ref VmTestContext c) {
+void test_refs_3(ref VmTestContext c) {
 	// Check stack reference escape via pointer in memory
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
@@ -229,11 +344,37 @@ void test_refs_1(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId, VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_STACK_REF_IN_MEMORY);
+	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM);
 }
 
 @VmTest
-void test_refs_2(ref VmTestContext c) {
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_refs_4(ref VmTestContext c) {
+	// Check stack reference escape via pointer in memory
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
+
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.add_stack_slot(SizeAndAlign(8, 1)); // local
+	a.emit_stack_addr(1, 0); // escape
+	a.emit_store_ptr(c.vm.ptrSize, 0, 1); // store pointer to local slot into ptr
+	a.emit_tail_call(0, 0, funcB.index); // must trigger here
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 1.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_trap();
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	c.callFail(funcA, VmReg(memId));
+	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM);
+}
+
+@VmTest
+void test_refs_5(ref VmTestContext c) {
 	// Check that pointers are removed from stack allocation and references are correctly decremented
 	// If they were not removed, escape error occurs
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -244,6 +385,29 @@ void test_refs_2(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.call(funcId);
+}
+
+@VmTest
+void test_refs_6(ref VmTestContext c) {
+	// Check that pointers are removed from stack allocation and references are correctly decremented
+	// If they were not removed, escape error occurs
+	// tail call
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.add_stack_slot(SizeAndAlign(8, 1));
+	a.emit_stack_addr(0, 0);
+	a.emit_store_ptr(c.vm.ptrSize, 0, 0); // store pointer to local slot into local
+	a.emit_tail_call(0, 0, funcB.index); // must clear the local stack slot
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 0.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ret();
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	c.call(funcA);
 }
 
 
@@ -1134,7 +1298,7 @@ void test_tail_call_0(ref VmTestContext c) {
 
 @VmTest
 void test_tail_call_1(ref VmTestContext c) {
-	// Bytecode function tail call
+	// Bytecode function tail call, non-zero first reg
 
 	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
@@ -1143,22 +1307,34 @@ void test_tail_call_1(ref VmTestContext c) {
 	//     return b(number);
 	// }
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
-	a.emit_tail_call(0, 0, funcB.index);
-
-	c.vm.functions[funcA.index].code = a.code;
+	a.add_stack_slot(SizeAndAlign(8, 1)); // local
+	a.emit_mov(1, 0); // move arg to r1
+	a.emit_stack_addr(0, 0);
+	a.emit_add_i64_imm8(2, 0, -1);
+	a.emit_store_m64(0, 2); // set local mem to s0-1
+	a.emit_stack_alloc(SizeAndAlign(8, 1)); // parameter
+	a.emit_stack_addr(0, 1);
+	a.emit_const_s8(2, 88);
+	a.emit_store_m64(0, 2); // set parameter mem to 88
+	a.emit_const_s8(0, 0); // erase r0
+	// parameter slot must be shifter over the local slot and overwrite s0-1 with 88
+	a.emit_tail_call(1, 0, funcB.index);
+	c.vm.setFunction(funcA, 1.NumResults, 1.NumRegParams, 0.NumStackParams, a);
 
 	// u64 b(u64 number) {
 	//     return number + 42;
 	// }
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_const_s8(1, 42);
+	b.emit_const_s8(1, 42); // 42
 	b.emit_add_i64(0, 0, 1);
+	a.emit_stack_addr(2, 0);
+	a.emit_load_m64(2, 2); // get 88
+	b.emit_add_i64(0, 0, 2);
 	b.emit_ret();
-
-	c.vm.functions[funcB.index].code = b.code;
+	c.vm.setFunction(funcB, 1.NumResults, 1.NumRegParams, 1.NumStackParams, b);
 
 	VmReg[] res = c.call(funcA, VmReg(5));
-	assert(res[0] == VmReg(47));
+	assert(res[0] == VmReg(5+42+88));
 }
 
 

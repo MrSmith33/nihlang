@@ -99,6 +99,12 @@ struct VmState {
 		return kind < MemoryKind.func_id;
 	}
 
+	AllocId addFunction() {
+		u32 index = functions.length;
+		functions.put(*allocator, VmFunction());
+		return AllocId(index, MemoryKind.func_id);
+	}
+
 	AllocId addFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
@@ -119,6 +125,17 @@ struct VmState {
 		u32 index = functions.length;
 		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code));
 		return AllocId(index, MemoryKind.func_id);
+	}
+
+	void setFunction(
+		AllocId id,
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		ref CodeBuilder builder)
+	{
+		assert(id.index < functions.length);
+		functions[id.index] = VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code);
 	}
 
 	AllocId addExternalFunction(
@@ -236,7 +253,7 @@ struct VmState {
 			static if (OUT_REFS_PER_MEMORY) {
 				++alloc.numOutRefs;
 			}
-			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
+			PointerId ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
 			mem.setPtrBit(ptrSlotIndex);
 		}
 		changeAllocInRef(value, 1);
@@ -255,7 +272,7 @@ struct VmState {
 			static if (OUT_REFS_PER_MEMORY) {
 				--alloc.numOutRefs;
 			}
-			u32 ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
+			PointerId ptrSlotIndex = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
 			mem.resetPtrBit(ptrSlotIndex);
 			changeAllocInRef(oldPtr, -1);
 		}

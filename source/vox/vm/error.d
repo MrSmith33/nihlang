@@ -28,9 +28,8 @@ enum VmStatus : u8 {
 	ERR_LOAD_INVALID_POINTER,
 	ERR_CALL_INSUFFICIENT_STACK_ARGS,
 	ERR_CALL_INVALID_STACK_ARG_SIZES,
-	ERR_STACK_REF_IN_RESULT,
-	// Doesn't restore the state
-	ERR_STACK_REF_IN_MEMORY,
+	ERR_DANGLING_PTR_TO_STACK_IN_REG,
+	ERR_DANGLING_PTR_TO_STACK_IN_MEM,
 }
 
 bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
@@ -212,19 +211,19 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			}
 			break;
 
-		case ERR_STACK_REF_IN_RESULT:
+		case ERR_DANGLING_PTR_TO_STACK_IN_REG:
 			u8 regIndex = cast(u8)vm.errData;
 			VmReg* reg = &vm.regs[regIndex];
 			sink.formattedWrite(
-				"Address of stack slot %s escapes throught result register r%s",
+				"Address of stack slot %s escapes through register r%s",
 				*reg, regIndex);
 			break;
 
-		case ERR_STACK_REF_IN_MEMORY:
+		case ERR_DANGLING_PTR_TO_STACK_IN_MEM:
 			u8 slotIndex = cast(u8)vm.errData;
 			auto slotId = AllocId(vm.frameFirstStackSlot + slotIndex, MemoryKind.stack_mem);
 			sink.formattedWrite(
-				"Address of stack slot %s escapes throught memory",
+				"Address of stack slot %s escapes through memory",
 				slotId);
 			break;
 	}
