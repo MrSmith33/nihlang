@@ -217,8 +217,9 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 void instr_tail_call(ref VmState vm) {
 	// TODO: stack slots
 	pragma(inline, true);
-	u8  num_args = vm.code[vm.ip+1];
-	u32 calleeId = *cast(i32*)&vm.code[vm.ip+2];
+	u8  arg0_idx = vm.code[vm.ip+1];
+	u8  num_args = vm.code[vm.ip+2];
+	u32 calleeId = *cast(i32*)&vm.code[vm.ip+3];
 
 	VmFunction* caller = &vm.functions[vm.func];
 

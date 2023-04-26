@@ -90,10 +90,11 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			break;
 
 		case tail_call:
+			u8 arg0_idx = code[ip++];
 			u8 num_args = code[ip++];
 			i32 func_id = *cast(i32*)&code[ip];
 			ip += 4;
-			sink.formattedWrite("%04X tail_call r0 %s f%s", addr, num_args, func_id);
+			sink.formattedWrite("%04X tail_call r%s %s f%s", addr, arg0_idx, num_args, func_id);
 			break;
 
 		case ret:

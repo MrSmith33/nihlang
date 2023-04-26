@@ -54,8 +54,8 @@ struct CodeBuilder {
 		U32(funcIndex);
 	}
 
-	void emit_tail_call(u8 num_args, u32 funcIndex) {
-		U8(VmOpcode.tail_call, num_args);
+	void emit_tail_call(u8 arg0_idx, u8 num_args, u32 funcIndex) {
+		U8(VmOpcode.tail_call, arg0_idx, num_args);
 		U32(funcIndex);
 	}
 

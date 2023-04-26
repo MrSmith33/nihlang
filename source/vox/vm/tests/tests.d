@@ -1124,7 +1124,7 @@ void test_tail_call_0(ref VmTestContext c) {
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
-	b.emit_tail_call(0, extFuncId.index);
+	b.emit_tail_call(0, 0, extFuncId.index);
 	b.emit_ret();
 
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
@@ -1143,7 +1143,7 @@ void test_tail_call_1(ref VmTestContext c) {
 	//     return b(number);
 	// }
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
-	a.emit_tail_call(0, funcB.index);
+	a.emit_tail_call(0, 0, funcB.index);
 
 	c.vm.functions[funcA.index].code = a.code;
 
