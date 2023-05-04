@@ -19,8 +19,6 @@ struct VmTestContext {
 
 	this(ref VoxAllocator allocator, SinkDelegate _sink) {
 		vm.allocator = &allocator;
-		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
-		vm.ptrSize = PtrSize._32;
 
 		enum static_bytes = 64*1024;
 		enum heap_bytes = 64*1024;

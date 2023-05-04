@@ -578,46 +578,6 @@ void instr_load(ref VmState vm) {
 
 	vm.ip += 3;
 }
-void instr_load_m8(ref VmState vm) {
-	pragma(inline, true);
-	enum u32 size = 1;
-
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-
-	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_LOAD_NOT_PTR);
-	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
-
-	if (!vm.isPointerValid(src.pointer)) return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
-
-	Memory* mem = &vm.memories[src.pointer.kind];
-	Allocation* alloc = &mem.allocations[src.pointer.index];
-	u8* memory = mem.memory[].ptr;
-
-	i64 offset = src.as_s64;
-	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
-	if (offset + size > alloc.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
-
-	static if (SANITIZE_UNINITIALIZED_MEM) {
-		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
-		size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
-		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_LOAD_UNINIT);
-	}
-
-	dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset);
-	dst.pointer = AllocId();
-
-	vm.ip += 3;
-}
-void instr_load_m16(ref VmState vm) {
-	pragma(inline, true);
-}
-void instr_load_m32(ref VmState vm) {
-	pragma(inline, true);
-}
-void instr_load_m64(ref VmState vm) {
-	pragma(inline, true);
-}
 void instr_store(ref VmState vm) {
 	pragma(inline, true);
 	VmOpcode op = cast(VmOpcode)vm.code[vm.ip+0];
@@ -666,16 +626,4 @@ void instr_store(ref VmState vm) {
 	}
 
 	vm.ip += 3;
-}
-void instr_store_m8(ref VmState vm) {
-	pragma(inline, true);
-}
-void instr_store_m16(ref VmState vm) {
-	pragma(inline, true);
-}
-void instr_store_m32(ref VmState vm) {
-	pragma(inline, true);
-}
-void instr_store_m64(ref VmState vm) {
-	pragma(inline, true);
 }
