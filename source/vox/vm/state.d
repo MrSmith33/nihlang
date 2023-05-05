@@ -13,7 +13,6 @@ struct VmState {
 	@nogc nothrow:
 
 	PtrSize ptrSize;
-	u8 readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_R;
 
 	// must be checked on return
 	VmStatus status = VmStatus.RUNNING;
@@ -49,6 +48,10 @@ struct VmState {
 	}
 
 	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
+		memories[MemoryKind.static_mem].kind = MemoryKind.static_mem;
+		memories[MemoryKind.heap_mem].kind   = MemoryKind.heap_mem;
+		memories[MemoryKind.stack_mem].kind  = MemoryKind.stack_mem;
+
 		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
 		memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes, ptrSize);
 		memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes, ptrSize);
@@ -87,16 +90,27 @@ struct VmState {
 		regs = &registers[0];
 	}
 
+	void setAllocationPermission(AllocId id, MemoryPermissions perm) {
+		assert(id.kind != MemoryKind.func_id);
+		Memory* mem = &memories[id.kind];
+		assert(id.index < mem.allocations.length);
+		Allocation* alloc = &mem.allocations[id.index];
+		alloc.setPermission(perm);
+	}
+
 	bool isMemoryReadable(MemoryKind kind) {
-		return cast(bool)(readWriteMask & (1 << kind));
+		pragma(inline, true);
+		return kind != MemoryKind.func_id;
 	}
 
 	bool isMemoryWritable(MemoryKind kind) {
-		return cast(bool)(readWriteMask & (1 << (kind + 4)));
+		pragma(inline, true);
+		return kind != MemoryKind.func_id;
 	}
 
 	bool isMemoryRefcounted(MemoryKind kind) {
-		return kind < MemoryKind.func_id;
+		pragma(inline, true);
+		return kind != MemoryKind.func_id;
 	}
 
 	AllocId addFunction() {
@@ -158,9 +172,9 @@ struct VmState {
 		return AllocId(index, MemoryKind.func_id);
 	}
 
-	AllocId pushStackAlloc(SizeAndAlign sizeAlign) {
+	AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryPermissions perm = MemoryPermissions.read_write) {
 		assert(numFrameStackSlots < u8.max);
-		return memories[MemoryKind.stack_mem].allocate(*allocator, sizeAlign, MemoryKind.stack_mem);
+		return memories[MemoryKind.stack_mem].allocate(*allocator, sizeAlign, perm);
 	}
 
 	void pushRegisters(u32 numRegisters) {

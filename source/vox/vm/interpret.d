@@ -548,7 +548,7 @@ void instr_load(ref VmState vm) {
 
 	Memory* mem = &vm.memories[src.pointer.kind];
 	Allocation* alloc = &mem.allocations[src.pointer.index];
-	u8* memory = mem.memory[].ptr;
+	if (!alloc.isReadable) return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
 
 	i64 offset = src.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
@@ -568,6 +568,7 @@ void instr_load(ref VmState vm) {
 		dst.pointer = AllocId();
 	}
 
+	u8* memory = mem.memory[].ptr;
 	switch(op) with(VmOpcode) {
 		case load_m8:  dst.as_u64 = *cast( u8*)(memory + alloc.offset + offset); break;
 		case load_m16: dst.as_u64 = *cast(u16*)(memory + alloc.offset + offset); break;
@@ -591,6 +592,7 @@ void instr_store(ref VmState vm) {
 
 	Memory* mem = &vm.memories[dst.pointer.kind];
 	Allocation* alloc = &mem.allocations[dst.pointer.index];
+	if (!alloc.isWritable) return vm.setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
 
 	i64 offset = dst.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_STORE_OOB);

@@ -335,7 +335,7 @@ void test_refs_2(ref VmTestContext c) {
 void test_refs_3(ref VmTestContext c) {
 	// Check stack reference escape via pointer in memory
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.add_stack_slot(SizeAndAlign(8, 1)); // local
 	b.emit_stack_addr(1, 0);
@@ -352,7 +352,7 @@ void test_refs_3(ref VmTestContext c) {
 void test_refs_4(ref VmTestContext c) {
 	// Check stack reference escape via pointer in memory
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
 
 	AllocId funcA = c.vm.addFunction();
 	AllocId funcB = c.vm.addFunction();
@@ -587,8 +587,8 @@ void test_cmp_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.m64_eq, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -615,8 +615,8 @@ void test_cmp_5(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.m64_ne, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -643,7 +643,7 @@ void test_cmp_6(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.u64_gt, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -670,7 +670,7 @@ void test_cmp_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.u64_ge, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -699,8 +699,8 @@ void test_cmp_8(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(cond, 0, 0, 1);
 	b.emit_trap();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId memId2 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
 	assert(c.vm.status == VmStatus.ERR_CMP_DIFFERENT_PTR);
@@ -715,7 +715,7 @@ void test_cmp_9(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(cond, 0, 0, 1);
 	b.emit_trap();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
 	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
@@ -731,7 +731,7 @@ void test_cmp_10(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.s64_gt, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -755,7 +755,7 @@ void test_cmp_11(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(VmBinCond.s64_ge, 0, 0, 1);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
@@ -784,7 +784,7 @@ void test_cmp_12(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f32_gt, 2, 4, 5);
 	b.emit_cmp(VmBinCond.f32_ge, 3, 4, 5);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(cast(f32)100.0), VmReg(cast(f32)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
@@ -804,7 +804,7 @@ void test_cmp_13(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f64_gt, 2, 4, 5);
 	b.emit_cmp(VmBinCond.f64_ge, 3, 4, 5);
 	b.emit_ret();
-	AllocId memId1 = c.genericMemAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(cast(f64)100.0), VmReg(cast(f64)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
@@ -895,7 +895,7 @@ void test_load_mXX_3(ref VmTestContext c) {
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId;
 	if (memKind != MemoryKind.func_id) {
-		memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryPermissions.write);
 	}
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -903,7 +903,6 @@ void test_load_mXX_3(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	if (memKind == MemoryKind.func_id) memId = funcId;
-	c.vm.readWriteMask = 0; // everything is non-readable
 	c.callFail(funcId, VmReg(0), VmReg(memId));
 	assert(c.vm.status == VmStatus.ERR_LOAD_NO_READ_PERMISSION);
 }
@@ -915,7 +914,7 @@ void test_load_mXX_4(ref VmTestContext c) {
 	// Test load_mXX src memory offset is negative
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -931,7 +930,7 @@ void test_load_mXX_5(ref VmTestContext c) {
 	// Test load_mXX src memory offset is too big
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -948,7 +947,7 @@ void test_load_mXX_6(ref VmTestContext c) {
 	// Test load_mXX src memory uninitialized
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -965,7 +964,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	u64 sizeMask = bitmask(1 << (op - VmOpcode.load_m8 + 3));
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(16, 1));
 	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
 	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
@@ -1005,7 +1004,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 	u32 size = 1 << (op - VmOpcode.load_m8);
 	u64 sizeMask = bitmask(1 << (op - VmOpcode.load_m8 + 3));
 
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(16, 1));
 	u64 value0 = 0x_88_77_66_55_44_33_22_11_UL;
 	u64 value1 = 0x_F1_FF_EE_DD_CC_BB_AA_99_UL;
 	c.vm.memWrite!u64(memId, 0, value0); // fill memory with data
@@ -1060,14 +1059,13 @@ void test_store_mXX_3(ref VmTestContext c) {
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId;
 	if (memKind != MemoryKind.func_id) {
-		memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryPermissions.read);
 	}
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	if (memKind == MemoryKind.func_id) memId = funcId;
-	c.vm.readWriteMask = 0; // everything is non-writable
 	c.callFail(funcId, VmReg(memId), VmReg(0));
 	assert(c.vm.status == VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
 }
@@ -1079,7 +1077,7 @@ void test_store_mXX_4(ref VmTestContext c) {
 	// Test store_mXX dst memory offset is negative
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -1095,7 +1093,7 @@ void test_store_mXX_5(ref VmTestContext c) {
 	// Test store_mXX dst memory offset is too big
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
@@ -1117,7 +1115,7 @@ void test_store_mXX_6(ref VmTestContext c) {
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 	VmOpcode store_op = cast(VmOpcode)(VmOpcode.store_m8 + param);
 	VmOpcode load_op = cast(VmOpcode)(VmOpcode.load_m8 + param);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(16, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(store_op, 0, 1);
@@ -1145,7 +1143,7 @@ void test_store_mXX_6(ref VmTestContext c) {
 void test_store_mXX_7(ref VmTestContext c) {
 	// Test store_mXX of pointers to unaligned address
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(16, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(16, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1);
@@ -1168,7 +1166,7 @@ void test_store_mXX_7(ref VmTestContext c) {
 void test_store_mXX_8(ref VmTestContext c) {
 	// Test store_mXX of pointers to aligned address
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 0); // store memId
@@ -1185,8 +1183,8 @@ void test_store_mXX_8(ref VmTestContext c) {
 void test_store_mXX_9(ref VmTestContext c) {
 	// Test store_mXX of pointers to aligned address that overwrites an existing pointer
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId1 = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
-	AllocId memId2 = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId1 = c.memAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId2 = c.memAlloc(memKind, SizeAndAlign(8, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1); // store memId1
@@ -1204,7 +1202,7 @@ void test_store_mXX_9(ref VmTestContext c) {
 void test_store_mXX_10(ref VmTestContext c) {
 	// Test store_mXX of non-pointer to aligned address that removes an existing pointer
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
-	AllocId memId = c.genericMemAlloc(memKind, SizeAndAlign(8, 1));
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1); // store memId

@@ -46,9 +46,40 @@ struct PointerId {
 struct Allocation {
 	@nogc nothrow:
 
+	this(u32 _offset, u32 _size, MemoryPermissions perm) {
+		payload0 = (_offset & ~0b11) | u32(perm & 0b11);
+		size = _size;
+	}
+
+	private u32 payload0;
+
 	// Start in parent Memory.memory
 	// All allocations are aligned to 8 bytes in Memory buffer
-	u32 offset;
+	u32 offset() const {
+		pragma(inline, true);
+		return payload0 & ~u32(0b111);
+	}
+
+	void offset(u32 newValue) {
+		pragma(inline, true);
+		payload0 = (newValue & ~0b11) | u32(payload0 & 0b11);
+	}
+
+	bool isReadable() const {
+		pragma(inline, true);
+		return (payload0 & MemoryPermissions.read) != 0;
+	}
+
+	bool isWritable() const {
+		pragma(inline, true);
+		return (payload0 & MemoryPermissions.write) != 0;
+	}
+
+	void setPermission(MemoryPermissions perm) {
+		pragma(inline, true);
+		payload0 = (payload0 & ~0b11) | u32(perm & 0b11);
+	}
+
 	// Size in bytes
 	u32 size;
 	// How many pointers to this allocation exist in other allocations
@@ -68,6 +99,11 @@ struct Allocation {
 struct Memory {
 	@nogc nothrow:
 
+	// How many bytes are used out of memory.reserved bytes
+	u32 bytesUsed;
+	// What memory is this
+	MemoryKind kind;
+
 	// Individual allocations
 	Array!Allocation allocations;
 	// Actual memory bytes
@@ -86,8 +122,6 @@ struct Memory {
 	static if (OUT_REFS_PER_MEMORY) {
 		HashMap!(u32, AllocId, u32.max) outRefs;
 	}
-	// How many bytes are used out of memory.reserved bytes
-	u32 bytesUsed;
 
 	void reserve(ref VoxAllocator allocator, u32 size, PtrSize ptrSize) {
 		memory.voidPut(allocator, size);
@@ -116,16 +150,16 @@ struct Memory {
 		bytesUsed = 0;
 	}
 
-	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryKind allocKind) {
+	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryPermissions perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		// allocate in multiple of 8 bytes
 		// so that pointers are always aligned in memory and we can use pointer bitmap
 		u32 alignedSize = alignValue(sizeAlign.size, 8);
 		bytesUsed += alignedSize;
-		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[allocKind]);
-		allocations.put(allocator, Allocation(offset, sizeAlign.size));
-		return AllocId(index, allocKind);
+		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
+		allocations.put(allocator, Allocation(offset, sizeAlign.size, perm));
+		return AllocId(index, kind);
 	}
 
 	// only for stack allocations
@@ -168,7 +202,7 @@ struct Memory {
 		// update allocations
 		const u32 byteOffset = toByte - fromByte;
 		foreach(ref alloc; allocations[from..from + shiftedAllocations]) {
-			alloc.offset -= byteOffset;
+			alloc.offset = alloc.offset - byteOffset;
 		}
 
 		usize* pointerBits = cast(usize*)&pointerBitmap.front();
@@ -277,20 +311,11 @@ immutable string[4] memoryKindLetter = [
 	"h", "s", "g", "f"
 ];
 
-// Low 4 bits are for reading, high 4 bits are for writing
-// Bit position is eaual to MemoryKind
-enum MemFlags : u8 {
-	heap_R    = 0b_0000_0001,
-	stack_R   = 0b_0000_0010,
-	static_R  = 0b_0000_0100,
-
-	heap_W    = 0b_0001_0000,
-	stack_W   = 0b_0010_0000,
-	static_W  = 0b_0100_0000,
-
-	heap_RW   = 0b_0001_0001,
-	stack_RW  = 0b_0010_0010,
-	static_RW = 0b_0100_0100,
+enum MemoryPermissions : u8 {
+	none  = 0b00,
+	read  = 0b01,
+	write = 0b10,
+	read_write = 0b11,
 }
 
 enum PtrSize : u8 {

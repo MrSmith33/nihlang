@@ -33,7 +33,6 @@ struct VmTestContext {
 		vm.reset;
 		test = _test;
 		vm.ptrSize = test.ptrSize;
-		vm.readWriteMask = MemFlags.heap_RW | MemFlags.stack_RW | MemFlags.static_RW;
 	}
 
 	// Sets vm.status
@@ -106,22 +105,10 @@ struct VmTestContext {
 		vm.registers.clear;
 	}
 
-	AllocId staticAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.static_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.static_mem);
-	}
-
-	AllocId heapAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.heap_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.heap_mem);
-	}
-
-	AllocId stackAlloc(SizeAndAlign sizeAlign) {
-		return vm.memories[MemoryKind.stack_mem].allocate(*vm.allocator, sizeAlign, MemoryKind.stack_mem);
-	}
-
-	AllocId genericMemAlloc(MemoryKind kind, SizeAndAlign sizeAlign) {
+	AllocId memAlloc(MemoryKind kind, SizeAndAlign sizeAlign, MemoryPermissions perm = MemoryPermissions.read_write) {
 		final switch(kind) with(MemoryKind) {
-			case stack_mem: return vm.pushStackAlloc(sizeAlign);
-			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, kind);
+			case stack_mem: return vm.pushStackAlloc(sizeAlign, perm);
+			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, perm);
 			case func_id: assert(false, "Cannot allocate function id");
 		}
 	}
