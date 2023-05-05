@@ -25,6 +25,7 @@ enum VmStatus : u8 {
 	ERR_STORE_PTR_UNALIGNED,
 	ERR_LOAD_OOB,
 	ERR_LOAD_UNINIT,
+	ERR_STORE_INVALID_POINTER,
 	ERR_LOAD_INVALID_POINTER,
 	ERR_CALL_INSUFFICIENT_STACK_ARGS,
 	ERR_CALL_INVALID_STACK_ARG_SIZES,
@@ -117,6 +118,11 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 		case ERR_LOAD_NOT_PTR:
 			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			sink.formattedWrite("Reading from non-pointer value (r%s:%s)", vm.code[vm.ip+2], *src);
+			break;
+
+		case ERR_STORE_INVALID_POINTER:
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			sink.formattedWrite("Writing to invalid pointer (r%s:%s)", vm.code[vm.ip+1], *dst);
 			break;
 
 		case ERR_LOAD_INVALID_POINTER:

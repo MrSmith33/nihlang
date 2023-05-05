@@ -113,8 +113,16 @@ struct VmTestContext {
 		}
 	}
 
+	void memFree(AllocId id) {
+		assert(id.kind == MemoryKind.heap_mem, "Can only free heap memory");
+		Memory* mem = &vm.memories[id.kind];
+		Allocation* alloc = &mem.allocations[id.index];
+		alloc.markFreed;
+	}
+
 	// Assumes that non-pointer data was already written
 	void memWritePtr(AllocId dstMem, u32 offset, AllocId ptrVal) {
+		assert(dstMem.kind != MemoryKind.func_id, "Cannot write to function id");
 		Memory* mem = &vm.memories[dstMem.kind];
 		Allocation* alloc = &mem.allocations[dstMem.index];
 		memWritePtr(mem, alloc, offset, ptrVal);

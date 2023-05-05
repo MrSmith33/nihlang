@@ -104,6 +104,9 @@ I decided to use 4 pointer kinds:
      Pro: works for external references (stored outside of VM)  
      Con: 32bit generation is stored in allocation metadata (same as 32bit refcount) and in each pointer  
      Con: Can only detect when pointer is accessed
+     Con: Need to preserve all allocation headers, since generation must remain in case it gets allocated again
+
+     This is needed if we want to reuse freed heap allocations and detect dangling pointers.
    - Use some sort of GC that runs on each stack frame end to find all references to stack allocations  
      Pro: No extra data needs to be stored  
      Pro: No instrumentation like in refcounting, only at the end of function  
@@ -202,3 +205,14 @@ Open questions:
    One for shadow pointers  
    Con: The consequence is that code must 100% know when something that is being loaded into register is a pointer.  
    Pro: No need to store pointer data for non-pointers
+
+Triggering dangling reference error right after free might not work, because you need refcount to already be zero before you call free, which is impossible.
+Second check is when refcount reaches zero, while free was never called. Conflicts with the first.
+After free the pointer may be in registers and/or memory slot.
+However I don't track register -> memory references
+For stack slots it is less of a problem, because they are freed automatically, but references may still be present in some memory buffer
+
+We need a way to indicate if allocation was freed.
+For now I will remove all permissions from the allocation and set the size to u32.max. This way single permission check is enough to handle 2 cases: no permission to read/write or freed allocation access.
+
+User may want to control runtime mutability of heap allocated memory, after it gets converted into static memory. This needs 1 bit of data to be stored on all heap allocations

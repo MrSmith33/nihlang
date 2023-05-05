@@ -544,11 +544,14 @@ void instr_load(ref VmState vm) {
 	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_LOAD_NOT_PTR);
 	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
 
-	if (!vm.isPointerValid(src.pointer)) return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
-
 	Memory* mem = &vm.memories[src.pointer.kind];
 	Allocation* alloc = &mem.allocations[src.pointer.index];
-	if (!alloc.isReadable) return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+	if (!alloc.isReadable) {
+		if (!alloc.isPointerValid(src.pointer)) {
+			return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
+		}
+		return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+	}
 
 	i64 offset = src.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
@@ -592,7 +595,12 @@ void instr_store(ref VmState vm) {
 
 	Memory* mem = &vm.memories[dst.pointer.kind];
 	Allocation* alloc = &mem.allocations[dst.pointer.index];
-	if (!alloc.isWritable) return vm.setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+	if (!alloc.isWritable) {
+		if (!alloc.isPointerValid(dst.pointer)) {
+			return vm.setTrap(VmStatus.ERR_STORE_INVALID_POINTER);
+		}
+		return vm.setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+	}
 
 	i64 offset = dst.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_STORE_OOB);

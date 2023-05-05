@@ -47,39 +47,12 @@ struct Allocation {
 	@nogc nothrow:
 
 	this(u32 _offset, u32 _size, MemoryPermissions perm) {
-		payload0 = (_offset & ~0b11) | u32(perm & 0b11);
+		payload0 = (_offset & ~0b111) | u32(perm & 0b011);
 		size = _size;
 	}
 
+	// offset | MemoryPermissions
 	private u32 payload0;
-
-	// Start in parent Memory.memory
-	// All allocations are aligned to 8 bytes in Memory buffer
-	u32 offset() const {
-		pragma(inline, true);
-		return payload0 & ~u32(0b111);
-	}
-
-	void offset(u32 newValue) {
-		pragma(inline, true);
-		payload0 = (newValue & ~0b11) | u32(payload0 & 0b11);
-	}
-
-	bool isReadable() const {
-		pragma(inline, true);
-		return (payload0 & MemoryPermissions.read) != 0;
-	}
-
-	bool isWritable() const {
-		pragma(inline, true);
-		return (payload0 & MemoryPermissions.write) != 0;
-	}
-
-	void setPermission(MemoryPermissions perm) {
-		pragma(inline, true);
-		payload0 = (payload0 & ~0b11) | u32(perm & 0b11);
-	}
-
 	// Size in bytes
 	u32 size;
 	// How many pointers to this allocation exist in other allocations
@@ -93,6 +66,58 @@ struct Allocation {
 		// How many pointers to this allocation contains.
 		// Equivalent to Allocation.outRefs.length.
 		u32 numOutRefs;
+	}
+
+
+	// Start in parent Memory.memory
+	// All allocations are aligned to 8 bytes in Memory buffer
+	u32 offset() const {
+		pragma(inline, true);
+		return payload0 & ~u32(0b111);
+	}
+
+	void offset(u32 newValue) {
+		pragma(inline, true);
+		payload0 = (newValue & ~0b111) | u32(payload0 & 0b111);
+	}
+
+	bool isPointerValid(AllocId ptr) {
+		pragma(inline, true);
+		// In case generation index is added, it should be checked against ptr.generation
+		return !isFreed;
+	}
+
+	bool isReadable() const {
+		pragma(inline, true);
+		return (payload0 & MemoryPermissions.read) != 0;
+	}
+
+	bool isWritable() const {
+		pragma(inline, true);
+		return (payload0 & MemoryPermissions.write) != 0;
+	}
+
+	// If true, when heap allocation is moved to static memory,
+	// that static memory will be writable at runtime.
+	bool isRuntimeWritable() const {
+		pragma(inline, true);
+		return (payload0 & MemoryPermissions.runtime_write) != 0;
+	}
+
+	bool isFreed() const {
+		pragma(inline, true);
+		return size == u32.max;
+	}
+
+	void setPermission(MemoryPermissions perm) {
+		pragma(inline, true);
+		payload0 = (payload0 & ~0b11) | u32(perm & 0b11);
+	}
+
+	void markFreed() {
+		assert(!isFreed, "double free detected");
+		size = u32.max;
+		setPermission(MemoryPermissions.none);
 	}
 }
 
@@ -312,10 +337,11 @@ immutable string[4] memoryKindLetter = [
 ];
 
 enum MemoryPermissions : u8 {
-	none  = 0b00,
-	read  = 0b01,
-	write = 0b10,
-	read_write = 0b11,
+	none          = 0b000,
+	read          = 0b001,
+	write         = 0b010,
+	read_write    = 0b011,
+	runtime_write = 0b100,
 }
 
 enum PtrSize : u8 {

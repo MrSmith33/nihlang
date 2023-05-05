@@ -303,12 +303,6 @@ struct VmState {
 		assert(alloc.numInRefs != typeof(alloc.numInRefs).max);
 	}
 
-	bool isPointerValid(AllocId ptr) {
-		// Pointer validity check should go here
-		// TODO: Relevant tests must be added when this is implemented
-		return true;
-	}
-
 	// For VM users
 	void memWrite(T)(AllocId dstMem, u32 offset, T value)
 		if(is(T == u8) || is(T == u16) || is(T == u32) || is(T == u64))

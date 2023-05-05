@@ -1036,6 +1036,21 @@ void test_load_mXX_8(ref VmTestContext c) {
 	}
 }
 
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+void test_load_mXX_9(ref VmTestContext c) {
+	// Test load_mXX src memory was freed
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.memFree(memId);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
+	assert(c.vm.status == VmStatus.ERR_LOAD_INVALID_POINTER);
+}
+
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
@@ -1213,6 +1228,21 @@ void test_store_mXX_10(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId), VmReg(0));
 	assert(res[0] == VmReg(0));
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+void test_store_mXX_11(ref VmTestContext c) {
+	// Test store_mXX dst memory was freed
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.memFree(memId);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_STORE_INVALID_POINTER);
 }
 
 
