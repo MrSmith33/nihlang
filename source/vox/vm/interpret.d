@@ -170,7 +170,7 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 		bool sizesValid = true;
 		foreach(i; 0..numStackParams) {
 			// In the future we may allow bigger allocation than what was requested
-			sizesValid = sizesValid && (slotSizes[i].size == vm.stackSlots[i].size);
+			sizesValid = sizesValid && (slotSizes[i] == vm.stackSlots[i].sizeAlign);
 		}
 		if (!sizesValid) {
 			return vm.setTrap(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
@@ -240,7 +240,7 @@ void instr_tail_call(ref VmState vm) {
 		// parameters: verify sizes
 		foreach(i; 0..numStackParams) {
 			// In the future we may allow bigger allocation than what was requested
-			if (slotSizes[i].size == vm.stackSlots[i].size) continue;
+			if (slotSizes[i] == vm.stackSlots[i].sizeAlign) continue;
 			return vm.setTrap(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 		}
 	}
@@ -554,7 +554,7 @@ void instr_load(ref VmState vm) {
 
 	i64 offset = src.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
-	if (offset + size > alloc.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
+	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
 
 	static if (SANITIZE_UNINITIALIZED_MEM) {
 		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
@@ -603,7 +603,7 @@ void instr_store(ref VmState vm) {
 
 	i64 offset = dst.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_STORE_OOB);
-	if (offset + size > alloc.size) return vm.setTrap(VmStatus.ERR_STORE_OOB);
+	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_STORE_OOB);
 
 	// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 	// Note: this part should execute before bytes are written, because we need original data in trap handler

@@ -143,7 +143,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 				dst.pointer,
 				size,
 				offset,
-				alloc.size);
+				alloc.sizeAlign.size);
 			break;
 
 		case ERR_STORE_PTR_UNALIGNED:
@@ -173,7 +173,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 				src.pointer,
 				size,
 				offset,
-				alloc.size);
+				alloc.sizeAlign.size);
 			break;
 
 		case ERR_LOAD_UNINIT:
@@ -208,11 +208,11 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 
 			sink("Invalid stack slots sizes of stack arguments on the caller stack\n");
 			foreach(i; 0..numStackParams) {
-				if (slotSizes[i].size != vm.stackSlots[i].size) {
+				if (slotSizes[i] != vm.stackSlots[i].sizeAlign) {
 					sink.formattedWrite("arg %s: arg size %s != parameter size %s",
 						i,
-						slotSizes[i].size,
-						vm.stackSlots[i].size);
+						slotSizes[i],
+						vm.stackSlots[i].sizeAlign);
 				}
 			}
 			break;

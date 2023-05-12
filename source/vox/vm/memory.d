@@ -46,15 +46,15 @@ struct PointerId {
 struct Allocation {
 	@nogc nothrow:
 
-	this(u32 _offset, u32 _size, MemoryPermissions perm) {
+	this(u32 _offset, SizeAndAlign _sizeAlign, MemoryPermissions perm) {
 		payload0 = (_offset & ~0b111) | u32(perm & 0b011);
-		size = _size;
+		sizeAlign = _sizeAlign;
 	}
 
 	// offset | MemoryPermissions
 	private u32 payload0;
 	// Size in bytes
-	u32 size;
+	SizeAndAlign sizeAlign;
 	// How many pointers to this allocation exist in other allocations
 	// Pointers in registers do not increment the numInRefs
 	u32 numInRefs;
@@ -79,6 +79,11 @@ struct Allocation {
 	void offset(u32 newValue) {
 		pragma(inline, true);
 		payload0 = (newValue & ~0b111) | u32(payload0 & 0b111);
+	}
+
+	u32 size() const {
+		pragma(inline, true);
+		return sizeAlign.size;
 	}
 
 	bool isPointerValid(AllocId ptr) {
@@ -106,7 +111,7 @@ struct Allocation {
 
 	bool isFreed() const {
 		pragma(inline, true);
-		return size == u32.max;
+		return size == lowMask!u32(27);
 	}
 
 	void setPermission(MemoryPermissions perm) {
@@ -116,7 +121,7 @@ struct Allocation {
 
 	void markFreed() {
 		assert(!isFreed, "double free detected");
-		size = u32.max;
+		sizeAlign = SizeAndAlign(lowMask!u32(27), sizeAlign.alignment);
 		setPermission(MemoryPermissions.none);
 	}
 }
@@ -185,7 +190,7 @@ struct Memory {
 		u32 alignedSize = alignValue(sizeAlign.size, 8);
 		bytesUsed += alignedSize;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
-		allocations.put(allocator, Allocation(offset, sizeAlign.size, perm));
+		allocations.put(allocator, Allocation(offset, sizeAlign, perm));
 		return AllocId(index, kind);
 	}
 
