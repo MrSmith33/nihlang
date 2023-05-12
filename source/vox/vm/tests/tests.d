@@ -895,7 +895,7 @@ void test_load_mXX_3(ref VmTestContext c) {
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId;
 	if (memKind != MemoryKind.func_id) {
-		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryPermissions.write);
+		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.write);
 	}
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1074,7 +1074,7 @@ void test_store_mXX_3(ref VmTestContext c) {
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId;
 	if (memKind != MemoryKind.func_id) {
-		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryPermissions.read);
+		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.read);
 	}
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);

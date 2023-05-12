@@ -46,13 +46,17 @@ struct PointerId {
 struct Allocation {
 	@nogc nothrow:
 
-	this(u32 _offset, SizeAndAlign _sizeAlign, MemoryPermissions perm) {
-		payload0 = (_offset & ~0b111) | u32(perm & 0b011);
+	this(u32 _offset, SizeAndAlign _sizeAlign, MemoryFlags perm) {
+		flags = perm;
+		offset = _offset;
 		sizeAlign = _sizeAlign;
 	}
 
-	// offset | MemoryPermissions
-	private u32 payload0;
+	// MemoryFlags
+	u32 flags;
+	// Start in parent Memory.memory
+	// All allocations are aligned to 8 bytes in Memory buffer
+	u32 offset;
 	// Size in bytes
 	SizeAndAlign sizeAlign;
 	// How many pointers to this allocation exist in other allocations
@@ -68,19 +72,6 @@ struct Allocation {
 		u32 numOutRefs;
 	}
 
-
-	// Start in parent Memory.memory
-	// All allocations are aligned to 8 bytes in Memory buffer
-	u32 offset() const {
-		pragma(inline, true);
-		return payload0 & ~u32(0b111);
-	}
-
-	void offset(u32 newValue) {
-		pragma(inline, true);
-		payload0 = (newValue & ~0b111) | u32(payload0 & 0b111);
-	}
-
 	u32 size() const {
 		pragma(inline, true);
 		return sizeAlign.size;
@@ -92,37 +83,24 @@ struct Allocation {
 		return !isFreed;
 	}
 
-	bool isReadable() const {
-		pragma(inline, true);
-		return (payload0 & MemoryPermissions.read) != 0;
-	}
-
-	bool isWritable() const {
-		pragma(inline, true);
-		return (payload0 & MemoryPermissions.write) != 0;
-	}
+	bool isReadable() const { return (flags & MemoryFlags.read) != 0; }
+	bool isWritable() const { return (flags & MemoryFlags.write) != 0; }
 
 	// If true, when heap allocation is moved to static memory,
 	// that static memory will be writable at runtime.
-	bool isRuntimeWritable() const {
-		pragma(inline, true);
-		return (payload0 & MemoryPermissions.runtime_write) != 0;
-	}
+	bool isRuntimeWritable() const { return (flags & MemoryFlags.runtime_write) != 0; }
+	bool isFreed() const { return (flags & MemoryFlags.isFreed) != 0; }
+	bool isMarked() const { return (flags & MemoryFlags.isMarked) != 0; }
 
-	bool isFreed() const {
+	void setPermission(MemoryFlags perm) {
 		pragma(inline, true);
-		return size == lowMask!u32(27);
-	}
-
-	void setPermission(MemoryPermissions perm) {
-		pragma(inline, true);
-		payload0 = (payload0 & ~0b11) | u32(perm & 0b11);
+		flags = (flags & ~0b11) | u32(perm & 0b11);
 	}
 
 	void markFreed() {
 		assert(!isFreed, "double free detected");
-		sizeAlign = SizeAndAlign(lowMask!u32(27), sizeAlign.alignment);
-		setPermission(MemoryPermissions.none);
+		flags |= MemoryFlags.isFreed;
+		setPermission(MemoryFlags.none);
 	}
 }
 
@@ -182,7 +160,7 @@ struct Memory {
 		bytesUsed = 0;
 	}
 
-	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryPermissions perm) {
+	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		// allocate in multiple of 8 bytes
@@ -343,12 +321,14 @@ immutable string[4] memoryKindLetter = [
 	"h", "s", "g", "f"
 ];
 
-enum MemoryPermissions : u8 {
-	none          = 0b000,
-	read          = 0b001,
-	write         = 0b010,
-	read_write    = 0b011,
-	runtime_write = 0b100,
+enum MemoryFlags : u8 {
+	none          = 0,
+	read          = 1 << 0,
+	write         = 1 << 1,
+	read_write    = read | write,
+	runtime_write = 1 << 2,
+	isFreed       = 1 << 3,
+	isMarked      = 1 << 4,
 }
 
 enum PtrSize : u8 {

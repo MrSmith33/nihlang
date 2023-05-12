@@ -105,7 +105,7 @@ struct VmTestContext {
 		vm.registers.clear;
 	}
 
-	AllocId memAlloc(MemoryKind kind, SizeAndAlign sizeAlign, MemoryPermissions perm = MemoryPermissions.read_write) {
+	AllocId memAlloc(MemoryKind kind, SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
 		final switch(kind) with(MemoryKind) {
 			case stack_mem: return vm.pushStackAlloc(sizeAlign, perm);
 			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, perm);

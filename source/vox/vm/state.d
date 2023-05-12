@@ -94,7 +94,7 @@ struct VmState {
 		regs = &registers[0];
 	}
 
-	void setAllocationPermission(AllocId id, MemoryPermissions perm) {
+	void setAllocationPermission(AllocId id, MemoryFlags perm) {
 		assert(id.kind != MemoryKind.func_id);
 		Memory* mem = &memories[id.kind];
 		assert(id.index < mem.allocations.length);
@@ -176,7 +176,7 @@ struct VmState {
 		return AllocId(index, MemoryKind.func_id);
 	}
 
-	AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryPermissions perm = MemoryPermissions.read_write) {
+	AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
 		assert(numFrameStackSlots < u8.max);
 		return memories[MemoryKind.stack_mem].allocate(*allocator, sizeAlign, perm);
 	}
