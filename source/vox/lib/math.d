@@ -59,9 +59,13 @@ struct SizeAndAlign {
 
 	u32 payload;
 
-	u32 size() { return payload & SIZE_MASK; }
-	u32 alignmentPower() { return payload >> SIZE_BITS; }
-	u32 alignment() { return 1 << cast(u32)alignmentPower; }
+	u32 size() const { return payload & SIZE_MASK; }
+	u32 alignmentPower() const { return payload >> SIZE_BITS; }
+	u32 alignment() const { return 1 << cast(u32)alignmentPower; }
+
+	void toString(scope SinkDelegate sink, FormatSpec spec) const {
+		sink.formattedWrite("(size:%s, align:%s)", size(), alignment);
+	}
 }
 
 bool isPowerOfTwo(T)(T x) pure {
