@@ -15,14 +15,39 @@ void test_copyBitRange() {
 	foreach(usize setBit; 0..64) {
 		u64 input = 0;
 		setBitAt(&input, setBit);
-		u64 result = input;
-		copyBitRange!u8(cast(u8*)&result, dst, src, length);
+		// different ptr
+		foreach(usize dstBit; 0..64) {
+			u64 dstInput = 0;
+			setBitAt(&dstInput, dstBit);
 
-		if (!isResultValid(input, result, dst, src, length)) {
-			printTestCase(input, dst, src, length);
-			onTestFail(input, result, dst, src, length);
+			u64 resultSrc = input;
+			u64 resultDst = dstInput;
+			copyBitRange!u8(cast(u8*)&resultDst, cast(u8*)&resultSrc, dst, src, length);
+
+			foreach(index; 0..64) {
+				bool expectedBit;
+				if (index >= dst && index < dst + length) {
+					expectedBit = getBitAt(cast(usize*)&input, index - dst + src);
+				} else {
+					expectedBit = getBitAt(cast(usize*)&dstInput, index);
+				}
+				bool resultBit = getBitAt(cast(usize*)&resultDst, index);
+				if (expectedBit != resultBit) assert(false);
+			}
+			assert(resultSrc == input);
+			++permutations;
 		}
-		++permutations;
+		// same ptr
+		{
+			u64 result = input;
+			copyBitRange!u8(cast(u8*)&result, cast(u8*)&result, dst, src, length);
+
+			if (!isResultValid(input, result, dst, src, length)) {
+				printTestCase(input, dst, src, length);
+				onTestFail(input, result, dst, src, length);
+			}
+			++permutations;
+		}
 	}
 	writefln("%s permutations", permutations);
 }
@@ -54,7 +79,7 @@ void testCase(
 {
 	u64 result = input;
 
-	copyBitRange!u8(cast(u8*)&result, dst, src, length);
+	copyBitRange!u8(cast(u8*)&result, cast(u8*)&result, dst, src, length);
 
 	if (isResultValid(input, result, dst, src, length)) {
 		onTestSuccess(input, result, dst, src, length);
@@ -164,4 +189,69 @@ void printTestCase(
 	writefln("\", %s, %s, %s);", dst, src, length);
 	write("//");
 	printMarker(8, dst, length, '^');
+}
+
+void testCase2(
+	string dstMem,
+	string srcMem,
+	usize dst,
+	usize src,
+	usize length,
+	string file = __FILE__,
+	int line = __LINE__)
+{
+	u64 dstBits;
+	u64 srcBits;
+	usize index = 0;
+	foreach(char bit; dstMem) {
+		if (bit == '1') setBitAt(&dstBits, index);
+		if (bit == '0' || bit == '1') ++index;
+	}
+	index = 0;
+	foreach(char bit; srcMem) {
+		if (bit == '1') setBitAt(&srcBits, index);
+		if (bit == '0' || bit == '1') ++index;
+	}
+	testCase2(dstBits, srcBits, dst, src, length, file, line);
+}
+
+void testCase2(
+	const u64 dstBits,
+	const u64 srcBits,
+	usize dst,
+	usize src,
+	usize length,
+	string file = __FILE__,
+	int line = __LINE__)
+{
+	u64 dstMem = dstBits;
+	u64 srcMem = srcBits;
+
+	copyBitRange!u8(cast(u8*)&dstMem, cast(u8*)&srcMem, dst, src, length);
+
+	if (isResultValid2(dstBits, srcBits, dstMem, dst, src, length)) {
+		onTestSuccess(srcBits, dstMem, dst, src, length);
+	} else {
+		onTestFail(srcBits, dstMem, dst, src, length, file, line);
+	}
+}
+
+bool isResultValid2(
+	const u64 dstBits,
+	const u64 srcBits,
+	const u64 result,
+	usize dst,
+	usize src,
+	usize length) {
+	foreach(index; 0..64) {
+		bool expectedBit;
+		if (index >= dst && index < dst + length) {
+			expectedBit = getBitAt(cast(usize*)&srcBits, index - dst + src);
+		} else {
+			expectedBit = getBitAt(cast(usize*)&dstBits, index);
+		}
+		bool resultBit = getBitAt(cast(usize*)&result, index);
+		if (expectedBit != resultBit) return false;
+	}
+	return true;
 }

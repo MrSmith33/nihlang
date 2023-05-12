@@ -243,8 +243,8 @@ struct Memory {
 			assert(popcntBitRange(pointerBits, fromSlot, toSlot) == 0);
 		}
 
-		// move pointer bits
-		copyBitRange(pointerBits, fromSlot, toSlot, shiftedSlots);
+		// copy pointer bits
+		copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, shiftedSlots);
 
 		// update outRefs in shifted allocations
 		static if (OUT_REFS_PER_MEMORY) {
@@ -257,10 +257,10 @@ struct Memory {
 			}
 		}
 
-		// move init bits
+		// copy init bits
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			usize* initBits = cast(usize*)&initBitmap.front();
-			copyBitRange(initBits, fromByte, toByte, shiftedBytes);
+			copyBitRange(initBits, initBits, fromByte, toByte, shiftedBytes);
 		}
 
 		if (allocations.length) {

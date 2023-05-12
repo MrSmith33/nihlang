@@ -10,9 +10,10 @@ import vox.lib;
 debug import vox.lib.bitcopy_test : printTestCase;
 
 // Bit level memmove
-// Handles overlapping dst and src ranges
-void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
-	if (dst == src)  return;
+// Handles overlapping dst and src ranges if dstPtr == srcPtr
+// Otherwise dstPtr and srcPtr must not overlap
+void copyBitRange(T)(T* dstPtr, const(T)* srcPtr, usize dst, usize src, usize length) {
+	if (dst == src && dstPtr == srcPtr) return;
 	if (length == 0) return;
 
 	enum BITS_PER_SLOT = T.sizeof * 8;
@@ -27,8 +28,8 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 	isize dstLastSlot  = cast(isize)(dst + length - 1) / BITS_PER_SLOT;
 	isize dstLastBit   = cast(isize)(dst + length - 1) % BITS_PER_SLOT;
 
-	ref T atSrc(isize i) { pragma(inline, true); assert(i >= srcFirstSlot && i <= srcLastSlot); return ptr[i]; }
-	ref T atDst(isize i) { pragma(inline, true); assert(i >= dstFirstSlot && i <= dstLastSlot); return ptr[i]; }
+	const(T) atSrc(isize i) { pragma(inline, true); assert(i >= srcFirstSlot && i <= srcLastSlot); return srcPtr[i]; }
+	ref T atDst(isize i) { pragma(inline, true); assert(i >= dstFirstSlot && i <= dstLastSlot); return dstPtr[i]; }
 
 	static T mergeSlots(const isize bitDeficit, const T lowSlot, const T highSlot) { pragma(inline, true);
 		const T lowData  = lowSlot.shiftDown(bitDeficit);
@@ -64,7 +65,7 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 	if (dst < src) {
 		if (bitDeficit == 0) { // can use memmove for full slots
 			atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
-			memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
+			memmove((dstPtr+dstFirstSlot+1), (srcPtr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
 			atDst(dstLastSlot) = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
 			return;
 		}
@@ -93,7 +94,7 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 	} else {
 		if (bitDeficit == 0) { // can use memmove for full slots
 			atDst(dstLastSlot)  = combineBits(atSrc(srcLastSlot), atDst(dstLastSlot), dstLastBit+1);
-			memmove((ptr+dstFirstSlot+1), (ptr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
+			memmove((dstPtr+dstFirstSlot+1), (srcPtr+srcFirstSlot+1), (dstLastSlot-dstFirstSlot-1) * T.sizeof);
 			atDst(dstFirstSlot) = combineBits(atDst(dstFirstSlot), atSrc(srcFirstSlot), dstFirstBit);
 			return;
 		}
