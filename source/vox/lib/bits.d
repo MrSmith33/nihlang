@@ -17,15 +17,15 @@ void copyBitRange(T)(T* ptr, usize dst, usize src, usize length) {
 
 	enum BITS_PER_SLOT = T.sizeof * 8;
 
-	isize srcFirstSlot = cast(isize) src / 8;
-	isize srcFirstBit  = cast(isize) src % 8;
-	isize srcLastSlot  = cast(isize)(src + length - 1) / 8;
-	isize srcLastBit   = cast(isize)(src + length - 1) % 8;
+	isize srcFirstSlot = cast(isize) src / BITS_PER_SLOT;
+	isize srcFirstBit  = cast(isize) src % BITS_PER_SLOT;
+	isize srcLastSlot  = cast(isize)(src + length - 1) / BITS_PER_SLOT;
+	isize srcLastBit   = cast(isize)(src + length - 1) % BITS_PER_SLOT;
 
-	isize dstFirstSlot = cast(isize) dst / 8;
-	isize dstFirstBit  = cast(isize) dst % 8;
-	isize dstLastSlot  = cast(isize)(dst + length - 1) / 8;
-	isize dstLastBit   = cast(isize)(dst + length - 1) % 8;
+	isize dstFirstSlot = cast(isize) dst / BITS_PER_SLOT;
+	isize dstFirstBit  = cast(isize) dst % BITS_PER_SLOT;
+	isize dstLastSlot  = cast(isize)(dst + length - 1) / BITS_PER_SLOT;
+	isize dstLastBit   = cast(isize)(dst + length - 1) % BITS_PER_SLOT;
 
 	ref T atSrc(isize i) { pragma(inline, true); assert(i >= srcFirstSlot && i <= srcLastSlot); return ptr[i]; }
 	ref T atDst(isize i) { pragma(inline, true); assert(i >= dstFirstSlot && i <= dstLastSlot); return ptr[i]; }
