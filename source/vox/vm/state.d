@@ -52,9 +52,13 @@ struct VmState {
 		memories[MemoryKind.heap_mem].kind   = MemoryKind.heap_mem;
 		memories[MemoryKind.stack_mem].kind  = MemoryKind.stack_mem;
 
-		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes, ptrSize);
-		memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes, ptrSize);
-		memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes, ptrSize);
+		memories[MemoryKind.static_mem].ptrSize = ptrSize;
+		memories[MemoryKind.heap_mem].ptrSize   = ptrSize;
+		memories[MemoryKind.stack_mem].ptrSize  = ptrSize;
+
+		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes);
+		memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes);
+		memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes);
 		// skip one allocation for null pointer
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 	}
@@ -68,7 +72,7 @@ struct VmState {
 		callerFrames.clear;
 		registers.clear;
 		foreach(ref mem; memories) {
-			mem.clear(*allocator, ptrSize);
+			mem.clear(*allocator);
 		}
 		// null allocation
 		memories[MemoryKind.heap_mem].allocations.put(*allocator, Allocation());

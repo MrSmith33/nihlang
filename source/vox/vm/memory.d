@@ -128,6 +128,8 @@ struct Memory {
 	u32 bytesUsed;
 	// What memory is this
 	MemoryKind kind;
+	// How big is the pointer
+	PtrSize ptrSize;
 
 	// Individual allocations
 	Array!Allocation allocations;
@@ -148,7 +150,7 @@ struct Memory {
 		HashMap!(u32, AllocId, u32.max) outRefs;
 	}
 
-	void reserve(ref VoxAllocator allocator, u32 size, PtrSize ptrSize) {
+	void reserve(ref VoxAllocator allocator, u32 size) {
 		memory.voidPut(allocator, size);
 		// By default no pointers are in memory
 		u8[] data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
@@ -160,7 +162,7 @@ struct Memory {
 		}
 	}
 
-	void clear(ref VoxAllocator allocator, PtrSize ptrSize) {
+	void clear(ref VoxAllocator allocator) {
 		static if (OUT_REFS_PER_ALLOCATION) {
 			foreach(ref alloc; allocations) {
 				alloc.outRefs.free(allocator);
@@ -202,7 +204,7 @@ struct Memory {
 		}
 	}
 
-	void popAndShiftAllocations(ref VoxAllocator allocator, u32 from, u32 to, PtrSize ptrSize) {
+	void popAndShiftAllocations(ref VoxAllocator allocator, u32 from, u32 to) {
 		assert(to <= allocations.length);
 		assert(from <= to);
 		if (from == to) return;

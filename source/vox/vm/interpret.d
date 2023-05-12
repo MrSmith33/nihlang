@@ -262,8 +262,7 @@ void instr_tail_call(ref VmState vm) {
 		mem.popAndShiftAllocations(
 			*vm.allocator,
 			vm.frameFirstStackSlot,
-			vm.frameFirstStackSlot + numCallerStackSlots,
-			vm.ptrSize);
+			vm.frameFirstStackSlot + numCallerStackSlots);
 	}
 
 	u8 numCallerRegisters = arg0_idx;
