@@ -46,6 +46,9 @@ struct PointerId {
 struct Allocation {
 	@nogc nothrow:
 
+	// All allocations are aligned to 8 bytes in Memory buffer
+	enum ALLOCATION_GRANULARITY = 8;
+
 	this(u32 _offset, SizeAndAlign _sizeAlign, MemoryFlags perm) {
 		flags = perm;
 		offset = _offset;
@@ -55,7 +58,7 @@ struct Allocation {
 	// MemoryFlags
 	u32 flags;
 	// Start in parent Memory.memory
-	// All allocations are aligned to 8 bytes in Memory buffer
+	// Aligned to ALLOCATION_GRANULARITY
 	u32 offset;
 	// Size in bytes
 	SizeAndAlign sizeAlign;
@@ -72,6 +75,11 @@ struct Allocation {
 		u32 numOutRefs;
 	}
 
+	u32 alignedSize() const {
+		pragma(inline, true);
+		return alignValue(sizeAlign.size, ALLOCATION_GRANULARITY);
+	}
+
 	u32 size() const {
 		pragma(inline, true);
 		return sizeAlign.size;
@@ -85,7 +93,6 @@ struct Allocation {
 
 	bool isReadable() const { return (flags & MemoryFlags.read) != 0; }
 	bool isWritable() const { return (flags & MemoryFlags.write) != 0; }
-
 	// If true, when heap allocation is moved to static memory,
 	// that static memory will be writable at runtime.
 	bool isRuntimeWritable() const { return (flags & MemoryFlags.runtime_write) != 0; }
@@ -140,7 +147,7 @@ struct Memory {
 		data1[] = 0;
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
-			u8[] data2 = initBitmap.voidPut(allocator, divCeil(size, 8));
+			u8[] data2 = initBitmap.voidPut(allocator, divCeil(size, Allocation.ALLOCATION_GRANULARITY));
 			data2[] = 0;
 		}
 	}
@@ -163,10 +170,9 @@ struct Memory {
 	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
-		// allocate in multiple of 8 bytes
+		// allocate in multiple of ALLOCATION_GRANULARITY bytes
 		// so that pointers are always aligned in memory and we can use pointer bitmap
-		u32 alignedSize = alignValue(sizeAlign.size, 8);
-		bytesUsed += alignedSize;
+		bytesUsed += alignValue(sizeAlign.size, Allocation.ALLOCATION_GRANULARITY);
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign, perm));
 		return AllocId(index, kind);
@@ -180,8 +186,7 @@ struct Memory {
 		allocations.unput(howMany);
 
 		if (allocations.length) {
-			u32 alignedSize = alignValue(allocations.back.size, 8);
-			bytesUsed = allocations.back.offset + alignedSize;
+			bytesUsed = allocations.back.offset + allocations.back.alignedSize;
 		} else {
 			bytesUsed = 0;
 		}
@@ -194,8 +199,8 @@ struct Memory {
 		if (to == allocations.length) return popAllocations(allocator, to - from);
 
 		const u32 fromByte = allocations[from].offset;
-		const u32 toByte   = allocations[to - 1].offset + alignValue(allocations[to - 1].size, 8);
-		const u32 lastByte = allocations.back.offset + alignValue(allocations.back.size, 8);
+		const u32 toByte   = allocations[to - 1].offset + allocations[to - 1].alignedSize;
+		const u32 lastByte = allocations.back.offset + allocations.back.alignedSize;
 		const u32 shiftedBytes = lastByte - toByte;
 
 		// move allocations
@@ -247,8 +252,7 @@ struct Memory {
 		}
 
 		if (allocations.length) {
-			const u32 alignedSize = alignValue(allocations.back.size, 8);
-			bytesUsed = allocations.back.offset + alignedSize;
+			bytesUsed = allocations.back.offset + allocations.back.alignedSize;
 		} else {
 			bytesUsed = 0;
 		}
