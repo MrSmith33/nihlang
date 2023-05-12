@@ -20,9 +20,9 @@ struct VmTestContext {
 	this(ref VoxAllocator allocator, SinkDelegate _sink) {
 		vm.allocator = &allocator;
 
-		enum static_bytes = 64*1024;
-		enum heap_bytes = 64*1024;
-		enum stack_bytes = 64*1024;
+		enum static_bytes = 1*1024;
+		enum heap_bytes = 1*1024;
+		enum stack_bytes = 1*1024;
 		vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
 		sink = _sink;
