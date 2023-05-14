@@ -120,6 +120,17 @@ struct VmTestContext {
 		alloc.markFreed;
 	}
 
+	AllocId memReadPtr(AllocId srcMem, u32 offset) {
+		assert(srcMem.kind != MemoryKind.func_id, "Cannot read from function id");
+		Memory* mem = &vm.memories[srcMem.kind];
+		Allocation* alloc = &mem.allocations[srcMem.index];
+		return memReadPtr(mem, alloc, offset);
+	}
+
+	AllocId memReadPtr(Memory* mem, Allocation* alloc, u32 offset) {
+		return vm.pointerGet(mem, alloc, offset);
+	}
+
 	// Assumes that non-pointer data was already written
 	void memWritePtr(AllocId dstMem, u32 offset, AllocId ptrVal) {
 		assert(dstMem.kind != MemoryKind.func_id, "Cannot write to function id");
@@ -134,6 +145,13 @@ struct VmTestContext {
 		} else {
 			vm.pointerRemove(mem, alloc, offset);
 		}
+	}
+
+	SizeAndAlign memSizeAlign(AllocId id) {
+		assert(id.kind != MemoryKind.func_id, "Cannot get size of function id");
+		Memory* mem = &vm.memories[id.kind];
+		Allocation* alloc = &mem.allocations[id.index];
+		return alloc.sizeAlign;
 	}
 
 	static if (SANITIZE_UNINITIALIZED_MEM)
