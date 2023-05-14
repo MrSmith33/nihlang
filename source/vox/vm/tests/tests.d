@@ -1344,18 +1344,20 @@ void test_tail_call_1(ref VmTestContext c) {
 	a.emit_const_s8(2, 88);
 	a.emit_store_m64(0, 2); // set parameter mem to 88
 	a.emit_const_s8(0, 0); // erase r0
-	// parameter slot must be shifter over the local slot and overwrite s0-1 with 88
+	// parameter slot must be shifted over the local slot and overwrite s0-1 with 88
 	a.emit_tail_call(1, 0, funcB.index);
+
 	c.vm.setFunction(funcA, 1.NumResults, 1.NumRegParams, 0.NumStackParams, a);
 
 	// u64 b(u64 number) {
 	//     return number + 42;
 	// }
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // parameter
 	b.emit_const_s8(1, 42); // 42
 	b.emit_add_i64(0, 0, 1);
-	a.emit_stack_addr(2, 0);
-	a.emit_load_m64(2, 2); // get 88
+	b.emit_stack_addr(2, 0);
+	b.emit_load_m64(2, 2); // get 88
 	b.emit_add_i64(0, 0, 2);
 	b.emit_ret();
 	c.vm.setFunction(funcB, 1.NumResults, 1.NumRegParams, 1.NumStackParams, b);

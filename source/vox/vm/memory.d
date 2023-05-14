@@ -203,15 +203,15 @@ struct Memory {
 		const u32 lastByte = allocations.back.offset + allocations.back.alignedSize;
 		const u32 shiftedBytes = lastByte - toByte;
 
-		// move allocations
+		// copy allocations
 		Allocation* allocationsDst = &allocations[from];
 		const Allocation* allocationsSrc = &allocations[to];
 		const u32 shiftedAllocations = allocations.length - to;
 		memmove(allocationsDst, allocationsSrc, shiftedAllocations * Allocation.sizeof);
 
-		// move memory
-		u8* memoryDst = &memory[from];
-		const u8* memorySrc = &memory[to];
+		// copy memory
+		u8* memoryDst = &memory[fromByte];
+		const u8* memorySrc = &memory[toByte];
 		memmove(memoryDst, memorySrc, shiftedBytes);
 
 		// update allocations
