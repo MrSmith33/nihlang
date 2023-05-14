@@ -269,10 +269,9 @@ void test_stack_alloc_0(ref VmTestContext c) {
 		assert(vm.stackSlots[0].size == 8);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, &externFunc);
 	Array!SizeAndAlign stack;
 	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
-	c.vm.functions[extFuncId.index].stackSlotSizes = stack;
+	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_stack_alloc(SizeAndAlign(8, 1));
@@ -1259,7 +1258,7 @@ void test_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, &externFunc);
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
@@ -1312,7 +1311,7 @@ void test_tail_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, &externFunc);
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);

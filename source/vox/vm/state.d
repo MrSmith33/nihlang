@@ -130,8 +130,11 @@ struct VmState {
 		Array!u8 code)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, Array!SizeAndAlign.init, code));
-		return AllocId(index, MemoryKind.func_id);
+		functions.put(*allocator, VmFunction());
+		auto id = AllocId(index, MemoryKind.func_id);
+		auto builder = CodeBuilder(allocator, code);
+		setFunction(id, numResults, numRegParams, numStackParams, builder);
+		return id;
 	}
 
 	AllocId addFunction(
@@ -141,8 +144,10 @@ struct VmState {
 		ref CodeBuilder builder)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code));
-		return AllocId(index, MemoryKind.func_id);
+		functions.put(*allocator, VmFunction());
+		auto id = AllocId(index, MemoryKind.func_id);
+		setFunction(id, numResults, numRegParams, numStackParams, builder);
+		return id;
 	}
 
 	void setFunction(
@@ -159,16 +164,37 @@ struct VmState {
 	AllocId addExternalFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
+		VmExternalFn fn,
+		void* userData = null)
+	{
+		return addExternalFunction(
+			numResults,
+			numRegParams,
+			0.NumStackParams,
+			Array!SizeAndAlign.init,
+			fn,
+			userData);
+	}
+
+	AllocId addExternalFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
 		NumStackParams numStackParams,
+		Array!SizeAndAlign stack,
 		VmExternalFn fn,
 		void* userData = null)
 	{
 		u32 index = functions.length;
+		if (numStackParams.val > stack.length) {
+			panic("Ivalid function properties: Number of stack parameters (%s) is bigger than stack slot size (%s)",
+			numStackParams.val, stack.length);
+		}
 		VmFunction f = {
 			kind : VmFuncKind.external,
 			numResults : numResults.val,
 			numRegParams : numRegParams.val,
 			numStackParams : numStackParams.val,
+			stackSlotSizes : stack,
 			external : fn,
 			externalUserData : userData,
 		};
