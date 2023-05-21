@@ -109,6 +109,16 @@ struct Allocation {
 		flags |= MemoryFlags.isFreed;
 		setPermission(MemoryFlags.none);
 	}
+
+	void markAsMovedToStaticMem(AllocId static_index) {
+		flags |= MemoryFlags.isMarked;
+		assert(static_index.kind == MemoryKind.static_mem, "static_index must be in static memory");
+		numInRefs = static_index.index;
+	}
+	AllocId getStaticMemIndex() {
+		assert(isMarked);
+		return AllocId(numInRefs, MemoryKind.static_mem);
+	}
 }
 
 struct Memory {
@@ -260,17 +270,27 @@ struct Memory {
 
 	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitBits(u32 offset, u32 size, bool value) {
-		size_t* ptr = cast(size_t*)&initBitmap.front();
+		usz* ptr = cast(usz*)&initBitmap.front();
 		setBitRange(ptr, offset, offset+size, value);
 	}
 
+	void markPointerBits(u32 offset, u32 size, bool value) {
+		usz* ptr = cast(usz*)&pointerBitmap.front();
+		setBitRange(ptr, offset, offset+size, value);
+	}
+
+	bool getPtrBit(PointerId index) {
+		usz* ptr = cast(usz*)&pointerBitmap.front();
+		return getBitAt(ptr, index);
+	}
+
 	void setPtrBit(PointerId index) {
-		size_t* ptr = cast(size_t*)&pointerBitmap.front();
+		usz* ptr = cast(usz*)&pointerBitmap.front();
 		setBitAt(ptr, index);
 	}
 
 	void resetPtrBit(PointerId index) {
-		size_t* ptr = cast(size_t*)&pointerBitmap.front();
+		usz* ptr = cast(usz*)&pointerBitmap.front();
 		resetBitAt(ptr, index);
 	}
 }
