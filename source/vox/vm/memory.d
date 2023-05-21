@@ -279,11 +279,11 @@ struct AllocationRefIterator {
 	@nogc nothrow:
 
 	Memory* mem;
-	Allocation* alloc;
+	Allocation alloc;
 	// in bytes
 	PtrSize ptrSize;
 
-	i32 opApply(scope i32 delegate(u32 offset, AllocId target) @nogc nothrow del) {
+	i32 opApply(scope i32 delegate(u32 offset, ref AllocId target) @nogc nothrow del) {
 		static if (OUT_REFS_PER_ALLOCATION) {
 			foreach(const u32 k, ref AllocId v; alloc.outRefs) {
 				if (i32 ret = del(k, v)) return ret;
@@ -291,15 +291,15 @@ struct AllocationRefIterator {
 		} else {
 			if (alloc.numOutRefs == 0) return 0;
 			size_t* ptr = cast(size_t*)&mem.pointerBitmap.front();
-			u32 alignedSize = alignValue(alloc.size, 8);
 			PointerId from = memOffsetToPtrIndex(alloc.offset, ptrSize);
-			PointerId to   = memOffsetToPtrIndex(alloc.offset + alignedSize, ptrSize);
+			PointerId to   = memOffsetToPtrIndex(alloc.offset + alloc.alignedSize, ptrSize);
 			foreach(size_t slot; bitsSetRange(ptr, from, to)) {
 				u32 memOffset = ptrIndexToMemOffset(PointerId(cast(u32)slot), ptrSize);
-				AllocId val = mem.outRefs.get(memOffset);
-				assert(val.isDefined);
+				AllocId* val = memOffset in mem.outRefs;
+				assert(val);
+				assert(memOffset >= alloc.offset);
 				u32 localOffset = memOffset - alloc.offset;
-				if (i32 ret = del(localOffset, val)) return ret;
+				if (i32 ret = del(localOffset, *val)) return ret;
 			}
 		}
 		return 0;

@@ -229,8 +229,6 @@ void instr_tail_call(ref VmState vm) {
 	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
 
 	u8 numStackParams = callee.numStackParams;
-	// vm.numFrameStackSlots will be modified by pushStackAlloc below
-	u8 numCallerStackSlots = cast(u8)(vm.numFrameStackSlots - numStackParams);
 
 	if (callee.stackSlotSizes.length) {
 		if (vm.numFrameStackSlots < numStackParams) {
@@ -244,6 +242,9 @@ void instr_tail_call(ref VmState vm) {
 			return vm.setTrap(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 		}
 	}
+
+	// vm.numFrameStackSlots will be modified by pushStackAlloc below
+	u8 numCallerStackSlots = cast(u8)(vm.numFrameStackSlots - numStackParams);
 
 	if (numCallerStackSlots) {
 		// Caller stack slots are dropped
@@ -393,7 +394,7 @@ private void pre_drop_stack_range(ref VmState vm, DroppedStackSlots dropped) {
 		static if (OUT_REFS_PER_MEMORY) {
 			if (alloc.numOutRefs == 0) continue;
 		}
-		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, alloc, vm.ptrSize)) {
 			vm.pointerRemove(mem, &alloc, offset);
 		}
 		static if (OUT_REFS_PER_ALLOCATION) {
@@ -408,7 +409,7 @@ private void changeLocalPointeeInRefs(ref VmState vm, Allocation[] stackAllocs, 
 	Memory* mem = &vm.memories[MemoryKind.stack_mem];
 	foreach(ref Allocation alloc; stackAllocs) {
 		if (alloc.numOutRefs == 0) continue;
-		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, alloc, vm.ptrSize)) {
 			// skip non-stack targets
 			if (target.kind != MemoryKind.stack_mem) continue;
 			// skip targets outside of destroyed stack slot range
@@ -423,7 +424,7 @@ private void changePointeeInRefs(ref VmState vm, Allocation[] stackAllocs, int d
 	Memory* mem = &vm.memories[MemoryKind.stack_mem];
 	foreach(ref Allocation alloc; stackAllocs) {
 		if (alloc.numOutRefs == 0) continue;
-		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, &alloc, vm.ptrSize)) {
+		foreach(u32 offset, AllocId target; AllocationRefIterator(mem, alloc, vm.ptrSize)) {
 			vm.changeAllocInRef(target, delta);
 		}
 	}
