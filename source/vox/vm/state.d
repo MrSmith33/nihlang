@@ -273,7 +273,7 @@ struct VmState {
 	}
 
 	AllocId pointerGet(Memory* mem, Allocation* alloc, u32 offset) {
-		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (FAST_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		static if (OUT_REFS_PER_ALLOCATION) {
 			return alloc.outRefs.get(offset);
 		} else {
@@ -284,7 +284,7 @@ struct VmState {
 
 	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
 		assert(value.isDefined);
-		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (FAST_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (OUT_REFS_PER_ALLOCATION) {
 			alloc.outRefs.put(*allocator, cast(u32)offset, value, oldPtr);
@@ -305,7 +305,7 @@ struct VmState {
 	}
 
 	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
-		static if (CONSISTENCY_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
+		static if (FAST_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (OUT_REFS_PER_ALLOCATION) {
 			alloc.outRefs.remove(*allocator, cast(u32)offset, oldPtr);

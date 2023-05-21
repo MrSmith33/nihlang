@@ -227,7 +227,7 @@ struct Memory {
 		const u32 shiftedSlots   = lastSlot - toSlot;
 
 		// check that all pointers were removed
-		static if (CONSISTENCY_CHECKS) {
+		static if (SLOW_CHECKS) {
 			assert(popcntBitRange(pointerBits, fromSlot, toSlot) == 0);
 		}
 

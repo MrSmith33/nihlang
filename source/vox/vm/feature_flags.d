@@ -6,8 +6,10 @@ module vox.vm.feature_flags;
 enum OUT_REFS_PER_ALLOCATION = false;
 enum OUT_REFS_PER_MEMORY = !OUT_REFS_PER_ALLOCATION;
 
-// Checks for invariants that can be violated through an external API
-enum CONSISTENCY_CHECKS = true;
+// Checks for invariants
+enum FAST_CHECKS = true;
+// ditto, but slow
+enum SLOW_CHECKS = false;
 // Detect reading from uninitialized memory
 enum SANITIZE_UNINITIALIZED_MEM = true;
 // Detect existance of pointers to heap or stack memory that was freed
