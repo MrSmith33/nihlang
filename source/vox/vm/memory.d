@@ -261,6 +261,8 @@ struct Memory {
 			copyBitRange(initBits, initBits, fromByte, toByte, shiftedBytes);
 		}
 
+		allocations.unput(to - from);
+
 		if (allocations.length) {
 			bytesUsed = allocations.back.offset + allocations.back.alignedSize;
 		} else {

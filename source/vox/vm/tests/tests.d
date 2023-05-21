@@ -1325,6 +1325,29 @@ void test_tail_call_0(ref VmTestContext c) {
 
 @VmTest
 void test_tail_call_1(ref VmTestContext c) {
+	// External function call
+	// Check that caller local variable is removed from stack correctly
+	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		assert(vm.numFrameStackSlots == 1);
+	}
+
+	Array!SizeAndAlign stack;
+	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 1.NumStackParams, stack, &externFunc);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1)); // local. Should be removed from stack
+	b.emit_stack_alloc(SizeAndAlign(8, 1)); // parameter
+	b.emit_tail_call(0, 0, extFuncId.index);
+	b.emit_ret();
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId);
+	assert(c.vm.numFrameStackSlots == 0);
+}
+
+@VmTest
+void test_tail_call_2(ref VmTestContext c) {
 	// Bytecode function tail call, non-zero first reg
 
 	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
