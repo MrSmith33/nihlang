@@ -170,9 +170,15 @@ struct Memory {
 		} else {
 			outRefs.clear;
 		}
-		static if (SANITIZE_UNINITIALIZED_MEM) {
+		static if (SANITIZE_UNINITIALIZED_MEM) {{
 			markInitBits(0, bytesUsed, false);
-		}
+			static if (SLOW_CHECKS) {
+				usz* initBits = cast(usz*)&initBitmap.front();
+				usz len = initBitmap.length * 8;
+				usz numBits = popcntBitRange(initBits, 0, len);
+				if (numBits) panic("%s.clear: Invariant failed. init bitmap contains %s bits after reset", memoryKindString[kind], numBits);
+			}
+		}}
 		allocations.clear;
 		bytesUsed = 0;
 	}
@@ -195,10 +201,17 @@ struct Memory {
 		assert(allocations.length >= howMany);
 		allocations.unput(howMany);
 
+		const auto lastByte = bytesUsed;
+
 		if (allocations.length) {
 			bytesUsed = allocations.back.offset + allocations.back.alignedSize;
 		} else {
 			bytesUsed = 0;
+		}
+
+		// clean init bits
+		static if (SANITIZE_UNINITIALIZED_MEM) {
+			markInitBits(bytesUsed, lastByte - bytesUsed, false);
 		}
 	}
 
@@ -261,6 +274,11 @@ struct Memory {
 			copyBitRange(initBits, initBits, fromByte, toByte, shiftedBytes);
 		}
 
+		// clean trailing init bits
+		static if (SANITIZE_UNINITIALIZED_MEM) {
+			markInitBits(toByte, shiftedBytes, false);
+		}
+		
 		allocations.unput(to - from);
 
 		if (allocations.length) {

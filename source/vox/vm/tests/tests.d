@@ -261,6 +261,20 @@ void test_stack_addr_0(ref VmTestContext c) {
 	assert(res[0] == VmReg(42));
 }
 
+@VmTest
+void test_stack_9(ref VmTestContext c) {
+	// Test local stack slots clear. Check that mem init bits are cleared
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	b.emit_stack_addr(0, 0);
+	b.emit_const_s8(1, -1);
+	b.emit_store_m64(0, 1); // init local stack slot
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	VmReg[] res = c.call(funcId);
+}
+
 
 @VmTest
 void test_stack_alloc_0(ref VmTestContext c) {
