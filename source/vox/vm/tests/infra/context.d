@@ -23,6 +23,9 @@ struct VmTestContext {
 		enum static_bytes = 1*1024;
 		enum heap_bytes = 1*1024;
 		enum stack_bytes = 1*1024;
+
+		// Set to 32 bit during reserve, so that pointer bitmaps cover both 32 and 64 bits
+		vm.ptrSize = PtrSize._32;
 		vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
 		sink = _sink;
@@ -30,9 +33,12 @@ struct VmTestContext {
 
 	// Called before each test
 	void prepareForTest(ref Test _test) {
-		vm.reset;
 		test = _test;
 		vm.ptrSize = test.ptrSize;
+		vm.memories[MemoryKind.static_mem].ptrSize = test.ptrSize;
+		vm.memories[MemoryKind.heap_mem].ptrSize   = test.ptrSize;
+		vm.memories[MemoryKind.stack_mem].ptrSize  = test.ptrSize;
+		vm.reset;
 	}
 
 	// Sets vm.status

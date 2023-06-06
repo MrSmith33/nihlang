@@ -40,11 +40,17 @@ void test_warmup(ref VmTestContext c) {
 @VmTest @TestPtrSize32
 void test_runner_32bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == PtrSize._32);
+	assert(c.vm.memories[MemoryKind.static_mem].ptrSize == PtrSize._32);
+	assert(c.vm.memories[MemoryKind.heap_mem].ptrSize == PtrSize._32);
+	assert(c.vm.memories[MemoryKind.stack_mem].ptrSize == PtrSize._32);
 }
 
 @VmTest @TestPtrSize64
 void test_runner_64bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == PtrSize._64);
+	assert(c.vm.memories[MemoryKind.static_mem].ptrSize == PtrSize._64);
+	assert(c.vm.memories[MemoryKind.heap_mem].ptrSize == PtrSize._64);
+	assert(c.vm.memories[MemoryKind.stack_mem].ptrSize == PtrSize._64);
 }
 
 
