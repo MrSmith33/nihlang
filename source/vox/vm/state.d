@@ -158,6 +158,10 @@ struct VmState {
 		ref CodeBuilder builder)
 	{
 		assert(id.index < functions.length);
+		if (numStackParams.val > builder.stack.length) {
+			panic("Ivalid function properties: Number of stack parameters (%s) is bigger than stack slot size (%s)",
+			numStackParams.val, builder.stack.length);
+		}
 		functions[id.index] = VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code);
 	}
 
