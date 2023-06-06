@@ -1499,6 +1499,60 @@ void test_tail_call_2(ref VmTestContext c) {
 
 
 @VmTest
+void test_ctfe_finalize(ref VmTestContext c) {
+	// Test moveMemToStatic
+	// Give unique sizes, so we can check them later
+	AllocId root    = c.memAlloc(MemoryKind.static_mem, SizeAndAlign(16, 1));
+	AllocId heap1   = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(24, 1));
+	AllocId heap2   = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(32, 1));
+	AllocId heap3   = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(40, 1));
+	AllocId static1 = c.memAlloc(MemoryKind.static_mem, SizeAndAlign(48, 1));
+	AllocId static2 = c.memAlloc(MemoryKind.static_mem, SizeAndAlign(56, 1));
+
+	// all heap allocations reachable from root should be moved to static mem
+	// and all references to heap should be updated to point to newly allocated static
+	// all other references should be copied verbatim
+
+	c.memWritePtr(root, 0, heap1);
+	c.memWritePtr(root, 8, heap2);
+
+	c.memWritePtr(heap1, 0, heap2);
+	// reference from heap to non-heap should be copied as is
+	c.memWritePtr(heap1, 8, static1);
+	c.memWritePtr(heap1, 16, heap3);
+	c.memWritePtr(heap2, 0, heap1);
+
+	moveMemToStatic(
+		*c.vm.allocator,
+		c.vm.memories[MemoryKind.static_mem],
+		c.vm.memories[MemoryKind.heap_mem],
+		root,
+		c.vm.ptrSize);
+
+	// check
+	AllocId new_heap1 = c.memReadPtr(root, 0);
+	//writefln("h1 %s", new_heap1);
+	assert(new_heap1.kind == MemoryKind.static_mem);
+	assert(c.memSizeAlign(new_heap1) == SizeAndAlign(24, 1));
+
+	AllocId new_heap2 = c.memReadPtr(root, 8);
+	//writefln("h2 %s", new_heap2);
+	assert(new_heap2.kind == MemoryKind.static_mem);
+	assert(c.memSizeAlign(new_heap2) == SizeAndAlign(32, 1));
+
+	//writefln("h1|%s:0 == h2 %s", new_heap1, c.memReadPtr(new_heap1, 0));
+	assert(c.memReadPtr(new_heap1, 0) == new_heap2);
+	assert(c.memReadPtr(new_heap1, 8) == static1);
+
+	AllocId new_heap3 = c.memReadPtr(new_heap1, 16);
+	assert(new_heap3.kind == MemoryKind.static_mem);
+	assert(c.memSizeAlign(new_heap3) == SizeAndAlign(40, 1));
+
+	assert(c.memReadPtr(new_heap2, 0) == new_heap1);
+}
+
+
+@VmTest
 @VmTestIgnore
 @VmTestOnly
 @TestPtrSize64

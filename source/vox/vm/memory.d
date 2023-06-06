@@ -278,6 +278,7 @@ struct Memory {
 		markPointerBits(fromSlot + shiftedSlots, toSlot - fromSlot, false);
 
 		// update outRefs in shifted allocations
+		// target outRefs is already cleaned by pre_drop_stack_range
 		static if (OUT_REFS_PER_MEMORY) {
 			foreach(usize slot; bitsSetRange(pointerBits, fromSlot, fromSlot + shiftedSlots)) {
 				const u32 newOffset = ptrIndexToMemOffset(PointerId(cast(u32)slot), ptrSize);
@@ -334,6 +335,111 @@ struct Memory {
 		resetBitAt(ptr, index);
 	}
 }
+
+// Doesn't delete the heap allocations
+void moveMemToStatic(
+	ref VoxAllocator allocator,
+	ref Memory static_mem,
+	ref Memory heap_mem,
+	AllocId root,
+	PtrSize ptrSize)
+{
+	assert(root.kind == MemoryKind.static_mem, "Root must be in static memory");
+
+	static void visit(
+		ref VoxAllocator allocator,
+		ref Memory static_mem,
+		ref Memory heap_mem,
+		AllocId node,
+		PtrSize ptrSize) @nogc nothrow
+	{
+		assert(node.kind == MemoryKind.heap_mem, "Node must be in heap memory");
+		Allocation* heap_alloc = &heap_mem.allocations[node.index];
+		if (heap_alloc.isMarked) return;
+
+		u32 perm = MemoryFlags.read | heap_alloc.isRuntimeWritable ? MemoryFlags.runtime_write : 0;
+		AllocId static_node = static_mem.allocate(allocator, heap_alloc.sizeAlign, cast(MemoryFlags)perm);
+
+		{
+			Allocation* static_alloc = &static_mem.allocations[static_node.index];
+
+			// Copy numInRefs to static, before markAsMovedToStaticMem
+			static_alloc.numInRefs = heap_alloc.numInRefs;
+
+			// Copy pointer bits
+			usz* dstPtrBits = cast(usz*)&static_mem.pointerBitmap.front();
+			usz* srcPtrBits = cast(usz*)&heap_mem.pointerBitmap.front();
+			const PointerId dstPtrSlot  = memOffsetToPtrIndex(static_alloc.offset, ptrSize);
+			const PointerId srcPtrSlot  = memOffsetToPtrIndex(heap_alloc.offset,   ptrSize);
+			const PointerId numPtrSlots = memOffsetToPtrIndex(static_alloc.alignedSize, ptrSize);
+			copyBitRange!usz(dstPtrBits, srcPtrBits, dstPtrSlot, srcPtrSlot, numPtrSlots);
+
+			// Copy init bits
+			static if (SANITIZE_UNINITIALIZED_MEM) {
+				usz* dstInitBits = cast(usz*)&static_mem.initBitmap.front();
+				usz* srcInitBits = cast(usz*)&heap_mem.initBitmap.front();
+				copyBitRange(dstInitBits, srcInitBits, static_alloc.offset, heap_alloc.offset, static_alloc.alignedSize);
+			}
+		}
+
+		// This will overwrite heap_alloc.numInRefs
+		heap_alloc.markAsMovedToStaticMem(static_node);
+
+		foreach(u32 offset, ref AllocId target; AllocationRefIterator(&heap_mem, *heap_alloc, ptrSize)) {
+			if (target.kind != MemoryKind.heap_mem) {
+				// just copy the pointer to new memory
+				static if (OUT_REFS_PER_MEMORY) {
+					// writefln("copy ref %s|%s to %s:%s", node, static_node, offset, target);
+					Allocation* static_alloc = &static_mem.allocations[static_node.index];
+					static_mem.outRefs.put(allocator, static_alloc.offset + offset, target);
+				}
+				continue;
+			}
+
+			// visit reallocates static_mem.outRefs, static_mem.allocations. Can't reuse static_alloc
+			visit(allocator, static_mem, heap_mem, target, ptrSize);
+
+			Allocation* static_alloc = &static_mem.allocations[static_node.index];
+			Allocation* target_alloc = &heap_mem.allocations[target.index];
+
+			// writefln("in %s|%s update %s:%s to %s:%s", node, static_node, offset, target, offset, target_alloc.getStaticMemIndex);
+			static if (OUT_REFS_PER_ALLOCATION) {
+				target = target_alloc.getStaticMemIndex;
+			}
+			static if (OUT_REFS_PER_MEMORY) {
+				static_mem.outRefs.put(allocator, static_alloc.offset + offset, target_alloc.getStaticMemIndex);
+			}
+		}
+
+		{
+			Allocation* static_alloc = &static_mem.allocations[static_node.index];
+			static if (OUT_REFS_PER_ALLOCATION) {
+				static_alloc.outRefs = heap_alloc.outRefs;
+				heap_alloc.outRefs = heap_alloc.outRefs.init;
+			}
+			static if (OUT_REFS_PER_MEMORY) {
+				static_alloc.numOutRefs = heap_alloc.numOutRefs;
+			}
+		}
+	}
+
+	foreach(u32 offset, ref AllocId target; AllocationRefIterator(&static_mem, static_mem.allocations[root.index], ptrSize)) {
+		if (target.kind != MemoryKind.heap_mem) continue;
+		u32 target_index = target.index;
+		// reallocates outRefs. `target` becomes invalid in OUT_REFS_PER_MEMORY case
+		visit(allocator, static_mem, heap_mem, target, ptrSize);
+		Allocation* target_alloc = &heap_mem.allocations[target_index];
+		static if (OUT_REFS_PER_ALLOCATION) {
+			target = target_alloc.getStaticMemIndex;
+		}
+		static if (OUT_REFS_PER_MEMORY) {
+			Allocation* root_alloc = &static_mem.allocations[root.index];
+			const u32 newOffset = root_alloc.offset + offset;
+			static_mem.outRefs.put(allocator, newOffset, target_alloc.getStaticMemIndex);
+		}
+	}
+}
+
 
 struct AllocationRefIterator {
 	@nogc nothrow:
@@ -417,6 +523,7 @@ u32 inBits(PtrSize s) {
 
 PointerId memOffsetToPtrIndex(u32 offset, PtrSize ptrSize) {
 	pragma(inline, true);
+	assert((offset % ptrSize.inBytes) == 0);
 	return PointerId(offset >> (ptrSize + 2));
 }
 

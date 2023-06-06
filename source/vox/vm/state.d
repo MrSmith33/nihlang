@@ -282,7 +282,19 @@ struct VmState {
 			return alloc.outRefs.get(offset);
 		} else {
 			if (alloc.numOutRefs == 0) return AllocId.init;
-			return mem.outRefs.get(cast(u32)(alloc.offset + offset));
+			AllocId res = mem.outRefs.get(cast(u32)(alloc.offset + offset));
+			static if (FAST_CHECKS) {
+				PointerId slot = memOffsetToPtrIndex(alloc.offset + offset, ptrSize);
+				usz* ptrBits = cast(usz*)&mem.pointerBitmap.front();
+				if (mem.getPtrBit(slot) != res.isDefined) {
+					AllocId allocId = AllocId(cast(u32)(alloc - &mem.allocations.front()), mem.kind);
+					panic("Invariant failed: in allocation %s mem.outRefs contains pointer (%s) at offset %s, while pointer bit is not set. Bitmap addr: %s\n",
+						allocId,
+						res,
+						offset, ptrBits);
+				}
+			}
+			return res;
 		}
 	}
 
