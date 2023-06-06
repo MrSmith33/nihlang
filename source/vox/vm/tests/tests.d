@@ -249,7 +249,6 @@ void test_stack_8(ref VmTestContext c) {
 	assert(c.vm.numFrameStackSlots == 1); // parameter was consumed by the callee
 }
 
-
 @VmTest
 void test_stack_addr_0(ref VmTestContext c) {
 	// Test stack_addr
@@ -281,11 +280,100 @@ void test_stack_9(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId);
 }
 
+@VmTest
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_stack_10(ref VmTestContext c) {
+	// Test memory pointer bits clear.
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1));
+	c.memWritePtr(memId, 0, memId);
+}
+
+@VmTest
+void test_stack_11(ref VmTestContext c) {
+	// Test local stack slots clear. Check that mem pointer bits are cleared
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1));
+	b.emit_stack_addr(0, 0);
+	b.emit_store_m64(0, 0); // init local stack slot with pointer
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+
+	VmReg[] res = c.call(funcId);
+}
+
+@VmTest
+void test_stack_12(ref VmTestContext c) {
+	// Check that pointer bits are removed from stack allocation on tail call
+	AllocId funcA = c.vm.addFunction();
+	AllocId funcB = c.vm.addFunction();
+
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.add_stack_slot(SizeAndAlign(8, 1));   // slot 0
+	a.emit_stack_alloc(SizeAndAlign(8, 1)); // slot 1
+	a.emit_stack_addr(1, 1);              // r1 = slot 1 addr
+	a.emit_store_ptr(c.vm.ptrSize, 1, 0); // *r1 = param0
+	a.emit_tail_call(0, 0, funcB.index);  // must overwrite slot 0 with slot 1
+	a.emit_trap();
+	c.vm.setFunction(funcA, 0.NumResults, 1.NumRegParams, 0.NumStackParams, a);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1));   // parameter
+	b.emit_ret();
+	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.call(funcA, VmReg(memId));
+}
+
+@VmTest
+void test_stack_13(ref VmTestContext c) {
+	// External function tail call with stack parameter
+	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		assert(vm.numFrameStackSlots == 1);
+	}
+
+	Array!SizeAndAlign stack;
+	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
+	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_stack_alloc(SizeAndAlign(8, 1)); // slot 0
+	b.emit_tail_call(0, 0, extFuncId.index);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	VmReg[] res = c.call(funcId);
+}
+
+@VmTest
+void test_stack_14(ref VmTestContext c) {
+	// External function tail call with stack parameter
+	// Check with local stack
+	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		assert(vm.numFrameStackSlots == 1);
+	}
+
+	Array!SizeAndAlign stack;
+	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
+	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
+
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.add_stack_slot(SizeAndAlign(8, 1));   // slot 0
+	b.emit_stack_alloc(SizeAndAlign(8, 1)); // slot 1
+	b.emit_tail_call(0, 0, extFuncId.index);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	VmReg[] res = c.call(funcId);
+}
+
 
 @VmTest
 void test_stack_alloc_0(ref VmTestContext c) {
 	// Test stack_alloc
 	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		assert(vm.numFrameStackSlots == 1);
 		assert(vm.stackSlots[0].size == 8);
 	}
 
@@ -352,7 +440,7 @@ void test_refs_2(ref VmTestContext c) {
 @VmTest
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_refs_3(ref VmTestContext c) {
-	// Check stack reference escape via pointer in memory
+	// Check stack reference escape via pointer in memory (on return)
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -369,7 +457,7 @@ void test_refs_3(ref VmTestContext c) {
 @VmTest
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_refs_4(ref VmTestContext c) {
-	// Check stack reference escape via pointer in memory
+	// Check stack reference escape via pointer in memory (on tail call)
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
 
@@ -1325,7 +1413,7 @@ void test_call_1(ref VmTestContext c) {
 
 @VmTest
 void test_tail_call_0(ref VmTestContext c) {
-	// External function call
+	// External function tail call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
 		assert(state.regs[0] == VmReg(10));
 		state.regs[0] = VmReg(42);

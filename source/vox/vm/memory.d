@@ -179,6 +179,13 @@ struct Memory {
 				if (numBits) panic("%s.clear: Invariant failed. init bitmap contains %s bits after reset", memoryKindString[kind], numBits);
 			}
 		}}
+		markPointerBits(0, bytesUsed / ptrSize.inBytes, false);
+		static if (SLOW_CHECKS) {{
+			usz* ptrBits = cast(usz*)&pointerBitmap.front();
+			usz len = pointerBitmap.length * 8;
+			usz numBits = popcntBitRange(ptrBits, 0, len);
+			if (numBits) panic("%s numPointerBits %s", memoryKindString[kind], numBits);
+		}}
 		allocations.clear;
 		bytesUsed = 0;
 	}
@@ -191,6 +198,14 @@ struct Memory {
 		bytesUsed += alignValue(sizeAlign.size, Allocation.ALLOCATION_GRANULARITY);
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign, perm));
+		static if (SLOW_CHECKS) {
+			usz* ptr = cast(usz*)&pointerBitmap.front();
+			const PointerId fromSlot = memOffsetToPtrIndex(offset, ptrSize);
+			const PointerId toSlot   = memOffsetToPtrIndex(bytesUsed, ptrSize);
+			if(auto numBits = popcntBitRange(ptr, fromSlot, toSlot) != 0) {
+				panic("Pointer bitmap wasn't cleared, found %s bits in freshly allocated memory", numBits);
+			}
+		}
 		return AllocId(index, kind);
 	}
 
@@ -251,11 +266,16 @@ struct Memory {
 
 		// check that all pointers were removed
 		static if (SLOW_CHECKS) {
-			assert(popcntBitRange(pointerBits, fromSlot, toSlot) == 0);
+			if(auto numBits = popcntBitRange(pointerBits, fromSlot, toSlot) != 0) {
+				panic("Pointer bitmap wasn't cleared, found %s bits", numBits);
+			}
 		}
 
 		// copy pointer bits
 		copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, shiftedSlots);
+
+		// clean trailing pointer bits
+		markPointerBits(fromSlot + shiftedSlots, toSlot - fromSlot, false);
 
 		// update outRefs in shifted allocations
 		static if (OUT_REFS_PER_MEMORY) {
@@ -276,9 +296,9 @@ struct Memory {
 
 		// clean trailing init bits
 		static if (SANITIZE_UNINITIALIZED_MEM) {
-			markInitBits(toByte, shiftedBytes, false);
+			markInitBits(fromByte + shiftedBytes, toByte - fromByte, false);
 		}
-		
+
 		allocations.unput(to - from);
 
 		if (allocations.length) {

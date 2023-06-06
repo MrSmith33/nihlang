@@ -193,6 +193,7 @@ void setBitRange(size_t* ptr, size_t from, size_t to, bool val) {
 
 // counts set bits in a range of bits
 size_t popcntBitRange(size_t* ptr, size_t from, size_t to) {
+	assert(from <= to);
 	enum BITS_PER_SLOT = size_t.sizeof * 8;
 
 	size_t fromBit  = from % BITS_PER_SLOT;

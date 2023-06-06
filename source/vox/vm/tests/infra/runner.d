@@ -62,4 +62,8 @@ void runSingleTest(ref VmTestContext c, ref Test test) {
 	//}
 	//writeln;
 	test.test_handler(c);
+
+	static if (SLOW_CHECKS) {
+		c.vm.reset;
+	}
 }

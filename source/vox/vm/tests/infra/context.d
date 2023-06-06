@@ -70,25 +70,25 @@ struct VmTestContext {
 		return func;
 	}
 
+	private noreturn onCallFail() {
+		sink("  ---\n");
+		sink.formattedWrite("  Test %s failed\n", test.name);
+		sink("  Function expected to finish successfully\n");
+		sink("  ");
+		vmFormatError(vm, sink);
+		u32 ipCopy = vm.ip;
+		sink("\n  ---\n  ");
+		disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
+		sink("\n  ---\n");
+		panic("  Function expected to finish successfully");
+	}
+
 	// Takes exactly VmFunction.numStackParams arguments from the stack
 	VmReg[] call(AllocId funcId, VmReg[] regParams...) {
 		VmFunction* func = setupCall(funcId, 0, regParams);
 		vm.run();
 		// vm.runVerbose(sink);
-
-		if (vm.status.isError) {
-			sink("  ---\n");
-			sink.formattedWrite("  Test %s failed\n", test.name);
-			sink("  Function expected to finish successfully\n");
-			sink("  ");
-			vmFormatError(vm, sink);
-			u32 ipCopy = vm.ip;
-			sink("\n  ---\n  ");
-			disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
-			sink("\n  ---\n");
-			panic("  Function expected to finish successfully");
-		}
-
+		if (vm.status.isError) onCallFail();
 		return vm.registers[0..func.numResults];
 	}
 
@@ -99,11 +99,6 @@ struct VmTestContext {
 		if (!vm.status.isError) {
 			panic("Function expected to trap");
 		}
-		//vm.format_vm_error(sink);
-		//sink("\n  ---\n  ");
-		//u32 ipCopy = vm.frames.back.ip;
-		//disasmOne(sink, vm.functions[vm.frames.back.func].code[], ipCopy);
-		//sink("  ---\n");
 		clearStack;
 	}
 
