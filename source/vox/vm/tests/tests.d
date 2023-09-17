@@ -1499,6 +1499,128 @@ void test_tail_call_2(ref VmTestContext c) {
 
 
 @VmTest
+void test_memcopy_0(ref VmTestContext c) {
+	// memcopy instruction, dst is not a pointer
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	c.callFail(funcId, VmReg(5), VmReg(5), VmReg(5));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NOT_PTR);
+}
+
+@VmTest
+void test_memcopy_1(ref VmTestContext c) {
+	// memcopy instruction, dst memory is not writable
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(funcId), VmReg(memId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+}
+
+@VmTest
+void test_memcopy_2(ref VmTestContext c) {
+	// memcopy instruction, dst allocation is not writable
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
+	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+}
+
+@VmTest
+void test_memcopy_22(ref VmTestContext c) {
+	// memcopy instruction, dst allocation is freed
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.memFree(dstMem);
+	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_STORE_INVALID_POINTER);
+}
+
+@VmTest
+void test_memcopy_3(ref VmTestContext c) {
+	// memcopy instruction, src is not a pointer
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId), VmReg(5), VmReg(5));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NOT_PTR);
+}
+
+@VmTest
+void test_memcopy_4(ref VmTestContext c) {
+	// memcopy instruction, src memory is not readable
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
+	c.callFail(funcId, VmReg(memId), VmReg(funcId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+}
+
+@VmTest
+void test_memcopy_5(ref VmTestContext c) {
+	// memcopy instruction, src allocation is not readable
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.none);
+	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+}
+
+@VmTest
+void test_memcopy_52(ref VmTestContext c) {
+	// memcopy instruction, src allocation is freed
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.memFree(srcMem);
+	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_LOAD_INVALID_POINTER);
+}
+
+@VmTest
+void test_memcopy_6(ref VmTestContext c) {
+	// memcopy instruction, len is a pointer
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(memId));
+	assert(c.vm.status == VmStatus.ERR_MEMCOPY_LEN_IS_PTR);
+}
+
+
+@VmTest
 void test_ctfe_finalize(ref VmTestContext c) {
 	// Test moveMemToStatic
 	// Give unique sizes, so we can check them later

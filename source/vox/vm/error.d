@@ -21,6 +21,11 @@ enum VmStatus : u8 {
 	ERR_LOAD_NO_READ_PERMISSION,
 	ERR_STORE_NOT_PTR,
 	ERR_LOAD_NOT_PTR,
+	ERR_MEMCOPY_DST_NOT_PTR,
+	ERR_MEMCOPY_DST_NO_WRITE_PERMISSION,
+	ERR_MEMCOPY_SRC_NOT_PTR,
+	ERR_MEMCOPY_SRC_NO_READ_PERMISSION,
+	ERR_MEMCOPY_LEN_IS_PTR,
 	ERR_STORE_OOB,
 	ERR_STORE_PTR_UNALIGNED,
 	ERR_LOAD_OOB,
@@ -118,6 +123,33 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 		case ERR_LOAD_NOT_PTR:
 			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			sink.formattedWrite("Reading from non-pointer value (r%s:%s)", vm.code[vm.ip+2], *src);
+			break;
+
+		case ERR_MEMCOPY_DST_NOT_PTR:
+		case ERR_MEMCOPY_SRC_NOT_PTR:
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+			sink.formattedWrite("memcopy requires dst and src registers to contain valid pointers\n  dst r%s: %s\n  src r%s: %s",
+				vm.code[vm.ip+1], *dst, vm.code[vm.ip+2], *src);
+			break;
+
+		case ERR_MEMCOPY_DST_NO_WRITE_PERMISSION:
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+			sink.formattedWrite("memcopy dst pointer has no write permission\n  dst r%s: %s\n  src r%s: %s",
+				vm.code[vm.ip+1], *dst, vm.code[vm.ip+2], *src);
+			break;
+
+		case ERR_MEMCOPY_SRC_NO_READ_PERMISSION:
+			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+			sink.formattedWrite("memcopy src pointer has no read permission\n  dst r%s: %s\n  src r%s: %s",
+				vm.code[vm.ip+1], *dst, vm.code[vm.ip+2], *src);
+			break;
+
+		case ERR_MEMCOPY_LEN_IS_PTR:
+			VmReg* len = &vm.regs[vm.code[vm.ip+3]];
+			sink.formattedWrite("memcopy expects length parameter to be a non-pointer, while it is r%s:%s", vm.code[vm.ip+3], *len);
 			break;
 
 		case ERR_STORE_INVALID_POINTER:

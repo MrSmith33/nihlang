@@ -105,6 +105,9 @@ enum VmOpcode : u8 {
 	store_m16,
 	store_m32,
 	store_m64,
+
+	// u8 op, u8 dst, s8 src, u8 len
+	memcopy,
 }
 
 enum VmBinCond : ubyte {

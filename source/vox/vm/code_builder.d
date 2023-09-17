@@ -148,6 +148,10 @@ struct CodeBuilder {
 		U8(store_op, dst, src);
 	}
 
+	void emit_memcopy(u8 dst, u8 src, u8 len) {
+		U8(VmOpcode.memcopy, dst, src, len);
+	}
+
 	void emit_binop(VmOpcode op, u8 dst, u8 src) {
 		U8(op, dst, src);
 	}

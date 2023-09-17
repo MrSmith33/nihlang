@@ -42,6 +42,7 @@ void vmStep(ref VmState vm) {
 		case store_m16: return instr_store(vm);
 		case store_m32: return instr_store(vm);
 		case store_m64: return instr_store(vm);
+		case memcopy: return instr_memcopy(vm);
 	}
 }
 
@@ -636,4 +637,48 @@ void instr_store(ref VmState vm) {
 	}
 
 	vm.ip += 3;
+}
+
+void instr_memcopy(ref VmState vm) {
+	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* len = &vm.regs[vm.code[vm.ip+3]];
+
+	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NOT_PTR);
+	if (!vm.isMemoryWritable(dst.pointer.kind)) return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NOT_PTR);
+	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+	if (len.pointer.isDefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_LEN_IS_PTR);
+
+	Memory* dstMem = &vm.memories[dst.pointer.kind];
+	Allocation* dstAlloc = &dstMem.allocations[dst.pointer.index];
+	if (!dstAlloc.isWritable) {
+		if (!dstAlloc.isPointerValid(dst.pointer)) {
+			// TODO: other error
+			return vm.setTrap(VmStatus.ERR_STORE_INVALID_POINTER);
+		}
+		return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+	}
+
+	Memory* srctMem = &vm.memories[src.pointer.kind];
+	Allocation* srcAlloc = &srctMem.allocations[src.pointer.index];
+	if (!srcAlloc.isReadable) {
+		if (!srcAlloc.isPointerValid(src.pointer)) {
+			// TODO: other error
+			return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
+		}
+		return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+	}
+
+	// copy memory
+	//memmove(memoryDst, memorySrc, movedBytes);
+	// copy pointer bits
+	//copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, movedSlots);
+	// copy init bits
+	//static if (SANITIZE_UNINITIALIZED_MEM) {
+	//	copyBitRange(initBits, initBits, fromByte, toByte, movedBytes);
+	//}
+	// copy pointers
+
+	vm.ip += 4;
 }
