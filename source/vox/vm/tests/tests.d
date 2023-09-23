@@ -1688,6 +1688,19 @@ void test_memcopy_12(ref VmTestContext c) {
 	assert(c.vm.status == VmStatus.ERR_READ_OOB);
 }
 
+static if (SANITIZE_UNINITIALIZED_MEM)
+@VmTest
+void test_memcopy_13(ref VmTestContext c) {
+	// memcopy instruction, reading uninitialized memory
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_READ_UNINIT);
+}
 
 @VmTest
 void test_ctfe_finalize(ref VmTestContext c) {

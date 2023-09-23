@@ -234,6 +234,47 @@ size_t popcntBitRange(size_t* ptr, size_t from, size_t to) {
 	return count;
 }
 
+// popcntBitRange != 0
+bool isEmptyBitRange(size_t* ptr, size_t from, size_t to) {
+	assert(from <= to);
+	enum BITS_PER_SLOT = size_t.sizeof * 8;
+
+	size_t fromBit  = from % BITS_PER_SLOT;
+	size_t toBit    =   to % BITS_PER_SLOT;
+
+	size_t fromSlot = from / BITS_PER_SLOT;
+	size_t toSlot   =   to / BITS_PER_SLOT;
+
+	// All bits are in the same size_t slot
+	if (fromSlot == toSlot) {
+		size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+		size_t toSlotMask =    (size_t(1) << toBit) - 1;
+		size_t mask = fromSlotMask & toSlotMask;
+
+		return (ptr[fromSlot] & mask) != 0;
+	}
+
+	// Incomplete slot at the beginning
+	if (fromBit != 0) {
+		size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+		if ((ptr[fromSlot] & fromSlotMask) != 0) return true;
+		++fromSlot;
+	}
+
+	// Range of full slots can be counted faster
+	foreach(size_t slot; ptr[fromSlot .. toSlot]) {
+		if (slot != 0) return true;
+	}
+
+	// Incomplete slot at the end
+	if (toBit != 0) {
+		size_t toSlotMask = (size_t(1) << toBit) - 1;
+		if ((ptr[toSlot] & toSlotMask) != 0) return true;
+	}
+
+	return false;
+}
+
 
 // Most efficient with ulong
 // Iterates all set bits in increasing order

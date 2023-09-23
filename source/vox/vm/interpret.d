@@ -681,6 +681,14 @@ void instr_memcopy(ref VmState vm) {
 	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
 	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
 
+	// check read uninit mem
+	static if (SANITIZE_UNINITIALIZED_MEM) {
+		usize* initBits = cast(usize*)&srcMem.initBitmap.front();
+		if (popcntBitRange(initBits, srcAlloc.offset, length) != length) {
+			return vm.setTrap(VmStatus.ERR_READ_UNINIT);
+		}
+	}
+
 	// copy memory
 	//memmove(dstBytes, srcBytes, length);
 	// copy pointer bits
