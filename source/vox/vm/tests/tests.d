@@ -1636,6 +1636,58 @@ void test_memcopy_8(ref VmTestContext c) {
 	assert(c.vm.status == VmStatus.ERR_LEN_IS_PTR);
 }
 
+@VmTest
+void test_memcopy_9(ref VmTestContext c) {
+	// memcopy instruction, dst memory offset is negative
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId, -1), VmReg(memId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+}
+
+@VmTest
+void test_memcopy_10(ref VmTestContext c) {
+	// memcopy instruction, dst memory offset is too big
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId, 8), VmReg(memId), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+}
+
+@VmTest
+void test_memcopy_11(ref VmTestContext c) {
+	// memcopy instruction, src memory offset is negative
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId), VmReg(memId, -1), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+}
+
+@VmTest
+void test_memcopy_12(ref VmTestContext c) {
+	// memcopy instruction, src memory offset is too big
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(memId), VmReg(memId, 8), VmReg(8));
+	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+}
+
 
 @VmTest
 void test_ctfe_finalize(ref VmTestContext c) {

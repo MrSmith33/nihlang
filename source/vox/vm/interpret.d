@@ -659,8 +659,14 @@ void instr_memcopy(ref VmState vm) {
 		return vm.setTrap(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 	}
 
-	Memory* srctMem = &vm.memories[src.pointer.kind];
-	Allocation* srcAlloc = &srctMem.allocations[src.pointer.index];
+	i64 length = len.as_s64;
+
+	i64 dstOffset = dst.as_s64;
+	if (dstOffset < 0) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+	if (dstOffset + length > dstAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+
+	Memory* srcMem = &vm.memories[src.pointer.kind];
+	Allocation* srcAlloc = &srcMem.allocations[src.pointer.index];
 	if (!srcAlloc.isReadable) {
 		if (!srcAlloc.isPointerValid(src.pointer)) {
 			return vm.setTrap(VmStatus.ERR_SRC_ALLOC_FREED);
@@ -668,8 +674,15 @@ void instr_memcopy(ref VmState vm) {
 		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
+	i64 srcOffset = src.as_s64;
+	if (srcOffset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
+	if (srcOffset + length > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
+
+	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
+	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
+
 	// copy memory
-	//memmove(memoryDst, memorySrc, movedBytes);
+	//memmove(dstBytes, srcBytes, length);
 	// copy pointer bits
 	//copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, movedSlots);
 	// copy init bits

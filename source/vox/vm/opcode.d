@@ -87,7 +87,7 @@ enum VmOpcode : u8 {
 	// reg[dst].ptr = null
 	const_s8,
 
-	// u8 op, u8 dst, s8 src
+	// u8 op, u8 dst, u8 src
 	// s64 offset = reg[src].ptr + reg[src].s64
 	// reg[dst].u64 = zext_uXX_to_u64(mem[offset].uXX)
 	// reg[dst].ptr = null
@@ -97,7 +97,7 @@ enum VmOpcode : u8 {
 	load_m32,
 	load_m64,
 
-	// u8 op, u8 dst, s8 src
+	// u8 op, u8 dst, u8 src
 	// s64 offset = reg[dst].ptr + reg[dst].s64
 	// mem[offset].uXX = reg[src].uXX
 	// if (reg[src].ptr.defined && offset.ptr_aligned) reg[dst].ptr = mem[offset].ptr
@@ -106,7 +106,7 @@ enum VmOpcode : u8 {
 	store_m32,
 	store_m64,
 
-	// u8 op, u8 dst, s8 src, u8 len
+	// u8 op, u8 dst, u8 src, u8 len
 	memcopy,
 }
 
