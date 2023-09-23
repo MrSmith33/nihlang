@@ -401,7 +401,7 @@ void test_refs_0(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG);
+	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
 @VmTest
@@ -434,7 +434,7 @@ void test_refs_2(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG);
+	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
 @VmTest
@@ -451,7 +451,7 @@ void test_refs_3(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId, VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM);
+	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
 @VmTest
@@ -477,7 +477,7 @@ void test_refs_4(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcA, VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM);
+	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
 @VmTest
@@ -990,34 +990,42 @@ void test_load_mXX_2(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_LOAD_NOT_PTR);
+	assert(c.vm.status == VmStatus.ERR_SRC_NOT_PTR);
 }
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem, MemoryKind.func_id])
 void test_load_mXX_3(ref VmTestContext c) {
 	// Test load_mXX src memory is not readable
-	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId;
-	if (memKind != MemoryKind.func_id) {
-		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.write);
-	}
-
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	if (memKind == MemoryKind.func_id) memId = funcId;
-	c.callFail(funcId, VmReg(0), VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+	c.callFail(funcId, VmReg(0), VmReg(funcId));
+	assert(c.vm.status == VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_4(ref VmTestContext c) {
+	// Test load_mXX src allocation is not readable
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.write);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.callFail(funcId, VmReg(0), VmReg(memId));
+	assert(c.vm.status == VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_load_mXX_5(ref VmTestContext c) {
 	// Test load_mXX src memory offset is negative
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1027,13 +1035,13 @@ void test_load_mXX_4(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, -1));
-	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
+	assert(c.vm.status == VmStatus.ERR_READ_OOB);
 }
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_load_mXX_5(ref VmTestContext c) {
+void test_load_mXX_6(ref VmTestContext c) {
 	// Test load_mXX src memory offset is too big
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1043,14 +1051,14 @@ void test_load_mXX_5(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
-	assert(c.vm.status == VmStatus.ERR_LOAD_OOB);
+	assert(c.vm.status == VmStatus.ERR_READ_OOB);
 }
 
 static if (SANITIZE_UNINITIALIZED_MEM)
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_load_mXX_6(ref VmTestContext c) {
+void test_load_mXX_7(ref VmTestContext c) {
 	// Test load_mXX src memory uninitialized
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1060,13 +1068,13 @@ void test_load_mXX_6(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 0));
-	assert(c.vm.status == VmStatus.ERR_LOAD_UNINIT);
+	assert(c.vm.status == VmStatus.ERR_READ_UNINIT);
 }
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_load_mXX_7(ref VmTestContext c) {
+void test_load_mXX_8(ref VmTestContext c) {
 	// Test load_mXX raw bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1104,7 +1112,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 @VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
-void test_load_mXX_8(ref VmTestContext c) {
+void test_load_mXX_9(ref VmTestContext c) {
 	// Test load_mXX on pointer bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1145,7 +1153,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-void test_load_mXX_9(ref VmTestContext c) {
+void test_load_mXX_10(ref VmTestContext c) {
 	// Test load_mXX src memory was freed
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
@@ -1155,13 +1163,13 @@ void test_load_mXX_9(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
-	assert(c.vm.status == VmStatus.ERR_LOAD_INVALID_POINTER);
+	assert(c.vm.status == VmStatus.ERR_SRC_ALLOC_FREED);
 }
 
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
-void test_store_mXX_2(ref VmTestContext c) {
+void test_store_mXX_1(ref VmTestContext c) {
 	// Test store_mXX dst pointer undefined
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1169,27 +1177,36 @@ void test_store_mXX_2(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_STORE_NOT_PTR);
+	assert(c.vm.status == VmStatus.ERR_DST_NOT_PTR);
 }
 
 @VmTest
 @VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem, MemoryKind.func_id])
-void test_store_mXX_3(ref VmTestContext c) {
+void test_store_mXX_2(ref VmTestContext c) {
 	// Test store_mXX dst memory is not writable
-	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
-	AllocId memId;
-	if (memKind != MemoryKind.func_id) {
-		memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.read);
-	}
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	if (memKind == MemoryKind.func_id) memId = funcId;
+	c.callFail(funcId, VmReg(funcId), VmReg(0));
+	assert(c.vm.status == VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
+}
+
+@VmTest
+@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+void test_store_mXX_3(ref VmTestContext c) {
+	// Test store_mXX dst allocation is not writable
+	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
+	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
+	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1), MemoryFlags.read);
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_binop(op, 0, 1);
+	b.emit_trap();
+	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+	assert(c.vm.status == VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1205,7 +1222,7 @@ void test_store_mXX_4(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, -1), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
+	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1221,7 +1238,7 @@ void test_store_mXX_5(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_STORE_OOB);
+	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1274,7 +1291,7 @@ void test_store_mXX_7(ref VmTestContext c) {
 
 	foreach(offset; 1..c.vm.ptrSize.inBytes) {
 		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
-		assert(c.vm.status == VmStatus.ERR_STORE_PTR_UNALIGNED);
+		assert(c.vm.status == VmStatus.ERR_WRITE_PTR_UNALIGNED);
 
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// memory was not touched by unsuccessful store
@@ -1349,7 +1366,7 @@ void test_store_mXX_11(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_STORE_INVALID_POINTER);
+	assert(c.vm.status == VmStatus.ERR_DST_ALLOC_FREED);
 }
 
 
@@ -1507,7 +1524,7 @@ void test_memcopy_0(ref VmTestContext c) {
 
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(5), VmReg(5), VmReg(5));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NOT_PTR);
+	assert(c.vm.status == VmStatus.ERR_DST_NOT_PTR);
 }
 
 @VmTest
@@ -1520,7 +1537,7 @@ void test_memcopy_1(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(funcId), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+	assert(c.vm.status == VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1533,11 +1550,11 @@ void test_memcopy_2(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+	assert(c.vm.status == VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
 @VmTest
-void test_memcopy_22(ref VmTestContext c) {
+void test_memcopy_3(ref VmTestContext c) {
 	// memcopy instruction, dst allocation is freed
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1548,11 +1565,11 @@ void test_memcopy_22(ref VmTestContext c) {
 	c.memFree(dstMem);
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_STORE_INVALID_POINTER);
+	assert(c.vm.status == VmStatus.ERR_DST_ALLOC_FREED);
 }
 
 @VmTest
-void test_memcopy_3(ref VmTestContext c) {
+void test_memcopy_4(ref VmTestContext c) {
 	// memcopy instruction, src is not a pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1561,11 +1578,11 @@ void test_memcopy_3(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(5), VmReg(5));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NOT_PTR);
+	assert(c.vm.status == VmStatus.ERR_SRC_NOT_PTR);
 }
 
 @VmTest
-void test_memcopy_4(ref VmTestContext c) {
+void test_memcopy_5(ref VmTestContext c) {
 	// memcopy instruction, src memory is not readable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1574,11 +1591,11 @@ void test_memcopy_4(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(funcId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+	assert(c.vm.status == VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
 @VmTest
-void test_memcopy_5(ref VmTestContext c) {
+void test_memcopy_6(ref VmTestContext c) {
 	// memcopy instruction, src allocation is not readable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1588,11 +1605,11 @@ void test_memcopy_5(ref VmTestContext c) {
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.none);
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+	assert(c.vm.status == VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
 
 @VmTest
-void test_memcopy_52(ref VmTestContext c) {
+void test_memcopy_7(ref VmTestContext c) {
 	// memcopy instruction, src allocation is freed
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1603,11 +1620,11 @@ void test_memcopy_52(ref VmTestContext c) {
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.memFree(srcMem);
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_LOAD_INVALID_POINTER);
+	assert(c.vm.status == VmStatus.ERR_SRC_ALLOC_FREED);
 }
 
 @VmTest
-void test_memcopy_6(ref VmTestContext c) {
+void test_memcopy_8(ref VmTestContext c) {
 	// memcopy instruction, len is a pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
@@ -1616,7 +1633,7 @@ void test_memcopy_6(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_MEMCOPY_LEN_IS_PTR);
+	assert(c.vm.status == VmStatus.ERR_LEN_IS_PTR);
 }
 
 

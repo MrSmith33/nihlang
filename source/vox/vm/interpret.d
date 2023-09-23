@@ -366,7 +366,7 @@ private void pre_drop_stack_range(ref VmState vm, DroppedStackSlots dropped) {
 		if (val.pointer.kind != MemoryKind.stack_mem) continue;
 		if (val.pointer.index < vm.frameFirstStackSlot) continue;
 
-		return vm.setTrap(VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_REG, i);
+		return vm.setTrap(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG, i);
 	}
 
 	// step 2: Remove references in deleted stack slots
@@ -384,7 +384,7 @@ private void pre_drop_stack_range(ref VmState vm, DroppedStackSlots dropped) {
 		// Restore references from stackAllocs to stackAllocs
 		changeLocalPointeeInRefs(vm, stackAllocs, 1, fromSlot, toSlot);
 
-		return vm.setTrap(VmStatus.ERR_DANGLING_PTR_TO_STACK_IN_MEM, i);
+		return vm.setTrap(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM, i);
 	}
 
 	// step 4: actually delete the references now
@@ -542,26 +542,26 @@ void instr_load(ref VmState vm) {
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 
-	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_LOAD_NOT_PTR);
-	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_SRC_NOT_PTR);
+	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 
 	Memory* mem = &vm.memories[src.pointer.kind];
 	Allocation* alloc = &mem.allocations[src.pointer.index];
 	if (!alloc.isReadable) {
 		if (!alloc.isPointerValid(src.pointer)) {
-			return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
+			return vm.setTrap(VmStatus.ERR_SRC_ALLOC_FREED);
 		}
-		return vm.setTrap(VmStatus.ERR_LOAD_NO_READ_PERMISSION);
+		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
 	i64 offset = src.as_s64;
-	if (offset < 0) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
-	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_LOAD_OOB);
+	if (offset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
+	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
 	static if (SANITIZE_UNINITIALIZED_MEM) {
 		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
 		size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
-		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_LOAD_UNINIT);
+		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_READ_UNINIT);
 	}
 
 	// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
@@ -591,21 +591,21 @@ void instr_store(ref VmState vm) {
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 
-	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_STORE_NOT_PTR);
-	if (!vm.isMemoryWritable(dst.pointer.kind)) return vm.setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_DST_NOT_PTR);
+	if (!vm.isMemoryWritable(dst.pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 
 	Memory* mem = &vm.memories[dst.pointer.kind];
 	Allocation* alloc = &mem.allocations[dst.pointer.index];
 	if (!alloc.isWritable) {
 		if (!alloc.isPointerValid(dst.pointer)) {
-			return vm.setTrap(VmStatus.ERR_STORE_INVALID_POINTER);
+			return vm.setTrap(VmStatus.ERR_DST_ALLOC_FREED);
 		}
-		return vm.setTrap(VmStatus.ERR_STORE_NO_WRITE_PERMISSION);
+		return vm.setTrap(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 	}
 
 	i64 offset = dst.as_s64;
-	if (offset < 0) return vm.setTrap(VmStatus.ERR_STORE_OOB);
-	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_STORE_OOB);
+	if (offset < 0) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
 
 	// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 	// Note: this part should execute before bytes are written, because we need original data in trap handler
@@ -613,7 +613,7 @@ void instr_store(ref VmState vm) {
 		// this can be a pointer store
 		if (src.pointer.isDefined) {
 			// Pointer stores must be aligned
-			if (offset % size != 0) return vm.setTrap(VmStatus.ERR_STORE_PTR_UNALIGNED);
+			if (offset % size != 0) return vm.setTrap(VmStatus.ERR_WRITE_PTR_UNALIGNED);
 			// Mutate
 			vm.pointerPut(mem, alloc, cast(u32)offset, src.pointer);
 		} else if (offset % size == 0) {
@@ -644,30 +644,28 @@ void instr_memcopy(ref VmState vm) {
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* len = &vm.regs[vm.code[vm.ip+3]];
 
-	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NOT_PTR);
-	if (!vm.isMemoryWritable(dst.pointer.kind)) return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
-	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NOT_PTR);
-	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
-	if (len.pointer.isDefined) return vm.setTrap(VmStatus.ERR_MEMCOPY_LEN_IS_PTR);
+	if (dst.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_DST_NOT_PTR);
+	if (!vm.isMemoryWritable(dst.pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
+	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_SRC_NOT_PTR);
+	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
+	if (len.pointer.isDefined) return vm.setTrap(VmStatus.ERR_LEN_IS_PTR);
 
 	Memory* dstMem = &vm.memories[dst.pointer.kind];
 	Allocation* dstAlloc = &dstMem.allocations[dst.pointer.index];
 	if (!dstAlloc.isWritable) {
 		if (!dstAlloc.isPointerValid(dst.pointer)) {
-			// TODO: other error
-			return vm.setTrap(VmStatus.ERR_STORE_INVALID_POINTER);
+			return vm.setTrap(VmStatus.ERR_DST_ALLOC_FREED);
 		}
-		return vm.setTrap(VmStatus.ERR_MEMCOPY_DST_NO_WRITE_PERMISSION);
+		return vm.setTrap(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 	}
 
 	Memory* srctMem = &vm.memories[src.pointer.kind];
 	Allocation* srcAlloc = &srctMem.allocations[src.pointer.index];
 	if (!srcAlloc.isReadable) {
 		if (!srcAlloc.isPointerValid(src.pointer)) {
-			// TODO: other error
-			return vm.setTrap(VmStatus.ERR_LOAD_INVALID_POINTER);
+			return vm.setTrap(VmStatus.ERR_SRC_ALLOC_FREED);
 		}
-		return vm.setTrap(VmStatus.ERR_MEMCOPY_SRC_NO_READ_PERMISSION);
+		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
 	// copy memory
