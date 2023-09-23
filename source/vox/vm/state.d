@@ -408,7 +408,7 @@ struct VmState {
 		}
 
 		printIndent(sink, indentation);
-		sink.formattedWrite("Memory %s, %X..%X, %s bytes\n", allocId, offset, offset+length, length);
+		sink.formattedWrite("Allocation %s, %X..%X, %s bytes\n", allocId, offset, offset+length, length);
 
 		Memory* mem = &memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
@@ -444,7 +444,8 @@ struct VmState {
 
 		if (index < bytes.length) {
 			printIndent(sink, indentation);
-			printBytes(bytes[index..index+bytesPerLine]);
+			auto end = min(index + bytesPerLine, bytes.length);
+			printBytes(bytes[index .. end]);
 			sink("\n");
 		}
 	}

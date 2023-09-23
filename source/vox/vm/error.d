@@ -186,7 +186,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 
 			u64 offset = src.as_u64;
 
-			sink.formattedWrite("Reading from uninitialized memory\n  allocation: r%s = %s\n  size: %s bytes\n  offset: %s bytes",
+			sink.formattedWrite("Reading from uninitialized memory\n  allocation: r%s = %s\n  size: %s bytes\n  offset: %s bytes\n",
 				vm.code[vm.ip+2], *src,
 				size,
 				offset);

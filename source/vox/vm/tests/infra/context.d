@@ -73,12 +73,11 @@ struct VmTestContext {
 	private noreturn onCallFail() {
 		sink("  ---\n");
 		sink.formattedWrite("  Test %s failed\n", test.name);
-		sink("  Function expected to finish successfully\n");
-		sink("  ");
-		vmFormatError(vm, sink);
+		sink("  Function expected to finish successfully\n  ---\n  ");
 		u32 ipCopy = vm.ip;
-		sink("\n  ---\n  ");
 		disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
+		sink("\n  ---\n  ");
+		vmFormatError(vm, sink);
 		sink("\n  ---\n");
 		panic("  Function expected to finish successfully");
 	}
@@ -166,7 +165,6 @@ struct VmTestContext {
 	size_t countAllocInitBits(AllocId allocId) {
 		Memory* mem = &vm.memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
-		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
-		return popcntBitRange(initBits, alloc.offset, alloc.offset + alloc.size);
+		return mem.countInitBits(alloc.offset, alloc.size);
 	}
 }

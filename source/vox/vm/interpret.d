@@ -559,8 +559,7 @@ void instr_load(ref VmState vm) {
 	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
 	static if (SANITIZE_UNINITIALIZED_MEM) {
-		size_t* initBits = cast(size_t*)&mem.initBitmap.front();
-		size_t numInitedBytes = popcntBitRange(initBits, alloc.offset + cast(u32)offset, alloc.offset + cast(u32)offset + size);
+		size_t numInitedBytes = mem.countInitBits(alloc.offset + cast(u32)offset, size);
 		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_READ_UNINIT);
 	}
 
@@ -678,26 +677,28 @@ void instr_memcopy(ref VmState vm) {
 	if (srcOffset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
 	if (srcOffset + length > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
-	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
-	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
-
 	// check read uninit mem
 	static if (SANITIZE_UNINITIALIZED_MEM) {
-		usize* initBits = cast(usize*)&srcMem.initBitmap.front();
-		if (popcntBitRange(initBits, srcAlloc.offset, length) != length) {
+		if (srcMem.countInitBits(srcAlloc.offset, length) != length) {
 			return vm.setTrap(VmStatus.ERR_READ_UNINIT);
 		}
 	}
 
-	// copy memory
-	//memmove(dstBytes, srcBytes, length);
+	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
+	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
+
+	// copy bytes
+	memmove(dstBytes, srcBytes, length);
+
+	// move/remove overwritten pointers
+
 	// copy pointer bits
 	//copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, movedSlots);
-	// copy init bits
-	//static if (SANITIZE_UNINITIALIZED_MEM) {
-	//	copyBitRange(initBits, initBits, fromByte, toByte, movedBytes);
-	//}
-	// copy pointers
+
+	// set init bits
+	static if (SANITIZE_UNINITIALIZED_MEM) {
+		dstMem.markInitBits(dstAlloc.offset, length, true);
+	}
 
 	vm.ip += 4;
 }

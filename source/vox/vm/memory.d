@@ -173,17 +173,13 @@ struct Memory {
 		static if (SANITIZE_UNINITIALIZED_MEM) {{
 			markInitBits(0, bytesUsed, false);
 			static if (SLOW_CHECKS) {
-				usz* initBits = cast(usz*)&initBitmap.front();
-				usz len = initBitmap.length * 8;
-				usz numBits = popcntBitRange(initBits, 0, len);
+				usz numBits = countInitBits(0, initBitmap.length * 8);
 				if (numBits) panic("%s.clear: Invariant failed. init bitmap contains %s bits after reset", memoryKindString[kind], numBits);
 			}
 		}}
 		markPointerBits(0, bytesUsed / ptrSize.inBytes, false);
 		static if (SLOW_CHECKS) {{
-			usz* ptrBits = cast(usz*)&pointerBitmap.front();
-			usz len = pointerBitmap.length * 8;
-			usz numBits = popcntBitRange(ptrBits, 0, len);
+			usz numBits = countPointerBits(0, pointerBitmap.length * 8);
 			if (numBits) panic("%s numPointerBits %s", memoryKindString[kind], numBits);
 		}}
 		allocations.clear;
@@ -193,16 +189,17 @@ struct Memory {
 	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
+		assert(offset % Allocation.ALLOCATION_GRANULARITY == 0);
 		// allocate in multiple of ALLOCATION_GRANULARITY bytes
 		// so that pointers are always aligned in memory and we can use pointer bitmap
-		bytesUsed += alignValue(sizeAlign.size, Allocation.ALLOCATION_GRANULARITY);
+		u32 alignedSize = alignValue(sizeAlign.size, Allocation.ALLOCATION_GRANULARITY);
+		bytesUsed += alignedSize;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
 		allocations.put(allocator, Allocation(offset, sizeAlign, perm));
 		static if (SLOW_CHECKS) {
-			usz* ptr = cast(usz*)&pointerBitmap.front();
 			const PointerId fromSlot = memOffsetToPtrIndex(offset, ptrSize);
-			const PointerId toSlot   = memOffsetToPtrIndex(bytesUsed, ptrSize);
-			if(auto numBits = popcntBitRange(ptr, fromSlot, toSlot) != 0) {
+			const PointerId numSlots = memOffsetToPtrIndex(alignedSize, ptrSize);
+			if(auto numBits = countPointerBits(fromSlot, numSlots) != 0) {
 				panic("Pointer bitmap wasn't cleared, found %s bits in freshly allocated memory", numBits);
 			}
 		}
@@ -258,7 +255,6 @@ struct Memory {
 			alloc.offset = alloc.offset - byteOffset;
 		}
 
-		usize* pointerBits = cast(usize*)&pointerBitmap.front();
 		const PointerId fromSlot = memOffsetToPtrIndex(fromByte, ptrSize);
 		const PointerId toSlot   = memOffsetToPtrIndex(toByte, ptrSize);
 		const PointerId lastSlot = memOffsetToPtrIndex(lastByte, ptrSize);
@@ -266,12 +262,13 @@ struct Memory {
 
 		// check that all pointers were removed
 		static if (SLOW_CHECKS) {
-			if(auto numBits = popcntBitRange(pointerBits, fromSlot, toSlot) != 0) {
+			if(auto numBits = countPointerBits(fromSlot, toSlot - fromSlot) != 0) {
 				panic("Pointer bitmap wasn't cleared, found %s bits", numBits);
 			}
 		}
 
 		// copy pointer bits
+		usize* pointerBits = cast(usize*)&pointerBitmap.front();
 		copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, shiftedSlots);
 
 		// clean trailing pointer bits
@@ -310,14 +307,25 @@ struct Memory {
 	}
 
 	static if (SANITIZE_UNINITIALIZED_MEM)
-	void markInitBits(u32 offset, u32 size, bool value) {
+	usz countInitBits(usz offset, usz size) {
 		usz* ptr = cast(usz*)&initBitmap.front();
-		setBitRange(ptr, offset, offset+size, value);
+		return popcntBitRange(ptr, offset, offset + size);
 	}
 
-	void markPointerBits(u32 offset, u32 size, bool value) {
+	static if (SANITIZE_UNINITIALIZED_MEM)
+	void markInitBits(usz offset, usz size, bool value) {
+		usz* ptr = cast(usz*)&initBitmap.front();
+		setBitRange(ptr, offset, offset + size, value);
+	}
+
+	usz countPointerBits(usz offset, usz size) {
 		usz* ptr = cast(usz*)&pointerBitmap.front();
-		setBitRange(ptr, offset, offset+size, value);
+		return popcntBitRange(ptr, offset, offset + size);
+	}
+
+	void markPointerBits(usz offset, usz size, bool value) {
+		usz* ptr = cast(usz*)&pointerBitmap.front();
+		setBitRange(ptr, offset, offset + size, value);
 	}
 
 	bool getPtrBit(PointerId index) {

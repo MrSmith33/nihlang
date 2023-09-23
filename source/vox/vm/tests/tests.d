@@ -1703,6 +1703,23 @@ void test_memcopy_13(ref VmTestContext c) {
 }
 
 @VmTest
+void test_memcopy_14(ref VmTestContext c) {
+	// memcopy instruction, check that non-pointers are written and that dst mem is initialized
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(3, -1);
+	b.emit_store_m64(1, 3);
+	b.emit_memcopy(0, 1, 2); // copy -1 into dst mem
+	b.emit_load_m64(0, 0); // read -1 from dst mem
+	b.emit_ret();
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(8));
+	assert(res[0] == VmReg(-1));
+}
+
+@VmTest
 void test_ctfe_finalize(ref VmTestContext c) {
 	// Test moveMemToStatic
 	// Give unique sizes, so we can check them later
