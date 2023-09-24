@@ -412,18 +412,14 @@ struct VmState {
 
 		Memory* mem = &memories[allocId.kind];
 		Allocation* alloc = &mem.allocations[allocId.index];
-		u8[] bytes = mem.memory[offset..offset+length];
+		u8[] bytes = mem.memory[alloc.offset + offset..alloc.offset + offset + length];
 
-		static if (SANITIZE_UNINITIALIZED_MEM) {
-			size_t* initBits = cast(size_t*)&mem.initBitmap.front();
-		}
-
-		size_t index = 0;
+		size_t index = offset;
 
 		void printBytes(u8[] bytes) {
 			foreach(i, b; bytes) {
 				static if (SANITIZE_UNINITIALIZED_MEM) {
-					if (getBitAt(initBits, index+i))
+					if (mem.getInitBit(alloc.offset + index+i))
 						sink.formattedWrite("%02X ", b);
 					else
 						sink("?? ");

@@ -70,15 +70,20 @@ struct VmTestContext {
 		return func;
 	}
 
-	private noreturn onCallFail() {
-		sink("  ---\n");
-		sink.formattedWrite("  Test %s failed\n", test.name);
-		sink("  Function expected to finish successfully\n  ---\n  ");
+	private void printState() {
+		sink("  ---\n  ");
 		u32 ipCopy = vm.ip;
 		disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
 		sink("\n  ---\n  ");
 		vmFormatError(vm, sink);
 		sink("\n  ---\n");
+	}
+
+	private noreturn onCallFail() {
+		sink("  ---\n");
+		sink.formattedWrite("  Test %s failed\n", test.name);
+		sink("  Function expected to finish successfully\n");
+		printState();
 		panic("  Function expected to finish successfully");
 	}
 
@@ -99,6 +104,14 @@ struct VmTestContext {
 			panic("Function expected to trap");
 		}
 		clearStack;
+	}
+
+	void expectStatus(VmStatus expected) {
+		if (vm.status != expected) {
+			writefln("Unexpected VM status\n  Expected: %s\n       Got: %s", VmStatus_names[expected], VmStatus_names[vm.status]);
+			printState();
+			panic("Unexpected VM status");
+		}
 	}
 
 	void clearStack() {
@@ -152,6 +165,13 @@ struct VmTestContext {
 		Memory* mem = &vm.memories[id.kind];
 		Allocation* alloc = &mem.allocations[id.index];
 		return alloc.sizeAlign;
+	}
+
+	static if (SANITIZE_UNINITIALIZED_MEM)
+	void setAllocInitBitsRange(AllocId allocId, u32 start, u32 length, bool value) {
+		Memory* mem = &vm.memories[allocId.kind];
+		Allocation* alloc = &mem.allocations[allocId.index];
+		mem.markInitBits(alloc.offset+start, length, value);
 	}
 
 	static if (SANITIZE_UNINITIALIZED_MEM)

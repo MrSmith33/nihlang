@@ -100,7 +100,7 @@ void test_stack_0(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
 @VmTest
@@ -120,7 +120,7 @@ void test_stack_1(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
 @VmTest
@@ -140,7 +140,7 @@ void test_stack_2(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
+	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
 @VmTest
@@ -153,7 +153,7 @@ void test_stack_3(ref VmTestContext c) {
 
 	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(16, 1));
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
 @VmTest
@@ -174,7 +174,7 @@ void test_stack_4(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
 @VmTest
@@ -195,7 +195,7 @@ void test_stack_5(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
+	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
 @VmTest
@@ -401,7 +401,7 @@ void test_refs_0(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
+	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
 @VmTest
@@ -434,7 +434,7 @@ void test_refs_2(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcA);
-	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
+	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
 @VmTest
@@ -451,7 +451,7 @@ void test_refs_3(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId, VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
+	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
 @VmTest
@@ -477,7 +477,7 @@ void test_refs_4(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcA, VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
+	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
 @VmTest
@@ -525,7 +525,7 @@ void test_trap_0(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_TRAP);
+	c.expectStatus(VmStatus.ERR_TRAP);
 }
 
 
@@ -545,7 +545,7 @@ void test_budget_1(ref VmTestContext c) {
 	// check that budget of 0 is not enough to run single instruction
 	c.vm.budget = 0;
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_BUDGET);
+	c.expectStatus(VmStatus.ERR_BUDGET);
 }
 
 @VmTest
@@ -684,7 +684,7 @@ void test_cmp_0(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId);
-	assert(c.vm.status == VmStatus.ERR_COND_OOB);
+	c.expectStatus(VmStatus.ERR_COND_OOB);
 }
 
 
@@ -810,7 +810,7 @@ void test_cmp_8(ref VmTestContext c) {
 	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
-	assert(c.vm.status == VmStatus.ERR_CMP_DIFFERENT_PTR);
+	c.expectStatus(VmStatus.ERR_CMP_DIFFERENT_PTR);
 }
 
 @VmTest
@@ -825,11 +825,11 @@ void test_cmp_9(ref VmTestContext c) {
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
-	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+	c.expectStatus(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(10));
-	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+	c.expectStatus(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 	c.callFail(funcId, VmReg(10), VmReg(memId1, 10));
-	assert(c.vm.status == VmStatus.ERR_CMP_REQUIRES_NO_PTR);
+	c.expectStatus(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 }
 
 @VmTest
@@ -951,7 +951,7 @@ void test_add_i64_2(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(funcId, 10), VmReg(funcId, 20));
-	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
+	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
 
 @VmTest
@@ -962,7 +962,7 @@ void test_add_i64_3(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
-	assert(c.vm.status == VmStatus.ERR_PTR_SRC1);
+	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
 
 
@@ -990,7 +990,7 @@ void test_load_mXX_2(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_SRC_NOT_PTR);
+	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
 }
 
 @VmTest
@@ -1003,7 +1003,7 @@ void test_load_mXX_3(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(funcId));
-	assert(c.vm.status == VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
 @VmTest
@@ -1019,7 +1019,7 @@ void test_load_mXX_4(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
 
 @VmTest
@@ -1035,7 +1035,7 @@ void test_load_mXX_5(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, -1));
-	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
 @VmTest
@@ -1051,7 +1051,7 @@ void test_load_mXX_6(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
-	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
 static if (SANITIZE_UNINITIALIZED_MEM)
@@ -1068,7 +1068,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 0));
-	assert(c.vm.status == VmStatus.ERR_READ_UNINIT);
+	c.expectStatus(VmStatus.ERR_READ_UNINIT);
 }
 
 @VmTest
@@ -1163,7 +1163,7 @@ void test_load_mXX_10(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
-	assert(c.vm.status == VmStatus.ERR_SRC_ALLOC_FREED);
+	c.expectStatus(VmStatus.ERR_SRC_ALLOC_FREED);
 }
 
 
@@ -1177,7 +1177,7 @@ void test_store_mXX_1(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_DST_NOT_PTR);
+	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
 
 @VmTest
@@ -1190,7 +1190,7 @@ void test_store_mXX_2(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(funcId), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1206,7 +1206,7 @@ void test_store_mXX_3(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1222,7 +1222,7 @@ void test_store_mXX_4(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, -1), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1238,7 +1238,7 @@ void test_store_mXX_5(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1291,7 +1291,7 @@ void test_store_mXX_7(ref VmTestContext c) {
 
 	foreach(offset; 1..c.vm.ptrSize.inBytes) {
 		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
-		assert(c.vm.status == VmStatus.ERR_WRITE_PTR_UNALIGNED);
+		c.expectStatus(VmStatus.ERR_WRITE_PTR_UNALIGNED);
 
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// memory was not touched by unsuccessful store
@@ -1366,7 +1366,7 @@ void test_store_mXX_11(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
-	assert(c.vm.status == VmStatus.ERR_DST_ALLOC_FREED);
+	c.expectStatus(VmStatus.ERR_DST_ALLOC_FREED);
 }
 
 
@@ -1524,7 +1524,7 @@ void test_memcopy_0(ref VmTestContext c) {
 
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(5), VmReg(5), VmReg(5));
-	assert(c.vm.status == VmStatus.ERR_DST_NOT_PTR);
+	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
 
 @VmTest
@@ -1537,7 +1537,7 @@ void test_memcopy_1(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(funcId), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1550,7 +1550,7 @@ void test_memcopy_2(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
 @VmTest
@@ -1565,7 +1565,7 @@ void test_memcopy_3(ref VmTestContext c) {
 	c.memFree(dstMem);
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_DST_ALLOC_FREED);
+	c.expectStatus(VmStatus.ERR_DST_ALLOC_FREED);
 }
 
 @VmTest
@@ -1578,7 +1578,7 @@ void test_memcopy_4(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(5), VmReg(5));
-	assert(c.vm.status == VmStatus.ERR_SRC_NOT_PTR);
+	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
 }
 
 @VmTest
@@ -1591,7 +1591,7 @@ void test_memcopy_5(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(funcId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
 @VmTest
@@ -1605,7 +1605,7 @@ void test_memcopy_6(ref VmTestContext c) {
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.none);
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
+	c.expectStatus(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
 
 @VmTest
@@ -1620,7 +1620,7 @@ void test_memcopy_7(ref VmTestContext c) {
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.memFree(srcMem);
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_SRC_ALLOC_FREED);
+	c.expectStatus(VmStatus.ERR_SRC_ALLOC_FREED);
 }
 
 @VmTest
@@ -1633,7 +1633,7 @@ void test_memcopy_8(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(memId));
-	assert(c.vm.status == VmStatus.ERR_LEN_IS_PTR);
+	c.expectStatus(VmStatus.ERR_LEN_IS_PTR);
 }
 
 @VmTest
@@ -1646,7 +1646,7 @@ void test_memcopy_9(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId, -1), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1659,7 +1659,7 @@ void test_memcopy_10(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId, 8), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_WRITE_OOB);
+	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
 @VmTest
@@ -1672,7 +1672,7 @@ void test_memcopy_11(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId, -1), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
 @VmTest
@@ -1685,7 +1685,7 @@ void test_memcopy_12(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId, 8), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_READ_OOB);
+	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
 static if (SANITIZE_UNINITIALIZED_MEM)
@@ -1697,9 +1697,14 @@ void test_memcopy_13(ref VmTestContext c) {
 	b.emit_trap();
 
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
-	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
-	assert(c.vm.status == VmStatus.ERR_READ_UNINIT);
+	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	foreach(offset; 0..8) {
+		c.setAllocInitBits(srcMem, true);
+		c.setAllocInitBitsRange(srcMem, offset, 1, false);
+		c.callFail(funcId, VmReg(dstMem), VmReg(srcMem, offset), VmReg(1));
+		c.expectStatus(VmStatus.ERR_READ_UNINIT);
+	}
 }
 
 @VmTest

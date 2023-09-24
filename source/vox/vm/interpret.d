@@ -679,7 +679,6 @@ void instr_memcopy(ref VmState vm) {
 
 	// check read uninit mem
 	static if (SANITIZE_UNINITIALIZED_MEM) {
-		// TODO: test with non-zero src offsets
 		if (srcMem.countInitBits(srcAlloc.offset + srcOffset, length) != length) {
 			return vm.setTrap(VmStatus.ERR_READ_UNINIT);
 		}
@@ -695,12 +694,12 @@ void instr_memcopy(ref VmState vm) {
 		assert(false);
 	} else {
 		auto dstFromMem = cast(u32)roundUp(dstAlloc.offset + dstOffset, vm.ptrSize.inBytes);
-		auto dstToMem   = cast(u32)(dstAlloc.offset + dstOffset + length); // rounded down by memOffsetToPtrIndex
+		auto dstToMem   = cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes);
 		PointerId dstFromMemSlot = memOffsetToPtrIndex(dstFromMem, vm.ptrSize);
 		PointerId dstToMemSlot   = memOffsetToPtrIndex(dstToMem, vm.ptrSize);
 
 		auto srcFromMem = cast(u32)roundUp(srcAlloc.offset + srcOffset, vm.ptrSize.inBytes);
-		auto srcToMem   = cast(u32)(srcAlloc.offset + srcOffset + length); // rounded down by memOffsetToPtrIndex
+		auto srcToMem   = cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes);
 		PointerId srcFromMemSlot = memOffsetToPtrIndex(srcFromMem, vm.ptrSize);
 		PointerId srcToMemSlot   = memOffsetToPtrIndex(srcToMem, vm.ptrSize);
 

@@ -40,6 +40,8 @@ enum VmStatus : u8 {
 	ERR_ESCAPED_PTR_TO_STACK_IN_MEM,
 }
 
+immutable string[__traits(allMembers, VmStatus).length] VmStatus_names = [ __traits(allMembers, VmStatus) ];
+
 bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
 
 usz memOpSize(ref VmState vm) {

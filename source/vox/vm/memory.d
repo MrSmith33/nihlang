@@ -314,8 +314,14 @@ struct Memory {
 
 	static if (SANITIZE_UNINITIALIZED_MEM)
 	void markInitBits(usz offset, usz size, bool value) {
+		if (size == 0) return;
 		usz* ptr = cast(usz*)&initBitmap.front();
 		setBitRange(ptr, offset, offset + size, value);
+	}
+
+	bool getInitBit(usz index) {
+		usz* ptr = cast(usz*)&initBitmap.front();
+		return getBitAt(ptr, index);
 	}
 
 	usz countPointerBits(usz offset, usz size) {

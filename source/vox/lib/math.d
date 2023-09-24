@@ -84,6 +84,11 @@ T roundUp(T)(T value, T multiple) {
 	return cast(T)(((value + multiple - 1) / multiple) * multiple);
 }
 
+T roundDown(T)(T value, T multiple) {
+	enforce(multiple != 0, "multiple must not be zero");
+	return cast(T)((value / multiple) * multiple);
+}
+
 /// alignment is POT
 T paddingSize(T)(T address, T alignment) {
 	return cast(T)(alignValue(address, alignment) - address);
