@@ -14,6 +14,8 @@ void swap(T)(ref T lhs, ref T rhs) pure {
 	rhs = tmp;
 }
 
+T[n] staticArray(T, size_t n)(T[n] a) { return a; }
+
 version(VANILLA_D) {
 	public import core.stdc.string : memmove;
 }

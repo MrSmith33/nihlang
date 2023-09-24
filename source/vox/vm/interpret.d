@@ -680,28 +680,36 @@ void instr_memcopy(ref VmState vm) {
 	if (srcOffset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
 	if (srcOffset + length > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
+	auto dstFromMem = cast(u32)roundUp(dstAlloc.offset + dstOffset, vm.ptrSize.inBytes);
+	auto dstToMem   = max(dstFromMem, cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes));
+	PointerId dstFromMemSlot = memOffsetToPtrIndex(dstFromMem, vm.ptrSize);
+	PointerId dstToMemSlot   = memOffsetToPtrIndex(dstToMem, vm.ptrSize);
+	assert(dstFromMemSlot <= dstToMemSlot);
+
+	auto srcFromMem = cast(u32)roundUp(srcAlloc.offset + srcOffset, vm.ptrSize.inBytes);
+	auto srcToMem   = max(srcFromMem, cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes));
+	PointerId srcFromMemSlot = memOffsetToPtrIndex(srcFromMem, vm.ptrSize);
+	PointerId srcToMemSlot   = memOffsetToPtrIndex(srcToMem, vm.ptrSize);
+	assert(srcFromMemSlot <= srcToMemSlot);
+
+	auto dstAlignment = dstOffset % vm.ptrSize.inBytes;
+	auto srcAlignment = srcOffset % vm.ptrSize.inBytes;
+
+	// check for unaligned pointer writes
+	if (dstAlignment != srcAlignment) {
+		auto numPointers = srcMem.countPointerBits(srcFromMemSlot, srcToMemSlot - srcFromMemSlot);
+		if (numPointers) {
+			// Source contains pointers. Copying them means writing pointers to an unaligned address
+			// TODO: Use specialized error for memcopy
+			return vm.setTrap(VmStatus.ERR_WRITE_PTR_UNALIGNED);
+		}
+	}
+
 	if (dstAlloc == srcAlloc) {
 		assert(false); // TODO
 	} else {
-		auto dstFromMem = cast(u32)roundUp(dstAlloc.offset + dstOffset, vm.ptrSize.inBytes);
-		auto dstToMem   = max(dstFromMem, cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes));
-		PointerId dstFromMemSlot = memOffsetToPtrIndex(dstFromMem, vm.ptrSize);
-		PointerId dstToMemSlot   = memOffsetToPtrIndex(dstToMem, vm.ptrSize);
-		assert(dstFromMemSlot <= dstToMemSlot);
-
-		auto srcFromMem = cast(u32)roundUp(srcAlloc.offset + srcOffset, vm.ptrSize.inBytes);
-		auto srcToMem   = max(srcFromMem, cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes));
-		PointerId srcFromMemSlot = memOffsetToPtrIndex(srcFromMem, vm.ptrSize);
-		PointerId srcToMemSlot   = memOffsetToPtrIndex(srcToMem, vm.ptrSize);
-		assert(srcFromMemSlot <= srcToMemSlot);
-
 		// remove dst pointers
 		removePointersInRange(vm, dstMem, dstAlloc, dstFromMemSlot, dstToMemSlot);
-
-		// check that alignment matches
-		auto dstAlignment = dstOffset % vm.ptrSize.inBytes;
-		auto srcAlignment = srcOffset % vm.ptrSize.inBytes;
-
 
 		if (dstAlignment == srcAlignment) {
 			// copy pointer bits
@@ -720,12 +728,6 @@ void instr_memcopy(ref VmState vm) {
 				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
 				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
 				vm.pointerPut(dstMem, dstAlloc, dstAllocOffset, value);
-			}
-		} else {
-			auto count = srcMem.countPointerBits(srcFromMemSlot, srcToMemSlot - srcFromMemSlot);
-			if (count) {
-				// TODO: test
-				return vm.setTrap(VmStatus.ERR_WRITE_PTR_UNALIGNED);
 			}
 		}
 	}

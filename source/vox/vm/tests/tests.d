@@ -1731,9 +1731,9 @@ void test_memcopy_14(ref VmTestContext c) {
 void test_memcopy_15(ref VmTestContext c) {
 	// memcopy instruction, different allocations, non-overlapping memcopy
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId-1) into src mem
-	b.emit_memcopy(0, 1, 2);              //  copy (funcId-1) from src into dst mem
-	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId-1) from dst mem
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId+c) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId+c) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId+c) from dst mem
 	b.emit_ret();
 
 	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
@@ -1744,6 +1744,31 @@ void test_memcopy_15(ref VmTestContext c) {
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(24, 1));
 	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId, value));
 	assert(res[0] == VmReg(funcId, value & sizeMask));
+}
+
+@VmTest
+void test_memcopy_16(ref VmTestContext c) {
+	// memcopy instruction, unaligned pointer write
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId) into src mem
+	b.emit_memcopy(0, 1, 2);
+	b.emit_trap();
+
+	AllocId funcId = c.vm.addFunction(0.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(16, 1));
+	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	c.callFail(funcId, VmReg(dst, 1), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId));
+	c.expectStatus(VmStatus.ERR_WRITE_PTR_UNALIGNED);
+
+	foreach(offset; 1..c.vm.ptrSize.inBytes) {
+		c.callFail(funcId, VmReg(dst, offset), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId));
+		c.expectStatus(VmStatus.ERR_WRITE_PTR_UNALIGNED);
+
+		static if (SANITIZE_UNINITIALIZED_MEM) {
+			// memory was not touched by unsuccessful store
+			assert(c.countAllocInitBits(dst) == 0);
+		}
+	}
 }
 
 // non-overlapping memcopy
