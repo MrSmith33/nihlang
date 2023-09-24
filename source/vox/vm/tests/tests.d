@@ -17,6 +17,9 @@ void vmTests(ref VoxAllocator allocator, ref TestSuite suite) {
 // - What if the same register/memory is used multiple times in an instruction
 // - Check that state is not changed on trap
 //   - Memory init bits are not changed on trapped store
+// - When opcode has multiple registers, and a register gets overwritten
+//   check that in case the same register is passed in multiple operands
+//   the value is not overwritten before it is read
 
 
 @VmTest @TestPtrSize64
@@ -1691,25 +1694,26 @@ void test_memcopy_12(ref VmTestContext c) {
 static if (SANITIZE_UNINITIALIZED_MEM)
 @VmTest
 void test_memcopy_13(ref VmTestContext c) {
-	// memcopy instruction, reading uninitialized memory
+	// memcopy instruction, copying uninitialized memory
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_memcopy(0, 1, 2);
-	b.emit_trap();
+	b.emit_ret();
 
 	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	foreach(offset; 0..8) {
+		c.setAllocInitBits(dstMem, true);
 		c.setAllocInitBits(srcMem, true);
 		c.setAllocInitBitsRange(srcMem, offset, 1, false);
-		c.callFail(funcId, VmReg(dstMem), VmReg(srcMem, offset), VmReg(1));
-		c.expectStatus(VmStatus.ERR_READ_UNINIT);
+		c.call(funcId, VmReg(dstMem), VmReg(srcMem, offset), VmReg(1));
+		assert(c.countAllocInitBits(dstMem) == 7);
 	}
 }
 
 @VmTest
 void test_memcopy_14(ref VmTestContext c) {
-	// memcopy instruction, check that non-pointers are written and that dst mem is initialized
+	// memcopy instruction, check that non-pointers are written
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_m64(1, 3);  // write -1 into src mem
 	b.emit_memcopy(0, 1, 2); //  copy -1 from src into dst mem

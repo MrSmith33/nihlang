@@ -159,7 +159,7 @@ I decided to use 4 pointer kinds:
     I track initialization for each memory byte.
     Memory reads check that data being read is initialized.
     I can assume that reading individual fields always hits initialized data (1 bit per byte) for valid programs, but memcopy just needs to copy bytes.
-    1. memcopy also copies the initialization data. 
+    1. memcopy also copies initialization bits. 
     2. padding must be initialized. Or marked as initialized. memcopy marks target memory as initialized (should be faster)
     
     Option 1 seems to be equal to what happens in native code
@@ -169,6 +169,7 @@ I decided to use 4 pointer kinds:
     I think of using a bitmap, with one bit per pointer slot. This implies supporting aligned pointers only.  
     Then memcopy would copy a bitmap too. Plus for each 1 in the bitmap it would also look into the hashmap and copy the entry.  
     When memcopy copies a pointer, the pointer must land into aligned memory location. (Same with a store of a pointer)
+    The pointers in the destination memory are erased.
 
 12. What happens when load_m64 tries to load two 32-bit pointers?
     - Only load raw bytes (current solution)

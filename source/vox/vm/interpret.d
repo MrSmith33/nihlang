@@ -541,20 +541,22 @@ void instr_load(ref VmState vm) {
 
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
+	// read src at the beginning, so writes to dst do not erase the data
+	AllocId pointer = src.pointer;
+	i64 offset      = src.as_s64;
 
-	if (src.pointer.isUndefined) return vm.setTrap(VmStatus.ERR_SRC_NOT_PTR);
-	if (!vm.isMemoryReadable(src.pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
+	if (pointer.isUndefined) return vm.setTrap(VmStatus.ERR_SRC_NOT_PTR);
+	if (!vm.isMemoryReadable(pointer.kind)) return vm.setTrap(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 
-	Memory* mem = &vm.memories[src.pointer.kind];
-	Allocation* alloc = &mem.allocations[src.pointer.index];
+	Memory* mem = &vm.memories[pointer.kind];
+	Allocation* alloc = &mem.allocations[pointer.index];
 	if (!alloc.isReadable) {
-		if (!alloc.isPointerValid(src.pointer)) {
+		if (!alloc.isPointerValid(pointer)) {
 			return vm.setTrap(VmStatus.ERR_SRC_ALLOC_FREED);
 		}
 		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
-	i64 offset = src.as_s64;
 	if (offset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
 	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
@@ -563,8 +565,9 @@ void instr_load(ref VmState vm) {
 		if (numInitedBytes != size) return vm.setTrap(VmStatus.ERR_READ_UNINIT);
 	}
 
+	// overwrite dst after src
 	// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
-	if (vm.ptrSize.inBytes == size && offset % size == 0) {
+	if (vm.ptrSize.inBytes == size && ((offset % size) == 0)) {
 		// this can be a pointer load
 		dst.pointer = vm.pointerGet(mem, alloc, cast(u32)offset);
 	} else {
@@ -677,31 +680,20 @@ void instr_memcopy(ref VmState vm) {
 	if (srcOffset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
 	if (srcOffset + length > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
-	// check read uninit mem
-	static if (SANITIZE_UNINITIALIZED_MEM) {
-		if (srcMem.countInitBits(srcAlloc.offset + srcOffset, length) != length) {
-			return vm.setTrap(VmStatus.ERR_READ_UNINIT);
-		}
-	}
-
-	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
-	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
-
-	// copy bytes
-	memmove(dstBytes, srcBytes, length);
-
 	if (dstAlloc == srcAlloc) {
-		assert(false);
+		assert(false); // TODO
 	} else {
 		auto dstFromMem = cast(u32)roundUp(dstAlloc.offset + dstOffset, vm.ptrSize.inBytes);
-		auto dstToMem   = cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes);
+		auto dstToMem   = max(dstFromMem, cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes));
 		PointerId dstFromMemSlot = memOffsetToPtrIndex(dstFromMem, vm.ptrSize);
 		PointerId dstToMemSlot   = memOffsetToPtrIndex(dstToMem, vm.ptrSize);
+		assert(dstFromMemSlot <= dstToMemSlot);
 
 		auto srcFromMem = cast(u32)roundUp(srcAlloc.offset + srcOffset, vm.ptrSize.inBytes);
-		auto srcToMem   = cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes);
+		auto srcToMem   = max(srcFromMem, cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes));
 		PointerId srcFromMemSlot = memOffsetToPtrIndex(srcFromMem, vm.ptrSize);
 		PointerId srcToMemSlot   = memOffsetToPtrIndex(srcToMem, vm.ptrSize);
+		assert(srcFromMemSlot <= srcToMemSlot);
 
 		// remove dst pointers
 		removePointersInRange(vm, dstMem, dstAlloc, dstFromMemSlot, dstToMemSlot);
@@ -709,30 +701,45 @@ void instr_memcopy(ref VmState vm) {
 		// check that alignment matches
 		auto dstAlignment = dstOffset % vm.ptrSize.inBytes;
 		auto srcAlignment = srcOffset % vm.ptrSize.inBytes;
-		assert(dstAlignment == srcAlignment); // TODO
 
-		// copy pointer bits
-		usize* dstPointerBits = cast(usize*)&dstMem.pointerBitmap.front();
-		usize* srcPointerBits = cast(usize*)&srcMem.pointerBitmap.front();
-		copyBitRange(dstPointerBits, srcPointerBits, dstFromMemSlot, srcFromMemSlot, dstToMemSlot - dstFromMemSlot);
 
-		// copy outRefs
-		size_t* srcPtrBits = cast(size_t*)&srcMem.pointerBitmap.front();
-		foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, srcFromMemSlot, srcToMemSlot)) {
-			const sliceSlot = srcMemSlot - srcFromMemSlot;
-			const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
-			const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
-			AllocId value = vm.pointerGet(srcMem, srcAlloc, srcAllocOffset);
+		if (dstAlignment == srcAlignment) {
+			// copy pointer bits
+			usize* dstPointerBits = cast(usize*)&dstMem.pointerBitmap.front();
+			usize* srcPointerBits = cast(usize*)&srcMem.pointerBitmap.front();
+			copyBitRange(dstPointerBits, srcPointerBits, dstFromMemSlot, srcFromMemSlot, dstToMemSlot - dstFromMemSlot);
 
-			const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
-			const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
-			vm.pointerPut(dstMem, dstAlloc, dstAllocOffset, value);
+			// copy outRefs
+			size_t* srcPtrBits = cast(size_t*)&srcMem.pointerBitmap.front();
+			foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, srcFromMemSlot, srcToMemSlot)) {
+				const sliceSlot = srcMemSlot - srcFromMemSlot;
+				const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
+				const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
+				AllocId value = vm.pointerGet(srcMem, srcAlloc, srcAllocOffset);
+
+				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
+				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
+				vm.pointerPut(dstMem, dstAlloc, dstAllocOffset, value);
+			}
+		} else {
+			auto count = srcMem.countPointerBits(srcFromMemSlot, srcToMemSlot - srcFromMemSlot);
+			if (count) {
+				// TODO: test
+				return vm.setTrap(VmStatus.ERR_WRITE_PTR_UNALIGNED);
+			}
 		}
 	}
 
-	// set init bits
+	// copy bytes
+	u8* dstBytes = dstMem.memory[].ptr + dstAlloc.offset + dstOffset;
+	u8* srcBytes = srcMem.memory[].ptr + srcAlloc.offset + srcOffset;
+	memmove(dstBytes, srcBytes, length);
+
+	// copy init bits
 	static if (SANITIZE_UNINITIALIZED_MEM) {
-		dstMem.markInitBits(dstAlloc.offset + dstOffset, length, true);
+		usize* dstInitBits = cast(usize*)&dstMem.initBitmap.front();
+		usize* srcInitBits = cast(usize*)&srcMem.initBitmap.front();
+		copyBitRange(dstInitBits, srcInitBits, dstAlloc.offset + dstOffset, srcAlloc.offset + srcOffset, length);
 	}
 
 	vm.ip += 4;

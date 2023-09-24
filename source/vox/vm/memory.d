@@ -177,7 +177,7 @@ struct Memory {
 				if (numBits) panic("%s.clear: Invariant failed. init bitmap contains %s bits after reset", memoryKindString[kind], numBits);
 			}
 		}}
-		markPointerBits(0, bytesUsed / ptrSize.inBytes, false);
+		markPointerBits(PointerId(0), bytesUsed / ptrSize.inBytes, false);
 		static if (SLOW_CHECKS) {{
 			usz numBits = countPointerBits(0, pointerBitmap.length * 8);
 			if (numBits) panic("%s numPointerBits %s", memoryKindString[kind], numBits);
@@ -272,7 +272,7 @@ struct Memory {
 		copyBitRange(pointerBits, pointerBits, fromSlot, toSlot, shiftedSlots);
 
 		// clean trailing pointer bits
-		markPointerBits(fromSlot + shiftedSlots, toSlot - fromSlot, false);
+		markPointerBits(PointerId(fromSlot + shiftedSlots), toSlot - fromSlot, false);
 
 		// update outRefs in shifted allocations
 		// target outRefs is already cleaned by pre_drop_stack_range
@@ -324,12 +324,12 @@ struct Memory {
 		return getBitAt(ptr, index);
 	}
 
-	usz countPointerBits(usz offset, usz size) {
+	usz countPointerBits(PointerId offset, usz size) {
 		usz* ptr = cast(usz*)&pointerBitmap.front();
 		return popcntBitRange(ptr, offset, offset + size);
 	}
 
-	void markPointerBits(usz offset, usz size, bool value) {
+	void markPointerBits(PointerId offset, usz size, bool value) {
 		usz* ptr = cast(usz*)&pointerBitmap.front();
 		setBitRange(ptr, offset, offset + size, value);
 	}

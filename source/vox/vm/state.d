@@ -396,7 +396,7 @@ struct VmState {
 		sink("]\n");
 	}
 
-	void printMem(scope SinkDelegate sink, AllocId allocId, u32 offset, u32 length, u32 bytesPerLine = 16, u32 indentation = 0) {
+	void printMem(scope SinkDelegate sink, AllocId allocId, usz offset, usz length, u32 bytesPerLine = 16, u32 indentation = 0) {
 		static immutable char[16] spaces = ' ';
 
 		static void printIndent(scope SinkDelegate sink, u32 indentation) {
