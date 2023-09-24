@@ -42,6 +42,24 @@ enum VmStatus : u8 {
 
 bool isError(VmStatus status) { return status > VmStatus.FINISHED; }
 
+usz memOpSize(ref VmState vm) {
+	u8 op = vm.code[vm.ip+0];
+	switch (op) with(VmOpcode) {
+		case load_m8:  return 1;
+		case load_m16: return 2;
+		case load_m32: return 4;
+		case load_m64: return 8;
+		case store_m8:  return 1;
+		case store_m16: return 2;
+		case store_m32: return 4;
+		case store_m64: return 8;
+		case memcopy:
+			VmReg* len = &vm.regs[vm.code[vm.ip+3]];
+			return len.as_s64;
+		default: panic("Opcode %s is not a memory opcode", op);
+	}
+}
+
 // No new line or dot at the end of the message
 void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 	final switch(vm.status) with(VmStatus) {
@@ -112,8 +130,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_READ_OOB:
-			u8 op = vm.code[vm.ip+0];
-			u32 size = 1 << (op - VmOpcode.load_m8);
+			usz size = memOpSize(vm);
 			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			Memory* mem = &vm.memories[src.pointer.kind];
 			Allocation* alloc = &mem.allocations[src.pointer.index];
@@ -128,8 +145,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_WRITE_OOB:
-			u8 op = vm.code[vm.ip+0];
-			u32 size = 1 << (op - VmOpcode.store_m8);
+			usz size = memOpSize(vm);
 			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 			Memory* mem = &vm.memories[dst.pointer.kind];
 			Allocation* alloc = &mem.allocations[dst.pointer.index];
@@ -144,8 +160,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_WRITE_PTR_UNALIGNED:
-			u8 op = vm.code[vm.ip+0];
-			u32 size = 1 << (op - VmOpcode.store_m8);
+			usz size = memOpSize(vm);
 			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 			Memory* mem = &vm.memories[dst.pointer.kind];
 			Allocation* alloc = &mem.allocations[dst.pointer.index];
@@ -178,8 +193,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			break;
 
 		case ERR_READ_UNINIT:
-			u8 op = vm.code[vm.ip+0];
-			u32 size = 1 << (op - VmOpcode.load_m8);
+			usz size = memOpSize(vm);
 			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 			Memory* mem = &vm.memories[src.pointer.kind];
 			Allocation* alloc = &mem.allocations[src.pointer.index];
@@ -191,7 +205,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 				size,
 				offset);
 
-			vm.printMem(sink, src.pointer, cast(u32)offset, size, 16, 2);
+			vm.printMem(sink, src.pointer, cast(u32)offset, cast(i32)size, 16, 2);
 			break;
 
 		case ERR_SRC_ALLOC_FREED:

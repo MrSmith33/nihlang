@@ -1706,18 +1706,40 @@ void test_memcopy_13(ref VmTestContext c) {
 void test_memcopy_14(ref VmTestContext c) {
 	// memcopy instruction, check that non-pointers are written and that dst mem is initialized
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_const_s8(3, -1);
-	b.emit_store_m64(1, 3);
-	b.emit_memcopy(0, 1, 2); // copy -1 into dst mem
-	b.emit_load_m64(0, 0); // read -1 from dst mem
+	b.emit_store_m64(1, 3);  // write -1 into src mem
+	b.emit_memcopy(0, 1, 2); //  copy -1 from src into dst mem
+	b.emit_load_m64(0, 0);   //  read -1 from dst mem
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(8));
+	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(8), VmReg(-1));
 	assert(res[0] == VmReg(-1));
 }
+
+@VmTest
+void test_memcopy_15(ref VmTestContext c) {
+	// memcopy instruction, different allocations, non-overlapping memcopy
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId-1) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId-1) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId-1) from dst mem
+	b.emit_ret();
+
+	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(24, 1));
+	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId, value));
+	assert(res[0] == VmReg(funcId, value & sizeMask));
+}
+
+// non-overlapping memcopy
+// overlapping memcopy dst > src
+// overlapping memcopy dst < src
 
 @VmTest
 void test_ctfe_finalize(ref VmTestContext c) {

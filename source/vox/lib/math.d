@@ -89,6 +89,7 @@ T paddingSize(T)(T address, T alignment) {
 	return cast(T)(alignValue(address, alignment) - address);
 }
 
+// n - least-significant bits to mask
 u64 bitmask(u64 n) {
 	if (n >= 64) return u64.max;
 	return (1UL << n) - 1;
