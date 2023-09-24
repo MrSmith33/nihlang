@@ -266,7 +266,7 @@ void test_stack_addr_0(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(42));
 
-	assert(res[0] == VmReg(42));
+	c.expectResult(VmReg(42));
 }
 
 @VmTest
@@ -576,7 +576,7 @@ void test_jump_0(ref VmTestContext c) {
 	b.patch_rip(patch_addr, ret_addr);
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 }
 
 
@@ -595,15 +595,15 @@ void test_branch_0(ref VmTestContext c) {
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 
 	// branch on pointer
 	res = c.call(funcId, VmReg(funcId, 0));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(funcId, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 
@@ -622,15 +622,15 @@ void test_branch_zero_0(ref VmTestContext c) {
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 
 	// branch on pointer
 	res = c.call(funcId, VmReg(funcId, 0));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(funcId, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 
@@ -642,7 +642,7 @@ void test_mov_0(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(42));
-	assert(res[0] == VmReg(42));
+	c.expectResult(VmReg(42));
 }
 
 @VmTest
@@ -653,7 +653,7 @@ void test_mov_1(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId));
-	assert(res[0] == VmReg(funcId));
+	c.expectResult(VmReg(funcId));
 }
 
 @VmTest
@@ -664,7 +664,7 @@ void test_mov_2(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId, 42));
-	assert(res[0] == VmReg(funcId, 42));
+	c.expectResult(VmReg(funcId, 42));
 }
 
 @VmTest
@@ -704,19 +704,19 @@ void test_cmp_4(ref VmTestContext c) {
 
 	// ptr is null
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 
 	// ptr is not null
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 }
 
 @VmTest
@@ -732,19 +732,19 @@ void test_cmp_5(ref VmTestContext c) {
 
 	// ptr is null
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 
 	// ptr is not null
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId2, 20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 @VmTest
@@ -759,19 +759,19 @@ void test_cmp_6(ref VmTestContext c) {
 
 	// ptr is null
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(20), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 
 	// ptr is not null
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 20), VmReg(memId1, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 @VmTest
@@ -786,19 +786,19 @@ void test_cmp_7(ref VmTestContext c) {
 
 	// ptr is null
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(20), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 
 	// ptr is not null
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(memId1, 10), VmReg(memId1, 20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(memId1, 20), VmReg(memId1, 10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 @VmTest
@@ -846,17 +846,17 @@ void test_cmp_10(ref VmTestContext c) {
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(20), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(-20), VmReg(-10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(-20), VmReg(-20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(-10), VmReg(-20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 @VmTest
@@ -870,17 +870,17 @@ void test_cmp_11(ref VmTestContext c) {
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(20), VmReg(10));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(-20), VmReg(-10));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 	res = c.call(funcId, VmReg(-20), VmReg(-20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 	res = c.call(funcId, VmReg(-10), VmReg(-20));
-	assert(res[0] == VmReg(1));
+	c.expectResult(VmReg(1));
 }
 
 @VmTest
@@ -932,7 +932,7 @@ void test_add_i64_0(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(10), VmReg(20));
-	assert(res[0] == VmReg(30));
+	c.expectResult(VmReg(30));
 }
 
 @VmTest
@@ -943,7 +943,7 @@ void test_add_i64_1(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(funcId, 10), VmReg(20));
-	assert(res[0] == VmReg(funcId, 30));
+	c.expectResult(VmReg(funcId, 30));
 }
 
 @VmTest
@@ -1108,7 +1108,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 		//writefln("  mask %02X", val);
 
 		VmReg[] res = c.call(funcId, VmReg(memId, offset));
-		assert(res[0] == VmReg(val));
+		c.expectResult(VmReg(val));
 	}
 }
 
@@ -1147,9 +1147,9 @@ void test_load_mXX_9(ref VmTestContext c) {
 		VmReg[] res = c.call(funcId, VmReg(memId, offset));
 		if (size == c.vm.ptrSize.inBytes && offset == 0) {
 			// writefln("op %s size %s mem %s offset %s", op, size, memKind, offset);
-			assert(res[0] == VmReg(memId, val));
+			c.expectResult(VmReg(memId, val));
 		} else {
-			assert(res[0] == VmReg(val));
+			c.expectResult(VmReg(val));
 		}
 	}
 }
@@ -1271,7 +1271,7 @@ void test_store_mXX_6(ref VmTestContext c) {
 			// should not init unrelated bytes
 			assert(c.countAllocInitBits(memId) == size);
 		}
-		assert(res[0] == VmReg(value & sizeMask));
+		c.expectResult(VmReg(value & sizeMask));
 
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// mark whole allocation as uninitialized
@@ -1317,7 +1317,7 @@ void test_store_mXX_8(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId));
-	assert(res[0] == VmReg(memId));
+	c.expectResult(VmReg(memId));
 }
 
 @VmTest
@@ -1336,7 +1336,7 @@ void test_store_mXX_9(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId1), VmReg(memId1), VmReg(memId2));
-	assert(res[0] == VmReg(memId2));
+	c.expectResult(VmReg(memId2));
 }
 
 @VmTest
@@ -1354,7 +1354,7 @@ void test_store_mXX_10(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId), VmReg(0));
-	assert(res[0] == VmReg(0));
+	c.expectResult(VmReg(0));
 }
 
 @VmTest
@@ -1395,7 +1395,7 @@ void test_call_0(ref VmTestContext c) {
 
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
-	assert(res[0] == VmReg(42));
+	c.expectResult(VmReg(42));
 }
 
 @VmTest
@@ -1427,7 +1427,7 @@ void test_call_1(ref VmTestContext c) {
 	c.vm.functions[funcB.index].code = b.code;
 
 	VmReg[] res = c.call(funcA, VmReg(5));
-	assert(res[0] == VmReg(57));
+	c.expectResult(VmReg(57));
 }
 
 
@@ -1448,7 +1448,7 @@ void test_tail_call_0(ref VmTestContext c) {
 
 	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
-	assert(res[0] == VmReg(42));
+	c.expectResult(VmReg(42));
 }
 
 @VmTest
@@ -1514,7 +1514,7 @@ void test_tail_call_2(ref VmTestContext c) {
 	c.vm.setFunction(funcB, 1.NumResults, 1.NumRegParams, 1.NumStackParams, b);
 
 	VmReg[] res = c.call(funcA, VmReg(5));
-	assert(res[0] == VmReg(5+42+88));
+	c.expectResult(VmReg(5+42+88));
 }
 
 
@@ -1724,7 +1724,7 @@ void test_memcopy_14(ref VmTestContext c) {
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(8), VmReg(-1));
-	assert(res[0] == VmReg(-1));
+	c.expectResult(VmReg(-1));
 }
 
 @VmTest
@@ -1743,7 +1743,7 @@ void test_memcopy_15(ref VmTestContext c) {
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(24, 1));
 	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId, value));
-	assert(res[0] == VmReg(funcId, value & sizeMask));
+	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
 @VmTest
@@ -1892,7 +1892,7 @@ void bench_0(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(40));
 	writefln("%s", res[0].as_u64);
-	assert(res[0] == VmReg(102334155));
+	c.expectResult(VmReg(102334155));
 }
 
 
@@ -1936,5 +1936,5 @@ void bench_1(ref VmTestContext c) {
 
 	VmReg[] res = c.call(funcId, VmReg(40));
 	writefln("%s", res[0].as_u64);
-	assert(res[0] == VmReg(102334155));
+	c.expectResult(VmReg(102334155));
 }
