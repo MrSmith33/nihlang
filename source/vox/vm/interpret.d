@@ -705,7 +705,7 @@ void instr_memcopy(ref VmState vm) {
 		}
 	}
 
-	if (dstAlloc == srcAlloc) {
+	if (dstAlloc == srcAlloc && rangesIntersect(dstOffset, srcOffset, length)) {
 		assert(false); // TODO
 	} else {
 		// remove dst pointers
@@ -745,6 +745,14 @@ void instr_memcopy(ref VmState vm) {
 	}
 
 	vm.ip += 4;
+}
+
+bool rangesIntersect(usz offsetA, usz offsetB, usz length) {
+	if (offsetA > offsetB) {
+		return offsetB + length > offsetA;
+	} else {
+		return offsetA + length > offsetB;
+	}
 }
 
 // Returns number of pointers removed

@@ -114,6 +114,14 @@ struct VmTestContext {
 		}
 	}
 
+	void expectResult(VmReg expected) {
+		if (vm.registers[0] != expected) {
+			writefln("Unexpected function result\n  Expected: %s\n       Got: %s", expected, vm.registers[0]);
+			printState();
+			panic("Unexpected function result");
+		}
+	}
+
 	void clearStack() {
 		vm.registers.clear;
 	}
