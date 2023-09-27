@@ -1789,8 +1789,81 @@ void test_memcopy_17(ref VmTestContext c) {
 	}
 }
 
-// overlapping memcopy dst > src
-// overlapping memcopy dst < src
+@VmTest
+void test_memcopy_18(ref VmTestContext c) {
+	// memcopy instruction, same allocation, src < dst
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId+c) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId+c) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId+c) from dst mem
+	b.emit_ret();
+
+	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+	auto ptrSize = c.vm.ptrSize.inBytes;
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
+	VmReg[] res = c.call(funcId, VmReg(mem, ptrSize), VmReg(mem), VmReg(ptrSize*2), VmReg(funcId, value));
+	c.expectResult(VmReg(funcId, value & sizeMask));
+}
+
+@VmTest
+void test_memcopy_19(ref VmTestContext c) {
+	// memcopy instruction, same allocation, src > dst
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId+c) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId+c) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId+c) from dst mem
+	b.emit_ret();
+
+	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+	auto ptrSize = c.vm.ptrSize.inBytes;
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
+	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem, ptrSize), VmReg(ptrSize*2), VmReg(funcId, value));
+	c.expectResult(VmReg(funcId, value & sizeMask));
+}
+
+@VmTest
+void test_memcopy_20(ref VmTestContext c) {
+	// memcopy instruction, same allocation, dst == src, noop
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId+c) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId+c) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId+c) from dst mem
+	b.emit_ret();
+
+	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+	auto ptrSize = c.vm.ptrSize.inBytes;
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
+	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem), VmReg(ptrSize*2), VmReg(funcId, value));
+	c.expectResult(VmReg(funcId, value & sizeMask));
+}
+
+@VmTest
+void test_memcopy_21(ref VmTestContext c) {
+	// memcopy instruction, same allocation, length == 0, noop
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_store_ptr(c.vm.ptrSize, 1, 3); // write (funcId+c) into src mem
+	b.emit_memcopy(0, 1, 2);              //  copy (funcId+c) from src into dst mem
+	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  read (funcId+c) from dst mem
+	b.emit_ret();
+
+	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
+	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
+	auto ptrSize = c.vm.ptrSize.inBytes;
+
+	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
+	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem), VmReg(0), VmReg(funcId, value));
+	c.expectResult(VmReg(funcId, value & sizeMask));
+}
 
 @VmTest
 void test_ctfe_finalize(ref VmTestContext c) {

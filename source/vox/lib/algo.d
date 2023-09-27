@@ -380,3 +380,73 @@ struct BitsSetRange(T) {
 		return 0;
 	}
 }
+
+BitsSetRangeReverse!T bitsSetRangeReverse(T)(T* bitmap, u32 from, u32 to) { return BitsSetRangeReverse!T(bitmap, from, to); }
+struct BitsSetRangeReverse(T) {
+	@nogc nothrow:
+
+	T* ptr;
+	u32 from;
+	u32 to;
+
+	import core.bitop : bsf;
+
+	int opApply(scope int delegate(size_t) @nogc nothrow dg) {
+		enum BITS_PER_SLOT = T.sizeof * 8;
+
+		size_t fromBit  = from % BITS_PER_SLOT;
+		size_t toBit    =   to % BITS_PER_SLOT;
+
+		size_t fromSlot = from / BITS_PER_SLOT;
+		size_t toSlot   =   to / BITS_PER_SLOT;
+
+		// All bits are in the same size_t slot
+		if (fromSlot == toSlot) {
+			size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+			size_t toSlotMask =    (size_t(1) << toBit) - 1;
+			size_t mask = fromSlotMask & toSlotMask;
+			T slotBits = ptr[fromSlot] & mask;
+			while (slotBits != 0) {
+				size_t highestSetBitIndex = bsr(slotBits);
+				if (int res = dg(fromSlot * BITS_PER_SLOT + highestSetBitIndex)) return res;
+				slotBits ^= 1 << highestSetBitIndex;
+			}
+			return 0;
+		}
+
+		// Incomplete slot at the end
+		if (toBit != 0) {
+			size_t toSlotMask = (size_t(1) << toBit) - 1;
+			T slotBits = ptr[toSlot] & toSlotMask;
+			while (slotBits != 0) {
+				size_t highestSetBitIndex = bsr(slotBits);
+				if (int res = dg(toSlot * BITS_PER_SLOT + highestSetBitIndex)) return res;
+				slotBits ^= 1 << highestSetBitIndex;
+			}
+		}
+
+		// Range of full slots can be counted faster
+		foreach_reverse(i, T slotBits; ptr[fromSlot .. toSlot]) {
+			size_t baseIndex = (fromSlot + i) * BITS_PER_SLOT;
+			while (slotBits != 0) {
+				size_t highestSetBitIndex = bsr(slotBits);
+				if (int res = dg(baseIndex + highestSetBitIndex)) return res;
+				slotBits ^= 1 << highestSetBitIndex;
+			}
+		}
+
+		// Incomplete slot at the beginning
+		if (fromBit != 0) {
+			size_t fromSlotMask = ~((size_t(1) << fromBit) - 1);
+			T slotBits = ptr[fromSlot] & fromSlotMask;
+			while (slotBits != 0) {
+				size_t highestSetBitIndex = bsr(slotBits);
+				if (int res = dg(fromSlot * BITS_PER_SLOT + highestSetBitIndex)) return res;
+				slotBits ^= 1 << highestSetBitIndex;
+			}
+			++fromSlot;
+		}
+
+		return 0;
+	}
+}

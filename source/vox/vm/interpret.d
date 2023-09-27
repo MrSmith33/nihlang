@@ -705,21 +705,41 @@ void instr_memcopy(ref VmState vm) {
 		}
 	}
 
+
+	scope(exit) vm.ip += 4;
+
+	if (length == 0) {
+		return; // noop
+	}
+
+	if (dstAlloc == srcAlloc && dstOffset == srcOffset) {
+		return; // noop
+	}
+
 	if (dstAlloc == srcAlloc && rangesIntersect(dstOffset, srcOffset, length)) {
-		assert(false); // TODO
-	} else {
-		// remove dst pointers
-		removePointersInRange(vm, dstMem, dstAlloc, dstFromMemSlot, dstToMemSlot);
+		// intersection of dst and src
+		if (dstOffset < srcOffset) {
+			// srcOffset > dstOffset
+			//   SSCC
+			// XXDD
 
-		if (dstAlignment == srcAlignment) {
-			// copy pointer bits
-			usize* dstPointerBits = cast(usize*)&dstMem.pointerBitmap.front();
-			usize* srcPointerBits = cast(usize*)&srcMem.pointerBitmap.front();
-			copyBitRange(dstPointerBits, srcPointerBits, dstFromMemSlot, srcFromMemSlot, dstToMemSlot - dstFromMemSlot);
+			// remove dst pointers in XX section
+			removePointersInRange(vm, srcMem, dstAlloc, srcToMemSlot, dstToMemSlot);
 
-			// copy outRefs
+			// Copy SS over XX (deleting SS pointers)
 			size_t* srcPtrBits = cast(size_t*)&srcMem.pointerBitmap.front();
-			foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, srcFromMemSlot, srcToMemSlot)) {
+			foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, srcFromMemSlot, dstToMemSlot)) {
+				const sliceSlot = srcMemSlot - srcFromMemSlot;
+				const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
+				const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
+				AllocId value = vm.pointerRemove(srcMem, srcAlloc, srcAllocOffset);
+
+				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
+				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
+				vm.pointerPut(srcMem, dstAlloc, dstAllocOffset, value);
+			}
+			// Copy CC over DD (retaining C pointers)
+			foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, dstToMemSlot, srcToMemSlot)) {
 				const sliceSlot = srcMemSlot - srcFromMemSlot;
 				const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
 				const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
@@ -727,8 +747,57 @@ void instr_memcopy(ref VmState vm) {
 
 				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
 				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
-				vm.pointerPut(dstMem, dstAlloc, dstAllocOffset, value);
+				vm.pointerPut(srcMem, dstAlloc, dstAllocOffset, value);
 			}
+		} else {
+			// srcOffset < dstOffset
+			// SSCC
+			//   XXDD
+
+			// remove dst pointers in DD section
+			removePointersInRange(vm, srcMem, dstAlloc, srcToMemSlot, dstToMemSlot);
+
+			// Copy CC over DD (deleting CC pointers)
+			size_t* srcPtrBits = cast(size_t*)&srcMem.pointerBitmap.front();
+			foreach(size_t srcMemSlot; bitsSetRangeReverse(srcPtrBits, dstFromMemSlot, srcToMemSlot)) {
+				const sliceSlot = srcMemSlot - srcFromMemSlot;
+				const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
+				const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
+				AllocId value = vm.pointerRemove(srcMem, srcAlloc, srcAllocOffset);
+
+				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
+				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
+				vm.pointerPut(srcMem, dstAlloc, dstAllocOffset, value);
+			}
+			// Copy CC over DD (retaining C pointers)
+			foreach(size_t srcMemSlot; bitsSetRangeReverse(srcPtrBits, srcFromMemSlot, dstFromMemSlot)) {
+				const sliceSlot = srcMemSlot - srcFromMemSlot;
+				const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
+				const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
+				AllocId value = vm.pointerGet(srcMem, srcAlloc, srcAllocOffset);
+
+				const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
+				const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
+				vm.pointerPut(srcMem, dstAlloc, dstAllocOffset, value);
+			}
+		}
+	} else {
+		// no intersection of dst and src
+
+		// remove dst pointers
+		removePointersInRange(vm, dstMem, dstAlloc, dstFromMemSlot, dstToMemSlot);
+
+		// copy outRefs
+		size_t* srcPtrBits = cast(size_t*)&srcMem.pointerBitmap.front();
+		foreach(size_t srcMemSlot; bitsSetRange(srcPtrBits, srcFromMemSlot, srcToMemSlot)) {
+			const sliceSlot = srcMemSlot - srcFromMemSlot;
+			const u32 srcMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)srcMemSlot), srcMem.ptrSize);
+			const u32 srcAllocOffset = srcMemOffset - srcAlloc.offset;
+			AllocId value = vm.pointerGet(srcMem, srcAlloc, srcAllocOffset);
+
+			const u32 dstMemOffset = ptrIndexToMemOffset(PointerId(cast(u32)(dstFromMemSlot + sliceSlot)), srcMem.ptrSize);
+			const u32 dstAllocOffset = dstMemOffset - dstAlloc.offset;
+			vm.pointerPut(dstMem, dstAlloc, dstAllocOffset, value);
 		}
 	}
 
@@ -743,8 +812,6 @@ void instr_memcopy(ref VmState vm) {
 		usize* srcInitBits = cast(usize*)&srcMem.initBitmap.front();
 		copyBitRange(dstInitBits, srcInitBits, dstAlloc.offset + dstOffset, srcAlloc.offset + srcOffset, length);
 	}
-
-	vm.ip += 4;
 }
 
 bool rangesIntersect(usz offsetA, usz offsetB, usz length) {
