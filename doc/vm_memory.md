@@ -159,7 +159,7 @@ I decided to use 4 pointer kinds:
     I track initialization for each memory byte.
     Memory reads check that data being read is initialized.
     I can assume that reading individual fields always hits initialized data (1 bit per byte) for valid programs, but memcopy just needs to copy bytes.
-    1. memcopy also copies initialization bits. 
+    1. memcopy also copies initialization bits. (current solution)
     2. padding must be initialized. Or marked as initialized. memcopy marks target memory as initialized (should be faster)
     
     Option 1 seems to be equal to what happens in native code
@@ -176,7 +176,7 @@ I decided to use 4 pointer kinds:
     - trap
     - Somehow support 2 pointers per register. This would probably mean supporting several arithmetic operations, like shifting left/right by 32.
 
-13. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes)
+13. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes, we will overwrite just the offset)
 
 VM limitations:
 - Only aligned pointers (aligned by pointer size)
@@ -198,9 +198,13 @@ void clearBuffer() {
 
 Open questions:
 1. Should we allow static memory to contain uninitialized bytes?
+   A. I think yes, considering that data can contain uninitialized padding.
+      Those bytes should become zeroes in the executable.
 2. Is it better to store a relocation hashmap per allocation or per memory?
+   A. It may be even better to just use an array, to simplify implementation.
 3. Should a store of a register to memory be an error, when register contains a pointer and store size != ptr size? (yes)
 4. Should we have a load_ptr/store_ptr instructions?
+   A. Probably not. Not sure if frontend knows in all cases if the value contains pointer or not.
 5. Should we have 2 kinds of registers?  
    One for non-pointer data  
    One for shadow pointers  
@@ -217,3 +221,62 @@ We need a way to indicate if allocation was freed.
 For now I will remove all permissions from the allocation and set the size to u32.max. This way single permission check is enough to handle 2 cases: no permission to read/write or freed allocation access.
 
 User may want to control runtime mutability of heap allocated memory, after it gets converted into static memory. This needs 1 bit of data to be stored on all heap allocations
+
+
+Representation (32-bit)
+=======================
+1. 32-bit pointer (h10 + 0xFFFF_2211)
++----+----+----+----+
+| 11 | 22 | FF | FF | memory bytes
++----+----+----+----+
+|  1 |  1 |  1 |  1 | initialized bits (0 - byte is not initialized, 1 - initialized)
++----+----+----+----+
+|         1         | pointer bits (0 - slot contains no pointer, 1 - there is pointer)
++----+----+----+----+
+|        h10        | shadow pointer base
++----+----+----+----+
+
+2. 8-bytes of uninitialized memory
++----+----+----+----+----+----+----+----+
+| ?? | ?? | ?? | ?? | ?? | ?? | ?? | ?? | memory bytes
++----+----+----+----+----+----+----+----+
+|  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 | initialized bits
++----+----+----+----+----+----+----+----+
+|         0         |         0         | pointer bits
++----+----+----+----+----+----+----+----+
+|        ???        |        ???        | shadow pointer base
++----+----+----+----+----+----+----+----+
+
+Representation (64-bit)
+=======================
+1. 64-bit pointer (h10 + 0xFFFF_FFFF_4433_2211)
++----+----+----+----+----+----+----+----+
+| 11 | 22 | 33 | 44 | FF | FF | FF | FF | memory bytes
++----+----+----+----+----+----+----+----+
+|  1 |  1 |  1 |  1 |  1 |  1 |  1 |  1 | initialized bits
++----+----+----+----+----+----+----+----+
+|                   1                   | pointer bits
++----+----+----+----+----+----+----+----+
+|                  h10                  | shadow pointer base
++----+----+----+----+----+----+----+----+
+
+2. 8-bytes of uninitialized memory
++----+----+----+----+----+----+----+----+
+| ?? | ?? | ?? | ?? | ?? | ?? | ?? | ?? | memory bytes
++----+----+----+----+----+----+----+----+
+|  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 | initialized bits
++----+----+----+----+----+----+----+----+
+|                   0                   | pointer bits
++----+----+----+----+----+----+----+----+
+|                  ???                  | shadow pointer base
++----+----+----+----+----+----+----+----+
+
+Data size when everything is stored as arrays
+=========
+ptr  | ptr  |                              | bits per
+size | data | 64 bits of memory            | raw bit
+-----+------+------------------------------+-------------
+  32 |  32  | 64 + 8 + 2 + 32x2 = 138 bits | 2.16
+  32 |  64  | 64 + 8 + 2 + 64x2 = 202 bits | 3.16
+  64 |  32  | 64 + 8 + 1 + 32   = 105 bits | 1.64
+  64 |  64  | 64 + 8 + 1 + 64   = 137 bits | 2.14
