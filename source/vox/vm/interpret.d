@@ -171,7 +171,6 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	// Must be checked by the caller
 	assert(calleeId < vm.functions.length);
 
-	VmFunction* caller = &vm.functions[vm.func];
 	VmFunction* callee = &vm.functions[calleeId];
 
 	if (callee.kind == VmFuncKind.external && callee.external == null) panic("VmFunction.external is not set");
@@ -237,8 +236,6 @@ void instr_tail_call(ref VmState vm) {
 	u8  arg0_idx = vm.code[vm.ip+1];
 	u8  num_args = vm.code[vm.ip+2];
 	u32 calleeId = *cast(i32*)&vm.code[vm.ip+3];
-
-	VmFunction* caller = &vm.functions[vm.func];
 
 	if (calleeId >= vm.functions.length) panic("Invalid function index (%s), only %s functions exist", calleeId, vm.functions.length);
 	VmFunction* callee = &vm.functions[calleeId];
