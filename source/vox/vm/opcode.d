@@ -96,6 +96,27 @@ enum VmOpcode : u8 {
 	rem_u64,
 	rem_s64,
 
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// lhs << rhs mod NN
+	shl_i64,
+	shl_i32,
+	shl_i16,
+	shl_i8,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// lhs >> rhs mod NN, zext
+	shr_u64,
+	shr_u32,
+	shr_u16,
+	shr_u8,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// lhs >> rhs mod NN, sext
+	shr_s64,
+	shr_s32,
+	shr_s16,
+	shr_s8,
+
 	// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 	// reg[dst].u64 = reg[src0].u64 {cmp_op} reg[src1].u64
 	// reg[dst].ptr = null

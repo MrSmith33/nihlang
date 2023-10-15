@@ -173,6 +173,90 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X rem.s64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
+		case shl_i64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shl.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shl_i32:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shl.i32 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shl_i16:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shl.i16 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shl_i8:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shl.i8 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_u64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.u64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_u32:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.u32 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_u16:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.u16 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_u8:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.u8 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_s64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.s64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_s32:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.s32 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_s16:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.s16 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case shr_s8:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X shr.s8 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
 		case const_s8:
 			u8 dst = code[ip++];
 			i8 src = code[ip++];

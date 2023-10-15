@@ -141,6 +141,54 @@ struct CodeBuilder {
 		U8(VmOpcode.rem_s64, dst, src0, src1);
 	}
 
+	void emit_shl_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shl_i64, dst, src0, src1);
+	}
+
+	void emit_shl_i32(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shl_i32, dst, src0, src1);
+	}
+
+	void emit_shl_i16(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shl_i16, dst, src0, src1);
+	}
+
+	void emit_shl_i8(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shl_i8, dst, src0, src1);
+	}
+
+	void emit_shr_u64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_u64, dst, src0, src1);
+	}
+
+	void emit_shr_u32(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_u32, dst, src0, src1);
+	}
+
+	void emit_shr_u16(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_u16, dst, src0, src1);
+	}
+
+	void emit_shr_u8(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_u8, dst, src0, src1);
+	}
+
+	void emit_shr_s64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_s64, dst, src0, src1);
+	}
+
+	void emit_shr_s32(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_s32, dst, src0, src1);
+	}
+
+	void emit_shr_s16(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_s16, dst, src0, src1);
+	}
+
+	void emit_shr_s8(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.shr_s8, dst, src0, src1);
+	}
+
 	void emit_mov(u8 dst, u8 src) {
 		U8(VmOpcode.mov, dst, src);
 	}

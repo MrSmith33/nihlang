@@ -36,6 +36,18 @@ void vmStep(ref VmState vm) {
 		case div_s64: return instr_div_s64(vm);
 		case rem_u64: return instr_rem_u64(vm);
 		case rem_s64: return instr_rem_s64(vm);
+		case shl_i64: return instr_shl_i64(vm);
+		case shl_i32: return instr_shl_i32(vm);
+		case shl_i16: return instr_shl_i16(vm);
+		case shl_i8:  return instr_shl_i8(vm);
+		case shr_u64: return instr_shr_u64(vm);
+		case shr_u32: return instr_shr_u32(vm);
+		case shr_u16: return instr_shr_u16(vm);
+		case shr_u8:  return instr_shr_u8(vm);
+		case shr_s64: return instr_shr_s64(vm);
+		case shr_s32: return instr_shr_s32(vm);
+		case shr_s16: return instr_shr_s16(vm);
+		case shr_s8:  return instr_shr_s8(vm);
 		case const_s8: return instr_const_s8(vm);
 
 		case load_m8: return instr_load(vm);
@@ -543,6 +555,15 @@ void instr_mul_i64(ref VmState vm) {
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
+void instr_div_u64(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u64 = src0.as_u64 / src1.as_u64;
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
 void instr_div_s64(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
@@ -552,12 +573,12 @@ void instr_div_s64(ref VmState vm) {
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_div_u64(ref VmState vm) {
+void instr_rem_u64(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_u64 / src1.as_u64;
+	dst.as_u64 = src0.as_u64 % src1.as_u64;
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
@@ -570,12 +591,111 @@ void instr_rem_s64(ref VmState vm) {
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_rem_u64(ref VmState vm) {
+void instr_shl_i64(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_u64 % src1.as_u64;
+	dst.as_u64 = src0.as_u64 << (src1.as_u8 % 64);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shl_i32(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u32 = src0.as_u32 << (src1.as_u8 % 32);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shl_i16(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u16 = cast(u16)(src0.as_u16 << (src1.as_u8 % 16));
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shl_i8(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u8 = cast(u8)(src0.as_u8 << (src1.as_u8 % 8));
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_u64(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u64 = src0.as_u64 >>> (src1.as_u8 % 64);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_u32(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u32 = src0.as_u32 >>> (src1.as_u8 % 32);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_u16(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u16 = src0.as_u16 >>> (src1.as_u8 % 16);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_u8(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_u8 = src0.as_u8 >>> (src1.as_u8 % 8);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_s64(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_s64 = src0.as_s64 >> (src1.as_u8 % 64);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_s32(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_s32 = src0.as_s32 >> (src1.as_u8 % 32);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_s16(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_s16 = src0.as_s16 >> (src1.as_u8 % 16);
+	dst.pointer = AllocId();
+	vm.ip += 4;
+}
+void instr_shr_s8(ref VmState vm) {
+	pragma(inline, true);
+	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+	dst.as_s8 = src0.as_s8 >> (src1.as_u8 % 8);
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
