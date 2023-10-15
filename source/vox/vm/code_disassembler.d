@@ -138,6 +138,41 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X sub.i64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
+		case mul_i64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X mul.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case div_u64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X div.u64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case div_s64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X div.s64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case rem_u64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X rem.u64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case rem_s64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X rem.s64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
 		case const_s8:
 			u8 dst = code[ip++];
 			i8 src = code[ip++];

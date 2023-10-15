@@ -16,6 +16,7 @@ enum VmStatus : u8 {
 	ERR_TRAP,
 	ERR_COND_OOB,
 	ERR_CMP_DIFFERENT_PTR,
+	ERR_SUB_DIFFERENT_PTR,
 	ERR_CMP_REQUIRES_NO_PTR,
 	ERR_PTR_SRC1,
 
@@ -95,6 +96,16 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 				vm.code[vm.ip+4], *src1);
 			break;
 
+		case ERR_SUB_DIFFERENT_PTR:
+			VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
+			VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
+			VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
+			sink.formattedWrite("Subtracted pointers must point to the same allocation\n  dst: r%s = %s\n  lhs: r%s = %s\n  rhs: r%s = %s",
+				vm.code[vm.ip+1], *dst,
+				vm.code[vm.ip+2], *src0,
+				vm.code[vm.ip+3], *src1);
+			break;
+
 		case ERR_CMP_REQUIRES_NO_PTR:
 			VmReg* dst  = &vm.regs[vm.code[vm.ip+2]];
 			VmReg* src0 = &vm.regs[vm.code[vm.ip+3]];
@@ -110,7 +121,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 			VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
 
-			sink.formattedWrite("add.i64 only allows pointers in the first argument.\n  dst: r%s = %s\n  lhs: r%s = %s\n  rhs: r%s = %s",
+			sink.formattedWrite("Pointers are not allowed in the second argument\n  dst: r%s = %s\n  lhs: r%s = %s\n  rhs: r%s = %s",
 				vm.code[vm.ip+1], *dst,
 				vm.code[vm.ip+2], *src0,
 				vm.code[vm.ip+3], *src1);
@@ -120,7 +131,7 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 			VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 
-			sink.formattedWrite("Writing to %s pointer is disabled.\n  dst: r%s = %s\n  src: r%s = %s",
+			sink.formattedWrite("Writing to %s pointer is disabled\n  dst: r%s = %s\n  src: r%s = %s",
 				memoryKindString[dst.pointer.kind],
 				vm.code[vm.ip+1], *dst,
 				vm.code[vm.ip+2], *src);

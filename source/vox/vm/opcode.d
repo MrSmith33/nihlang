@@ -14,6 +14,7 @@ import vox.lib;
 // u - unsigned int
 // s - signed int
 // p - pointer
+// u8 dst/src - u8 register index
 
 enum VmOpcode : u8 {
 	// u8 op
@@ -23,14 +24,14 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	jump,
 
-	// u8 op, u8 src, s32 offset
+	// u8 op, u8 src_reg, s32 offset
 	// if reg[src] is non zero jumps
-	// jumps relative to the address of the next instruction
+	// jumps to the address of the next instruction + offset
 	branch,
 
-	// u8 op, u8 src, s32 offset
+	// u8 op, u8 src_reg, s32 offset
 	// if reg[src] is zero jumps
-	// jumps relative to the address of the next instruction
+	// jumps to the address of the next instruction + offset
 	branch_zero,
 
 	//
@@ -66,16 +67,34 @@ enum VmOpcode : u8 {
 	mov,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
-	// reg[dst].u64 = reg[src0].u64 + reg[src1].u64
+	// reg[dst].i64 = reg[src0].i64 + reg[src1].i64
 	// reg[dst].ptr = reg[src0].ptr
 	// if (reg[src1].ptr.defined) trap(ERR_PTR_SRC1)
 	//
-	// Pointer can only occur in first argument
+	// Pointer can only occur in the first argument. Pointer is copied to dst
 	add_i64,
 	add_i64_imm8,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
+	// Valid pointers:
+	//   ptr0 - ptr1, where ptr0 == ptr1, dst ptr is null
+	//   ptr0 - int, dst ptr is ptr0
+	//   int - int, dst ptr is null
 	sub_i64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// int * int, dst ptr is null
+	mul_i64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// int / int, dst ptr is null
+	div_u64,
+	div_s64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// int % int, dst ptr is null
+	rem_u64,
+	rem_s64,
 
 	// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 	// reg[dst].u64 = reg[src0].u64 {cmp_op} reg[src1].u64

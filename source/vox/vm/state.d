@@ -63,9 +63,7 @@ struct VmState {
 		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
 	}
 
-	void reset() {
-		status = VmStatus.RUNNING;
-		errData = 0;
+	void resetMem() {
 		foreach(ref func; functions)
 			func.free(*allocator);
 		functions.clear;
@@ -81,7 +79,11 @@ struct VmState {
 			kind : VmFuncKind.external,
 		};
 		functions.put(*allocator, f);
+	}
 
+	void resetState() {
+		status = VmStatus.RUNNING;
+		errData = 0;
 		budget = u64.max;
 		numCalls = 0;
 		func = FuncId(0); // native caller function
@@ -90,6 +92,7 @@ struct VmState {
 		frameFirstStackSlot = 0;
 
 		// Each function can access top 256 registers
+		registers.clear;
 		pushRegisters(256);
 		regs = &registers[0];
 	}

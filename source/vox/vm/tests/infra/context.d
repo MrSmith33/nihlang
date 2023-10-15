@@ -38,7 +38,8 @@ struct VmTestContext {
 		vm.memories[MemoryKind.static_mem].ptrSize = test.ptrSize;
 		vm.memories[MemoryKind.heap_mem].ptrSize   = test.ptrSize;
 		vm.memories[MemoryKind.stack_mem].ptrSize  = test.ptrSize;
-		vm.reset;
+		vm.resetMem;
+		vm.resetState;
 	}
 
 	// Sets vm.status
@@ -72,6 +73,8 @@ struct VmTestContext {
 
 	private void printState() {
 		sink("  ---\n  ");
+		sink.formattedWrite("VM status: %s\n", VmStatus_names[vm.status]);
+		sink("  ---\n  ");
 		u32 ipCopy = vm.ip;
 		disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
 		sink("\n  ---\n  ");
@@ -81,10 +84,9 @@ struct VmTestContext {
 
 	private noreturn onCallFail() {
 		sink("  ---\n");
-		sink.formattedWrite("  Test %s failed\n", test.name);
-		sink("  Function expected to finish successfully\n");
+		sink.formattedWrite("Test %s failed\n", test.name);
 		printState();
-		panic("  Function expected to finish successfully");
+		panic("Function expected to finish successfully");
 	}
 
 	// Takes exactly VmFunction.numStackParams arguments from the stack
@@ -103,27 +105,23 @@ struct VmTestContext {
 		if (!vm.status.isError) {
 			panic("Function expected to trap");
 		}
-		clearStack;
 	}
 
-	void expectStatus(VmStatus expected) {
-		if (vm.status != expected) {
-			writefln("Unexpected VM status\n  Expected: %s\n       Got: %s", VmStatus_names[expected], VmStatus_names[vm.status]);
-			printState();
-			panic("Unexpected VM status");
-		}
+	void expectStatus(VmStatus expected, string file = __FILE__, int line = __LINE__) {
+		if (vm.status == expected) return;
+
+		sink.formattedWrite("Unexpected VM status\n  Expected: %s\n", VmStatus_names[expected]);
+		printState();
+		panic(line, file, 1, "Unexpected VM status");
 	}
 
-	void expectResult(VmReg expected) {
-		if (vm.registers[0] != expected) {
-			writefln("Unexpected function result\n  Expected: %s\n       Got: %s", expected, vm.registers[0]);
-			printState();
-			panic("Unexpected function result");
-		}
-	}
-
-	void clearStack() {
-		vm.registers.clear;
+	void expectResult(VmReg expected, string file = __FILE__, int line = __LINE__) {
+		if (vm.status.isError) panic(line, file, 1, "Cannot check result on errorneous state %s", VmStatus_names[vm.status]);
+		if (vm.registers[0] == expected) return;
+		sink.formattedWrite("Test %s failed\n", test.name);
+		sink.formattedWrite("Unexpected function result\n  Expected: %s\n       Got: %s\n", expected, vm.registers[0]);
+		printState();
+		panic(line, file, 1, "Unexpected function result");
 	}
 
 	AllocId memAlloc(MemoryKind kind, SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {

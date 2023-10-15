@@ -926,13 +926,13 @@ void test_cmp_13(ref VmTestContext c) {
 
 @VmTest
 void test_add_i64_0(ref VmTestContext c) {
-	// Test add_i64 number addition
+	// Test add_i64 number addition, same register
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	b.emit_add_i64(0, 0, 1);
+	b.emit_add_i64(0, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	VmReg[] res = c.call(funcId, VmReg(10), VmReg(20));
-	c.expectResult(VmReg(30));
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	VmReg[] res = c.call(funcId, VmReg(10));
+	c.expectResult(VmReg(20));
 }
 
 @VmTest
@@ -966,6 +966,134 @@ void test_add_i64_3(ref VmTestContext c) {
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
 	c.expectStatus(VmStatus.ERR_PTR_SRC1);
+}
+
+
+@VmTest
+void test_sub_i64_0(ref VmTestContext c) {
+	// Test sub_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_sub_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+
+	// dst: non-ptr, src0: non-ptr, src1: non-ptr
+	c.call(funcId, VmReg(44), VmReg(10));
+	c.expectResult(VmReg(34));
+}
+
+@VmTest
+void test_sub_i64_1(ref VmTestContext c) {
+	// Test sub_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_sub_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+
+	// dst: ptr0, src0: ptr0, src1: non-ptr
+	c.call(funcId, VmReg(funcId, 44), VmReg(10));
+	c.expectResult(VmReg(funcId, 34));
+}
+
+@VmTest
+void test_sub_i64_2(ref VmTestContext c) {
+	// Test sub_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_sub_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+
+	// dst: trap, src0: non-ptr, src1: ptr1
+	c.callFail(funcId, VmReg(44), VmReg(funcId, 10));
+	c.expectStatus(VmStatus.ERR_PTR_SRC1);
+}
+
+@VmTest
+void test_sub_i64_3(ref VmTestContext c) {
+	// Test sub_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_sub_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+
+	// dst: trap, src0: ptr0, src1: ptr1
+	c.callFail(funcId, VmReg(memId1, 44), VmReg(funcId, 10));
+	c.expectStatus(VmStatus.ERR_SUB_DIFFERENT_PTR);
+}
+
+@VmTest
+void test_sub_i64_4(ref VmTestContext c) {
+	// Test sub_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_sub_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
+
+	// dst: non-ptr, src0: ptr0, src1: ptr0
+	c.call(funcId, VmReg(memId1, 44), VmReg(memId1, 10));
+	c.expectResult(VmReg(34));
+}
+
+
+@VmTest
+void test_mul_i64_0(ref VmTestContext c) {
+	// Test mul_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_mul_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(32), VmReg(18));
+	c.expectResult(VmReg(32 * 18));
+}
+
+
+@VmTest
+void test_div_u64_0(ref VmTestContext c) {
+	// Test div_u64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_div_u64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(32), VmReg(18));
+	c.expectResult(VmReg(32 / 18));
+}
+
+
+@VmTest
+void test_div_s64_0(ref VmTestContext c) {
+	// Test div_u64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_div_s64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(-32), VmReg(18));
+	c.expectResult(VmReg(-32 / 18));
+}
+
+
+@VmTest
+void test_rem_u64_0(ref VmTestContext c) {
+	// Test rem_u64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rem_u64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(32), VmReg(18));
+	c.expectResult(VmReg(32 % 18));
+}
+
+
+@VmTest
+void test_rem_s64_0(ref VmTestContext c) {
+	// Test rem_u64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rem_s64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(-32), VmReg(18));
+	c.expectResult(VmReg(-32 % 18));
 }
 
 
@@ -1864,6 +1992,7 @@ void test_memcopy_21(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem), VmReg(0), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
+
 
 @VmTest
 void test_ctfe_finalize(ref VmTestContext c) {

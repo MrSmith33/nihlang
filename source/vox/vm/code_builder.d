@@ -121,6 +121,26 @@ struct CodeBuilder {
 		U8(VmOpcode.sub_i64, dst, src0, src1);
 	}
 
+	void emit_mul_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.mul_i64, dst, src0, src1);
+	}
+
+	void emit_div_u64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.div_u64, dst, src0, src1);
+	}
+
+	void emit_div_s64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.div_s64, dst, src0, src1);
+	}
+
+	void emit_rem_u64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rem_u64, dst, src0, src1);
+	}
+
+	void emit_rem_s64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rem_s64, dst, src0, src1);
+	}
+
 	void emit_mov(u8 dst, u8 src) {
 		U8(VmOpcode.mov, dst, src);
 	}
