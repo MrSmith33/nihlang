@@ -40,34 +40,34 @@ void vmStep(ref VmState vm) {
 		case and_i64: return instr_and_i64(vm);
 		case or_i64:  return instr_or_i64(vm);
 		case xor_i64: return instr_xor_i64(vm);
-		case shl_i8:  return instr_shl_i8(vm);
-		case shl_i16: return instr_shl_i16(vm);
-		case shl_i32: return instr_shl_i32(vm);
-		case shl_i64: return instr_shl_i64(vm);
-		case shr_u8:  return instr_shr_u8(vm);
-		case shr_u16: return instr_shr_u16(vm);
-		case shr_u32: return instr_shr_u32(vm);
-		case shr_u64: return instr_shr_u64(vm);
-		case shr_s8:  return instr_shr_s8(vm);
-		case shr_s16: return instr_shr_s16(vm);
-		case shr_s32: return instr_shr_s32(vm);
-		case shr_s64: return instr_shr_s64(vm);
-		case rotl_i8:  return instr_rotl_i8(vm);
-		case rotl_i16: return instr_rotl_i16(vm);
-		case rotl_i32: return instr_rotl_i32(vm);
-		case rotl_i64: return instr_rotl_i64(vm);
-		case rotr_i8:  return instr_rotr_i8(vm);
-		case rotr_i16: return instr_rotr_i16(vm);
-		case rotr_i32: return instr_rotr_i32(vm);
-		case rotr_i64: return instr_rotr_i64(vm);
-		case clz_i8:  return instr_clz_i8(vm);
-		case clz_i16: return instr_clz_i16(vm);
-		case clz_i32: return instr_clz_i32(vm);
-		case clz_i64: return instr_clz_i64(vm);
-		case ctz_i8:  return instr_ctz_i8(vm);
-		case ctz_i16: return instr_ctz_i16(vm);
-		case ctz_i32: return instr_ctz_i32(vm);
-		case ctz_i64: return instr_ctz_i64(vm);
+		case shl_i8:  return instr_shl_i!u8(vm);
+		case shl_i16: return instr_shl_i!u16(vm);
+		case shl_i32: return instr_shl_i!u32(vm);
+		case shl_i64: return instr_shl_i!u64(vm);
+		case shr_u8:  return instr_shr_u!u8(vm);
+		case shr_u16: return instr_shr_u!u16(vm);
+		case shr_u32: return instr_shr_u!u32(vm);
+		case shr_u64: return instr_shr_u!u64(vm);
+		case shr_s8:  return instr_shr_s!u8(vm);
+		case shr_s16: return instr_shr_s!u16(vm);
+		case shr_s32: return instr_shr_s!u32(vm);
+		case shr_s64: return instr_shr_s!u64(vm);
+		case rotl_i8:  return instr_rotl_i!u8(vm);
+		case rotl_i16: return instr_rotl_i!u16(vm);
+		case rotl_i32: return instr_rotl_i!u32(vm);
+		case rotl_i64: return instr_rotl_i!u64(vm);
+		case rotr_i8:  return instr_rotr_i!u8(vm);
+		case rotr_i16: return instr_rotr_i!u16(vm);
+		case rotr_i32: return instr_rotr_i!u32(vm);
+		case rotr_i64: return instr_rotr_i!u64(vm);
+		case clz_i8:  return instr_clz_i!u8(vm);
+		case clz_i16: return instr_clz_i!u16(vm);
+		case clz_i32: return instr_clz_i!u32(vm);
+		case clz_i64: return instr_clz_i!u64(vm);
+		case ctz_i8:  return instr_ctz_i!u8(vm);
+		case ctz_i16: return instr_ctz_i!u16(vm);
+		case ctz_i32: return instr_ctz_i!u32(vm);
+		case ctz_i64: return instr_ctz_i!u64(vm);
 		case popcnt_i64: return instr_popcnt_i64(vm);
 		case const_s8: return instr_const_s8(vm);
 
@@ -644,247 +644,64 @@ void instr_xor_i64(ref VmState vm) {
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shl_i64(ref VmState vm) {
+void instr_shl_i(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_u64 << (src1.as_u8 % 64);
+	dst.as_u64 = cast(T)(src0.get!T << (src1.as_u8 % (T.sizeof*8)));
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shl_i32(ref VmState vm) {
+void instr_shr_u(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u32 = src0.as_u32 << (src1.as_u8 % 32);
+	dst.as_u64 = src0.get!T >>> (src1.as_u8 % (T.sizeof*8));
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shl_i16(ref VmState vm) {
+void instr_shr_s(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u16 = cast(u16)(src0.as_u16 << (src1.as_u8 % 16));
+	dst.as_u64 = cast(T)(src0.get_s!T >> (src1.as_u8 % (T.sizeof*8)));
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shl_i8(ref VmState vm) {
+void instr_rotl_i(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u8 = cast(u8)(src0.as_u8 << (src1.as_u8 % 8));
+	dst.as_u64 = rol(src0.get!T, (src1.as_u8 % (T.sizeof*8)));
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shr_u64(ref VmState vm) {
+void instr_rotr_i(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_u64 >>> (src1.as_u8 % 64);
+	dst.as_u64 = ror(src0.get!T, (src1.as_u8 % (T.sizeof*8)));
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
-void instr_shr_u32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u32 = src0.as_u32 >>> (src1.as_u8 % 32);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_u16(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u16 = src0.as_u16 >>> (src1.as_u8 % 16);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_u8(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u8 = src0.as_u8 >>> (src1.as_u8 % 8);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_s64(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_s64 = src0.as_s64 >> (src1.as_u8 % 64);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_s32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_s32 = src0.as_s32 >> (src1.as_u8 % 32);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_s16(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_s16 = src0.as_s16 >> (src1.as_u8 % 16);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_shr_s8(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_s8 = src0.as_s8 >> (src1.as_u8 % 8);
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotl_i64(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = rol(src0.as_u64, (src1.as_u8 % 64));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotl_i32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u32 = rol(src0.as_u32, (src1.as_u8 % 32));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotl_i16(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u16 = rol(src0.as_u16, (src1.as_u8 % 16));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotl_i8(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u8 = rol(src0.as_u8, (src1.as_u8 % 8));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotr_i64(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = ror(src0.as_u64, (src1.as_u8 % 64));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotr_i32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u32 = ror(src0.as_u32, (src1.as_u8 % 32));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotr_i16(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u16 = ror(src0.as_u16, (src1.as_u8 % 16));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_rotr_i8(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u8 = ror(src0.as_u8, (src1.as_u8 % 8));
-	dst.pointer = AllocId();
-	vm.ip += 4;
-}
-void instr_clz_i8(ref VmState vm) {
+void instr_clz_i(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = clz(src.as_u8);
+	dst.as_u64 = clz(src.get!T);
 	dst.pointer = AllocId();
 	vm.ip += 3;
 }
-void instr_clz_i16(ref VmState vm) {
+void instr_ctz_i(T)(ref VmState vm) {
 	pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = clz(src.as_u16);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_clz_i32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = clz(src.as_u32);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_clz_i64(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = clz(src.as_u64);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_ctz_i64(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = ctz(src.as_u64);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_ctz_i32(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = ctz(src.as_u32);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_ctz_i16(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = ctz(src.as_u16);
-	dst.pointer = AllocId();
-	vm.ip += 3;
-}
-void instr_ctz_i8(ref VmState vm) {
-	pragma(inline, true);
-	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
-	dst.as_u64 = ctz(src.as_u8);
+	dst.as_u64 = ctz(src.get!T);
 	dst.pointer = AllocId();
 	vm.ip += 3;
 }

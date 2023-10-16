@@ -31,6 +31,23 @@ struct VmReg {
 	}
 	AllocId pointer;
 
+	ref T get(T)() if(is(T == u8))  { return as_u8; }
+	ref T get(T)() if(is(T == u16)) { return as_u16; }
+	ref T get(T)() if(is(T == u32)) { return as_u32; }
+	ref T get(T)() if(is(T == u64)) { return as_u64; }
+	ref T get(T)() if(is(T == i8))  { return as_s8; }
+	ref T get(T)() if(is(T == i16)) { return as_s16; }
+	ref T get(T)() if(is(T == i32)) { return as_s32; }
+	ref T get(T)() if(is(T == i64)) { return as_s64; }
+	ref  u8 get_u(T)() if(is(T == u8)  || is(T ==  i8)) { return as_u8; }
+	ref u16 get_u(T)() if(is(T == u16) || is(T == i16)) { return as_u16; }
+	ref u32 get_u(T)() if(is(T == u32) || is(T == i32)) { return as_u32; }
+	ref u64 get_u(T)() if(is(T == u64) || is(T == i64)) { return as_u64; }
+	ref  i8 get_s(T)() if(is(T == u8)  || is(T ==  i8)) { return as_s8; }
+	ref i16 get_s(T)() if(is(T == u16) || is(T == i16)) { return as_s16; }
+	ref i32 get_s(T)() if(is(T == u32) || is(T == i32)) { return as_s32; }
+	ref i64 get_s(T)() if(is(T == u64) || is(T == i64)) { return as_s64; }
+
 	bool opEquals(VmReg other) {
 		pragma(inline, true);
 		return as_u64 == other.as_u64 && pointer == other.pointer;

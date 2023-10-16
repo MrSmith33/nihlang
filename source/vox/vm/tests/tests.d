@@ -1191,8 +1191,8 @@ void test_shr_u64_0(ref VmTestContext c) {
 	b.emit_shr_u64(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0LU), VmReg(65));
-	c.expectResult(VmReg(0x7FFFFFFF_FFFFFFF8LU));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(65));
+	c.expectResult(VmReg(0x7FFFFFFF_FFFFFFF8));
 }
 
 @VmTest
@@ -1202,7 +1202,7 @@ void test_shr_u32_0(ref VmTestContext c) {
 	b.emit_shr_u32(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xFFFF_FFF0), VmReg(33));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(33));
 	c.expectResult(VmReg(0x7FFF_FFF8));
 }
 
@@ -1213,7 +1213,7 @@ void test_shr_u16_0(ref VmTestContext c) {
 	b.emit_shr_u16(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xFFF0), VmReg(17));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFF0), VmReg(17));
 	c.expectResult(VmReg(0x7FF8));
 }
 
@@ -1224,7 +1224,7 @@ void test_shr_u8_0(ref VmTestContext c) {
 	b.emit_shr_u8(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xF0), VmReg(9));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_F0), VmReg(9));
 	c.expectResult(VmReg(0x78));
 }
 
@@ -1246,7 +1246,7 @@ void test_shr_s32_0(ref VmTestContext c) {
 	b.emit_shr_s32(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xFFFF_FFF0), VmReg(33));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(33));
 	c.expectResult(VmReg(0xFFFF_FFF8));
 }
 
@@ -1257,7 +1257,7 @@ void test_shr_s16_0(ref VmTestContext c) {
 	b.emit_shr_s16(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xFFF0), VmReg(17));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFF0), VmReg(17));
 	c.expectResult(VmReg(0xFFF8));
 }
 
@@ -1268,7 +1268,7 @@ void test_shr_s8_0(ref VmTestContext c) {
 	b.emit_shr_s8(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xF0), VmReg(9));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_F0), VmReg(9));
 	c.expectResult(VmReg(0xF8));
 }
 
@@ -1279,7 +1279,7 @@ void test_rotl_i8_0(ref VmTestContext c) {
 	b.emit_rotl_i8(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xD8), VmReg(9));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_D8), VmReg(9));
 	c.expectResult(VmReg(0xB1));
 }
 
@@ -1290,7 +1290,7 @@ void test_rotl_i16_0(ref VmTestContext c) {
 	b.emit_rotl_i16(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xD800), VmReg(17));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_D800), VmReg(17));
 	c.expectResult(VmReg(0xB001));
 }
 
@@ -1301,7 +1301,7 @@ void test_rotl_i32_0(ref VmTestContext c) {
 	b.emit_rotl_i32(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xD800_0000), VmReg(33));
+	c.call(funcId, VmReg(0xFFFFFFFF_D8000000), VmReg(33));
 	c.expectResult(VmReg(0xB000_0001));
 }
 
@@ -1323,7 +1323,7 @@ void test_rotr_i8_0(ref VmTestContext c) {
 	b.emit_rotr_i8(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xB1), VmReg(9));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_B1), VmReg(9));
 	c.expectResult(VmReg(0xD8));
 }
 
@@ -1334,7 +1334,7 @@ void test_rotr_i16_0(ref VmTestContext c) {
 	b.emit_rotr_i16(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xB001), VmReg(17));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_B001), VmReg(17));
 	c.expectResult(VmReg(0xD800));
 }
 
@@ -1345,7 +1345,7 @@ void test_rotr_i32_0(ref VmTestContext c) {
 	b.emit_rotr_i32(0, 0, 1);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(0xB000_0001), VmReg(33));
+	c.call(funcId, VmReg(0xFFFFFFFF_B0000001), VmReg(33));
 	c.expectResult(VmReg(0xD800_0000));
 }
 
@@ -1367,11 +1367,13 @@ void test_clz_i8_0(ref VmTestContext c) {
 	b.emit_clz_i8(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u8.max));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_FF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(1));
+
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_01));
 	c.expectResult(VmReg(7));
-	c.call(funcId, VmReg(0));
+
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_00));
 	c.expectResult(VmReg(8));
 }
 
@@ -1382,11 +1384,11 @@ void test_clz_i16_0(ref VmTestContext c) {
 	b.emit_clz_i16(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u16.max));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFFF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(1));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_0001));
 	c.expectResult(VmReg(15));
-	c.call(funcId, VmReg(0));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_0000));
 	c.expectResult(VmReg(16));
 }
 
@@ -1397,11 +1399,11 @@ void test_clz_i32_0(ref VmTestContext c) {
 	b.emit_clz_i32(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u32.max));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(1));
+	c.call(funcId, VmReg(0xFFFFFFFF_00000001));
 	c.expectResult(VmReg(31));
-	c.call(funcId, VmReg(0));
+	c.call(funcId, VmReg(0xFFFFFFFF_00000000));
 	c.expectResult(VmReg(32));
 }
 
@@ -1427,11 +1429,11 @@ void test_ctz_i8_0(ref VmTestContext c) {
 	b.emit_ctz_i8(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u8.max));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_FF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(0b1100));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_0C));
 	c.expectResult(VmReg(2));
-	c.call(funcId, VmReg(0));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_00));
 	c.expectResult(VmReg(8));
 }
 
@@ -1442,11 +1444,11 @@ void test_ctz_i16_0(ref VmTestContext c) {
 	b.emit_ctz_i16(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u16.max));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFFF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(0b1100));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_000C));
 	c.expectResult(VmReg(2));
-	c.call(funcId, VmReg(0));
+	c.call(funcId, VmReg(0xFFFFFFFFFFFF_0000));
 	c.expectResult(VmReg(16));
 }
 
@@ -1457,11 +1459,11 @@ void test_ctz_i32_0(ref VmTestContext c) {
 	b.emit_ctz_i32(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u32.max));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
-	c.call(funcId, VmReg(0b1100));
+	c.call(funcId, VmReg(0xFFFFFFFF_0000000C));
 	c.expectResult(VmReg(2));
-	c.call(funcId, VmReg(0));
+	c.call(funcId, VmReg(0xFFFFFFFF_00000000));
 	c.expectResult(VmReg(32));
 }
 
@@ -1472,7 +1474,7 @@ void test_ctz_i64_0(ref VmTestContext c) {
 	b.emit_ctz_i64(0, 0);
 	b.emit_ret();
 	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
-	c.call(funcId, VmReg(u64.max));
+	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0b1100));
 	c.expectResult(VmReg(2));
