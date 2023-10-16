@@ -113,7 +113,7 @@ int setBitAt(size_t* p, size_t bitnum) pure {
 
 version(LDC)
 pragma(LDC_intrinsic, "llvm.ctlz.i#")
-private T llvm_ctlz(T)(T src, bool isZeroUndefined) if (__traits(isIntegral, T));
+private T llvm_ctlz(T)(T src, bool isZeroUndefined) pure if (__traits(isIntegral, T));
 
 T clz(T)(T val) pure {
 	version(LDC) {
@@ -126,7 +126,7 @@ T clz(T)(T val) pure {
 
 version(LDC)
 pragma(LDC_intrinsic, "llvm.cttz.i#")
-private T llvm_cttz(T)(T src, bool isZeroUndefined) if (__traits(isIntegral, T));
+private T llvm_cttz(T)(T src, bool isZeroUndefined) pure if (__traits(isIntegral, T));
 
 T ctz(T)(T val) pure {
 	version(LDC) {
