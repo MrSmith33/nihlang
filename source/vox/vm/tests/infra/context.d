@@ -73,11 +73,11 @@ struct VmTestContext {
 
 	private void printState() {
 		sink("  ---\n  ");
-		sink.formattedWrite("VM status: %s\n", VmStatus_names[vm.status]);
-		sink("  ---\n  ");
-		u32 ipCopy = vm.ip;
-		disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
-		sink("\n  ---\n  ");
+		if (vm.ip < vm.functions[vm.func].code.length) {
+			sink("  ---\n  ");
+			u32 ipCopy = vm.ip;
+			disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
+		}
 		vmFormatError(vm, sink);
 		sink("\n  ---\n");
 	}

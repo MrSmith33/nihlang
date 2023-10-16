@@ -128,31 +128,41 @@ struct CodeBuilder {
 	void emit_div_u64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.div_u64, dst, src0, src1);
 	}
-
 	void emit_div_s64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.div_s64, dst, src0, src1);
 	}
-
 	void emit_rem_u64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.rem_u64, dst, src0, src1);
 	}
-
 	void emit_rem_s64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.rem_s64, dst, src0, src1);
+	}
+
+	void emit_not_i64(u8 dst, u8 src) {
+		U8(VmOpcode.not_i64, dst, src);
+	}
+
+	void emit_and_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.and_i64, dst, src0, src1);
+	}
+
+	void emit_or_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.or_i64, dst, src0, src1);
+	}
+
+	void emit_xor_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.xor_i64, dst, src0, src1);
 	}
 
 	void emit_shl_i64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shl_i64, dst, src0, src1);
 	}
-
 	void emit_shl_i32(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shl_i32, dst, src0, src1);
 	}
-
 	void emit_shl_i16(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shl_i16, dst, src0, src1);
 	}
-
 	void emit_shl_i8(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shl_i8, dst, src0, src1);
 	}
@@ -160,15 +170,12 @@ struct CodeBuilder {
 	void emit_shr_u64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_u64, dst, src0, src1);
 	}
-
 	void emit_shr_u32(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_u32, dst, src0, src1);
 	}
-
 	void emit_shr_u16(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_u16, dst, src0, src1);
 	}
-
 	void emit_shr_u8(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_u8, dst, src0, src1);
 	}
@@ -176,17 +183,70 @@ struct CodeBuilder {
 	void emit_shr_s64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_s64, dst, src0, src1);
 	}
-
 	void emit_shr_s32(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_s32, dst, src0, src1);
 	}
-
 	void emit_shr_s16(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_s16, dst, src0, src1);
 	}
-
 	void emit_shr_s8(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.shr_s8, dst, src0, src1);
+	}
+
+	void emit_rotl_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotl_i64, dst, src0, src1);
+	}
+	void emit_rotl_i32(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotl_i32, dst, src0, src1);
+	}
+	void emit_rotl_i16(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotl_i16, dst, src0, src1);
+	}
+	void emit_rotl_i8(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotl_i8, dst, src0, src1);
+	}
+
+	void emit_rotr_i64(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotr_i64, dst, src0, src1);
+	}
+	void emit_rotr_i32(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotr_i32, dst, src0, src1);
+	}
+	void emit_rotr_i16(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotr_i16, dst, src0, src1);
+	}
+	void emit_rotr_i8(u8 dst, u8 src0, u8 src1) {
+		U8(VmOpcode.rotr_i8, dst, src0, src1);
+	}
+
+	void emit_clz_i64(u8 dst, u8 src) {
+		U8(VmOpcode.clz_i64, dst, src);
+	}
+	void emit_clz_i32(u8 dst, u8 src) {
+		U8(VmOpcode.clz_i32, dst, src);
+	}
+	void emit_clz_i16(u8 dst, u8 src) {
+		U8(VmOpcode.clz_i16, dst, src);
+	}
+	void emit_clz_i8(u8 dst, u8 src) {
+		U8(VmOpcode.clz_i8, dst, src);
+	}
+
+	void emit_ctz_i64(u8 dst, u8 src) {
+		U8(VmOpcode.ctz_i64, dst, src);
+	}
+	void emit_ctz_i32(u8 dst, u8 src) {
+		U8(VmOpcode.ctz_i32, dst, src);
+	}
+	void emit_ctz_i16(u8 dst, u8 src) {
+		U8(VmOpcode.ctz_i16, dst, src);
+	}
+	void emit_ctz_i8(u8 dst, u8 src) {
+		U8(VmOpcode.ctz_i8, dst, src);
+	}
+
+	void emit_popcnt_i64(u8 dst, u8 src) {
+		U8(VmOpcode.popcnt_i64, dst, src);
 	}
 
 	void emit_mov(u8 dst, u8 src) {

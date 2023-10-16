@@ -111,6 +111,32 @@ int setBitAt(size_t* p, size_t bitnum) pure {
 	return (originalSlot & bitmask) > 0;
 }
 
+version(LDC)
+pragma(LDC_intrinsic, "llvm.ctlz.i#")
+private T llvm_ctlz(T)(T src, bool isZeroUndefined) if (__traits(isIntegral, T));
+
+T clz(T)(T val) pure {
+	version(LDC) {
+		return llvm_ctlz!T(val, false);
+	} else {
+		if (val == 0) return T.sizeof * 8;
+		return cast(T)(T.sizeof * 8 - 1 - bsr(val));
+	}
+}
+
+version(LDC)
+pragma(LDC_intrinsic, "llvm.cttz.i#")
+private T llvm_cttz(T)(T src, bool isZeroUndefined) if (__traits(isIntegral, T));
+
+T ctz(T)(T val) pure {
+	version(LDC) {
+		return llvm_cttz!T(val, false);
+	} else {
+		if (val == 0) return T.sizeof * 8;
+		return cast(T)bsf(val);
+	}
+}
+
 
 version(LDC)
 pragma(LDC_intrinsic, "ldc.bitop.btc")

@@ -96,26 +96,78 @@ enum VmOpcode : u8 {
 	rem_u64,
 	rem_s64,
 
+	// u8 op, u8 dst, u8 src
+	// Bitwise negation of src
+	not_i64,
+
 	// u8 op, u8 dst, u8 src0, u8 src1
-	// lhs << rhs mod NN
-	shl_i64,
-	shl_i32,
-	shl_i16,
+	// Bitwise and of src0 and src1
+	and_i64,
+
+	// u8 op, u8 dst, u8 src
+	// Bitwise or of src0 and src1
+	or_i64,
+
+	// u8 op, u8 dst, u8 src
+	// Bitwise xor of src0 and src1
+	xor_i64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// src0 {shl_NN} (src1 mod NN)
 	shl_i8,
+	shl_i16,
+	shl_i32,
+	shl_i64,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
-	// lhs >> rhs mod NN, zext
-	shr_u64,
-	shr_u32,
-	shr_u16,
+	// src0 {shr_NN} (src1 mod NN), zext
 	shr_u8,
+	shr_u16,
+	shr_u32,
+	shr_u64,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
-	// lhs >> rhs mod NN, sext
-	shr_s64,
-	shr_s32,
-	shr_s16,
+	// src0 {shr_NN} (src1 mod NN), sext
 	shr_s8,
+	shr_s16,
+	shr_s32,
+	shr_s64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// src0 {rotl_NN} (src1 mod NN)
+	rotl_i8,
+	rotl_i16,
+	rotl_i32,
+	rotl_i64,
+
+	// u8 op, u8 dst, u8 src0, u8 src1
+	// src0 {rotr_NN} (src1 mod NN)
+	rotr_i8,
+	rotr_i16,
+	rotr_i32,
+	rotr_i64,
+
+	// u8 op, u8 dst, u8 src
+	// Count of leading zero bits in src
+	// Starting from the most significant bit
+	// When src is zero the result is the operand size
+	clz_i8,
+	clz_i16,
+	clz_i32,
+	clz_i64,
+
+	// u8 op, u8 dst, u8 src
+	// Count of trailing zero bits in src
+	// Starting from bit 0
+	// When src is zero the result is the operand size
+	ctz_i8,
+	ctz_i16,
+	ctz_i32,
+	ctz_i64,
+
+	// u8 op, u8 dst, u8 src
+	// Count of non-zero bits in src
+	popcnt_i64,
 
 	// u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 	// reg[dst].u64 = reg[src0].u64 {cmp_op} reg[src1].u64

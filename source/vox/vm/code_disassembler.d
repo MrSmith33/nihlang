@@ -173,88 +173,112 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X rem.s64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
-		case shl_i64:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shl.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+		case not_i64:
+			u8 dst = code[ip++];
+			u8 src = code[ip++];
+			sink.formattedWrite("%04X not.i64 r%s, r%s", addr, dst, src);
 			break;
 
-		case shl_i32:
+		case and_i64:
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shl.i32 r%s, r%s, r%s", addr, dst, src0, src1);
+			sink.formattedWrite("%04X and.i64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
-		case shl_i16:
+		case or_i64:
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shl.i16 r%s, r%s, r%s", addr, dst, src0, src1);
+			sink.formattedWrite("%04X or.i64 r%s, r%s, r%s", addr, dst, src0, src1);
+			break;
+
+		case xor_i64:
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X xor.i64 r%s, r%s, r%s", addr, dst, src0, src1);
 			break;
 
 		case shl_i8:
+		case shl_i16:
+		case shl_i32:
+		case shl_i64:
+			u32 size_bits = (1 << (op - shl_i8)) * 8;
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shl.i8 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_u64:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.u64 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_u32:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.u32 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_u16:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.u16 r%s, r%s, r%s", addr, dst, src0, src1);
+			sink.formattedWrite("%04X shl.i%s r%s, r%s, r%s", addr, size_bits, dst, src0, src1);
 			break;
 
 		case shr_u8:
+		case shr_u16:
+		case shr_u32:
+		case shr_u64:
+			u32 size_bits = (1 << (op - shr_u8)) * 8;
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.u8 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_s64:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.s64 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_s32:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.s32 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case shr_s16:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.s16 r%s, r%s, r%s", addr, dst, src0, src1);
+			sink.formattedWrite("%04X shr.u%s r%s, r%s, r%s", addr, size_bits, dst, src0, src1);
 			break;
 
 		case shr_s8:
+		case shr_s16:
+		case shr_s32:
+		case shr_s64:
+			u32 size_bits = (1 << (op - shr_s8)) * 8;
 			u8 dst  = code[ip++];
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
-			sink.formattedWrite("%04X shr.s8 r%s, r%s, r%s", addr, dst, src0, src1);
+			sink.formattedWrite("%04X shr.s%s r%s, r%s, r%s", addr, size_bits, dst, src0, src1);
+			break;
+
+		case rotl_i8:
+		case rotl_i16:
+		case rotl_i32:
+		case rotl_i64:
+			u32 size_bits = (1 << (op - rotl_i8)) * 8;
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X rotl.i%s r%s, r%s, r%s", addr, size_bits, dst, src0, src1);
+			break;
+
+		case rotr_i8:
+		case rotr_i16:
+		case rotr_i32:
+		case rotr_i64:
+			u32 size_bits = (1 << (op - rotr_i8)) * 8;
+			u8 dst  = code[ip++];
+			u8 src0 = code[ip++];
+			u8 src1 = code[ip++];
+			sink.formattedWrite("%04X rotr.i%s r%s, r%s, r%s", addr, size_bits, dst, src0, src1);
+			break;
+
+		case clz_i8:
+		case clz_i16:
+		case clz_i32:
+		case clz_i64:
+			u32 size_bits = (1 << (op - clz_i8)) * 8;
+			u8 dst = code[ip++];
+			u8 src = code[ip++];
+			sink.formattedWrite("%04X clz.i%s r%s, r%s", addr, size_bits, dst, src);
+			break;
+
+		case ctz_i8:
+		case ctz_i16:
+		case ctz_i32:
+		case ctz_i64:
+			u32 size_bits = (1 << (op - ctz_i8)) * 8;
+			u8 dst = code[ip++];
+			u8 src = code[ip++];
+			sink.formattedWrite("%04X ctz.i%s r%s, r%s", addr, size_bits, dst, src);
+			break;
+
+		case popcnt_i64:
+			u8 dst = code[ip++];
+			u8 src = code[ip++];
+			sink.formattedWrite("%04X popcnt.i64 r%s, r%s", addr, dst, src);
 			break;
 
 		case const_s8:

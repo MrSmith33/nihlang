@@ -1097,6 +1097,50 @@ void test_rem_s64_0(ref VmTestContext c) {
 }
 
 @VmTest
+void test_not_i64_0(ref VmTestContext c) {
+	// Test not_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_not_i64(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max));
+	c.expectResult(VmReg(0));
+}
+
+@VmTest
+void test_and_i64_0(ref VmTestContext c) {
+	// Test and_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_and_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
+	c.expectResult(VmReg(0xAAAAAAAA_AAAAAAAA));
+}
+
+@VmTest
+void test_or_i64_0(ref VmTestContext c) {
+	// Test or_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_or_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
+	c.expectResult(VmReg(u64.max));
+}
+
+@VmTest
+void test_xor_i64_0(ref VmTestContext c) {
+	// Test xor_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_xor_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
+	c.expectResult(VmReg(0x55555555_55555555));
+}
+
+@VmTest
 void test_shl_i64_0(ref VmTestContext c) {
 	// Test shl_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1228,6 +1272,228 @@ void test_shr_s8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xF8));
 }
 
+@VmTest
+void test_rotl_i8_0(ref VmTestContext c) {
+	// Test rotl_i8
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotl_i8(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xD8), VmReg(9));
+	c.expectResult(VmReg(0xB1));
+}
+
+@VmTest
+void test_rotl_i16_0(ref VmTestContext c) {
+	// Test rotl_i16
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotl_i16(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xD800), VmReg(17));
+	c.expectResult(VmReg(0xB001));
+}
+
+@VmTest
+void test_rotl_i32_0(ref VmTestContext c) {
+	// Test rotl_i32
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotl_i32(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xD800_0000), VmReg(33));
+	c.expectResult(VmReg(0xB000_0001));
+}
+
+@VmTest
+void test_rotl_i64_0(ref VmTestContext c) {
+	// Test rotl_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotl_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xD800_0000_0000_0000), VmReg(65));
+	c.expectResult(VmReg(0xB000_0000_0000_0001));
+}
+
+@VmTest
+void test_rotr_i8_0(ref VmTestContext c) {
+	// Test rotr_i8
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotr_i8(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xB1), VmReg(9));
+	c.expectResult(VmReg(0xD8));
+}
+
+@VmTest
+void test_rotr_i16_0(ref VmTestContext c) {
+	// Test rotr_i16
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotr_i16(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xB001), VmReg(17));
+	c.expectResult(VmReg(0xD800));
+}
+
+@VmTest
+void test_rotr_i32_0(ref VmTestContext c) {
+	// Test rotr_i32
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotr_i32(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xB000_0001), VmReg(33));
+	c.expectResult(VmReg(0xD800_0000));
+}
+
+@VmTest
+void test_rotr_i64_0(ref VmTestContext c) {
+	// Test rotr_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_rotr_i64(0, 0, 1);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(0xB000_0000_0000_0001), VmReg(65));
+	c.expectResult(VmReg(0xD800_0000_0000_0000));
+}
+
+@VmTest
+void test_clz_i8_0(ref VmTestContext c) {
+	// Test clz_i8
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_clz_i8(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u8.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(1));
+	c.expectResult(VmReg(7));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(8));
+}
+
+@VmTest
+void test_clz_i16_0(ref VmTestContext c) {
+	// Test clz_i16
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_clz_i16(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u16.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(1));
+	c.expectResult(VmReg(15));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(16));
+}
+
+@VmTest
+void test_clz_i32_0(ref VmTestContext c) {
+	// Test clz_i32
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_clz_i32(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u32.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(1));
+	c.expectResult(VmReg(31));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(32));
+}
+
+@VmTest
+void test_clz_i64_0(ref VmTestContext c) {
+	// Test clz_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_clz_i64(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(1));
+	c.expectResult(VmReg(63));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(64));
+}
+
+@VmTest
+void test_ctz_i8_0(ref VmTestContext c) {
+	// Test ctz_i8
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ctz_i8(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u8.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(0b1100));
+	c.expectResult(VmReg(2));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(8));
+}
+
+@VmTest
+void test_ctz_i16_0(ref VmTestContext c) {
+	// Test ctz_i16
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ctz_i16(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u16.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(0b1100));
+	c.expectResult(VmReg(2));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(16));
+}
+
+@VmTest
+void test_ctz_i32_0(ref VmTestContext c) {
+	// Test ctz_i32
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ctz_i32(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u32.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(0b1100));
+	c.expectResult(VmReg(2));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(32));
+}
+
+@VmTest
+void test_ctz_i64_0(ref VmTestContext c) {
+	// Test ctz_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_ctz_i64(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(0b1100));
+	c.expectResult(VmReg(2));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(64));
+}
+
+@VmTest
+void test_popcnt_i64_0(ref VmTestContext c) {
+	// Test popcnt_i64
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_popcnt_i64(0, 0);
+	b.emit_ret();
+	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	c.call(funcId, VmReg(u64.max));
+	c.expectResult(VmReg(64));
+	c.call(funcId, VmReg(0));
+	c.expectResult(VmReg(0));
+	c.call(funcId, VmReg(7));
+	c.expectResult(VmReg(3));
+}
 
 @VmTest
 void test_const_s8_0(ref VmTestContext c) {
