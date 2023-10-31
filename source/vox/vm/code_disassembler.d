@@ -44,30 +44,6 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X branchz r%s %04X", addr, src, addr + jump_offset + 6);
 			break;
 
-		case branch_ge:
-			u8 src0 = code[ip++];
-			u8 src1 = code[ip++];
-			i32 jump_offset = *cast(i32*)&code[ip];
-			ip += 4;
-			sink.formattedWrite("%04X branch r%s >= r%s %04X", addr, src0, src1, addr + jump_offset + 7);
-			break;
-
-		case branch_le_imm8:
-			u8 src0 = code[ip++];
-			i8 src1 = code[ip++];
-			i32 jump_offset = *cast(i32*)&code[ip];
-			ip += 4;
-			sink.formattedWrite("%04X branch r%s <= %s %04X", addr, src0, src1, addr + jump_offset + 7);
-			break;
-
-		case branch_gt_imm8:
-			u8 src0 = code[ip++];
-			i8 src1 = code[ip++];
-			i32 jump_offset = *cast(i32*)&code[ip];
-			ip += 4;
-			sink.formattedWrite("%04X branch r%s > %s %04X", addr, src0, src1, addr + jump_offset + 7);
-			break;
-
 		case stack_addr:
 			u8 dst = code[ip++];
 			u8 slot_index = code[ip++];
@@ -122,13 +98,6 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			u8 src0 = code[ip++];
 			u8 src1 = code[ip++];
 			sink.formattedWrite("%04X add.i64 r%s, r%s, r%s", addr, dst, src0, src1);
-			break;
-
-		case add_i64_imm8:
-			u8 dst  = code[ip++];
-			u8 src0 = code[ip++];
-			i8 src1 = code[ip++];
-			sink.formattedWrite("%04X add.i64 r%s, r%s, %s", addr, dst, src0, src1);
 			break;
 
 		case sub_i64:

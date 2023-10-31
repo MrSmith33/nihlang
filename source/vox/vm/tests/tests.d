@@ -2016,7 +2016,8 @@ void test_tail_call_2(ref VmTestContext c) {
 	a.add_stack_slot(SizeAndAlign(8, 1)); // local
 	a.emit_mov(1, 0); // move arg to r1
 	a.emit_stack_addr(0, 0);
-	a.emit_add_i64_imm8(2, 0, -1);
+	a.emit_const_s8(2, -1);
+	a.emit_add_i64(2, 0, 2);
 	a.emit_store_m64(0, 2); // set local mem to s0-1
 	a.emit_stack_alloc(SizeAndAlign(8, 1)); // parameter
 	a.emit_stack_addr(0, 1);
@@ -2486,50 +2487,6 @@ void bench_0(ref VmTestContext c) {
 	b.emit_add_i64(0, 1, 2);
 	// return number
 	b.patch_rip(patch_addr1, b.next_addr);
-	b.emit_ret();
-
-	c.vm.functions[funcId.index].code = b.code;
-
-	//disasm(stdoutSink, b[]);
-
-	VmReg[] res = c.call(funcId, VmReg(40));
-	writefln("%s", res[0].as_u64);
-	c.expectResult(VmReg(102334155));
-}
-
-
-@VmTest
-@VmTestIgnore
-@VmTestOnly
-@TestPtrSize64
-void bench_1(ref VmTestContext c) {
-	// Benchmark fib (special opcodes)
-
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
-
-	// u64 fib(u64 number) {
-	//     if (number <= 1) return number;
-	//     return fib(number-1) + fib(number-2);
-	// }
-	// r0: result
-	// r0: number
-	// r1: temp1
-	// r2: temp2
-	CodeBuilder b = CodeBuilder(c.vm.allocator);
-	// if (number <= 1)
-	//b.emit_const_s8(1, 1);
-	u32 patch_addr1 = b.emit_branch_gt_imm8(0, 1);
-	b.emit_ret();
-	// fib(number-1)
-	b.patch_rip(patch_addr1, b.next_addr);
-	b.emit_add_i64_imm8(1, 0, -1);
-	b.emit_call(1, 1, funcId.index);
-	// fib(number-2)
-	b.emit_add_i64_imm8(2, 0, -2);
-	b.emit_call(2, 1, funcId.index);
-	// fib(number-1) + fib(number-2)
-	b.emit_add_i64(0, 1, 2);
-	// return number
 	b.emit_ret();
 
 	c.vm.functions[funcId.index].code = b.code;

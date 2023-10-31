@@ -9,6 +9,7 @@ import vox.vm;
 @nogc nothrow:
 
 // Invariant: when trap happens, VM state should remain as if instruction was not executed
+// Whole destination register should be overwritten
 void vmStep(ref VmState vm) {
 	pragma(inline, true);
 	VmOpcode op = cast(VmOpcode)vm.code[vm.ip+0];
@@ -18,9 +19,6 @@ void vmStep(ref VmState vm) {
 		case jump: return instr_jump(vm);
 		case branch: return instr_branch(vm);
 		case branch_zero: return instr_branch_zero(vm);
-		case branch_ge: return instr_branch_ge(vm);
-		case branch_le_imm8: return instr_branch_le_imm8(vm);
-		case branch_gt_imm8: return instr_branch_gt_imm8(vm);
 		case stack_addr: return instr_stack_addr(vm);
 		case stack_alloc: return instr_stack_alloc(vm);
 		case call: return instr_call(vm);
@@ -29,7 +27,6 @@ void vmStep(ref VmState vm) {
 		case mov: return instr_mov(vm);
 		case cmp: return instr_cmp(vm);
 		case add_i64: return instr_add_i64(vm);
-		case add_i64_imm8: return instr_add_i64_imm8(vm);
 		case sub_i64: return instr_sub_i64(vm);
 		case mul_i64: return instr_mul_i64(vm);
 		case div_u64: return instr_div_u64(vm);
@@ -118,48 +115,6 @@ void instr_branch_zero(ref VmState vm) {
 	}
 
 	vm.ip += 6;
-}
-void instr_branch_ge(ref VmState vm) {
-	pragma(inline, true);
-
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+1]];
-	VmReg* src1 = &vm.regs[vm.code[vm.ip+2]];
-	i32 offset = *cast(i32*)&vm.code[vm.ip+3];
-
-	if (src0.as_u64 >= src1.as_u64) {
-		vm.ip += offset + 7;
-		return;
-	}
-
-	vm.ip += 7;
-}
-void instr_branch_le_imm8(ref VmState vm) {
-	pragma(inline, true);
-
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+1]];
-	i64 src1 = cast(i8)vm.code[vm.ip+2];
-	i32 offset = *cast(i32*)&vm.code[vm.ip+3];
-
-	if (src0.as_u64 <= src1) {
-		vm.ip += offset + 7;
-		return;
-	}
-
-	vm.ip += 7;
-}
-void instr_branch_gt_imm8(ref VmState vm) {
-	pragma(inline, true);
-
-	VmReg* src0 = &vm.regs[vm.code[vm.ip+1]];
-	i64 src1 = cast(i8)vm.code[vm.ip+2];
-	i32 offset = *cast(i32*)&vm.code[vm.ip+3];
-
-	if (src0.as_u64 > src1) {
-		vm.ip += offset + 7;
-		return;
-	}
-
-	vm.ip += 7;
 }
 void instr_stack_addr(ref VmState vm) {
 	pragma(inline, true);
@@ -622,7 +577,7 @@ void instr_and_i64(ref VmState vm) {
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_s64 & src1.as_s64;
+	dst.as_u64 = src0.as_u64 & src1.as_u64;
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
@@ -631,7 +586,7 @@ void instr_or_i64(ref VmState vm) {
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_s64 | src1.as_s64;
+	dst.as_u64 = src0.as_u64 | src1.as_u64;
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }
@@ -640,7 +595,7 @@ void instr_xor_i64(ref VmState vm) {
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
-	dst.as_u64 = src0.as_s64 ^ src1.as_s64;
+	dst.as_u64 = src0.as_u64 ^ src1.as_u64;
 	dst.pointer = AllocId();
 	vm.ip += 4;
 }

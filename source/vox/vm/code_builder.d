@@ -79,24 +79,6 @@ struct CodeBuilder {
 		return code.length;
 	}
 
-	u32 emit_branch_ge(u8 src0, u8 src1) {
-		U8(VmOpcode.branch_ge, src0, src1);
-		U32z();
-		return code.length;
-	}
-
-	u32 emit_branch_le_imm8(u8 src0, u8 src1) {
-		U8(VmOpcode.branch_le_imm8, src0, src1);
-		U32z();
-		return code.length;
-	}
-
-	u32 emit_branch_gt_imm8(u8 src0, u8 src1) {
-		U8(VmOpcode.branch_gt_imm8, src0, src1);
-		U32z();
-		return code.length;
-	}
-
 	void patch_rip(u32 patch_addr, u32 target) {
 		i32 offset = target - patch_addr;
 		code[patch_addr-4+0] = (offset >>  0) & 0xFF;
@@ -111,10 +93,6 @@ struct CodeBuilder {
 
 	void emit_add_i64(u8 dst, u8 src0, u8 src1) {
 		U8(VmOpcode.add_i64, dst, src0, src1);
-	}
-
-	void emit_add_i64_imm8(u8 dst, u8 src0, i8 src1) {
-		U8(VmOpcode.add_i64_imm8, dst, src0, src1);
 	}
 
 	void emit_sub_i64(u8 dst, u8 src0, u8 src1) {

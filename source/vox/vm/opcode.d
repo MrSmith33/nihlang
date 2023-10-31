@@ -24,20 +24,15 @@ enum VmOpcode : u8 {
 	// jumps relative to the address of the next instruction
 	jump,
 
-	// u8 op, u8 src_reg, s32 offset
+	// u8 op, u8 src, s32 offset
 	// if reg[src] is non zero jumps
 	// jumps to the address of the next instruction + offset
 	branch,
 
-	// u8 op, u8 src_reg, s32 offset
+	// u8 op, u8 src, s32 offset
 	// if reg[src] is zero jumps
 	// jumps to the address of the next instruction + offset
 	branch_zero,
-
-	//
-	branch_ge,
-	branch_le_imm8,
-	branch_gt_imm8,
 
 	// u8 op, u8 dst, u8 slot_index
 	stack_addr,
@@ -73,7 +68,6 @@ enum VmOpcode : u8 {
 	//
 	// Pointer can only occur in the first argument. Pointer is copied to dst
 	add_i64,
-	add_i64_imm8,
 
 	// u8 op, u8 dst, u8 src0, u8 src1
 	// Valid pointers:
