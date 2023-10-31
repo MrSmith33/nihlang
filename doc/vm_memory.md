@@ -152,8 +152,27 @@ I decided to use 4 pointer kinds:
        eq, ne also check the pointer
        gt, ge trap if pointer is not the same
        Only unsigned integer compares should check for pointers
-    9. branch
-       jumps if either data or pointer is not zero
+    9. Operations intended for tagged pointers like & |.  
+       This is probably the same as add instruction, but a pointer should be allowed on either side, but only a single pointer
+       An option is to return pointer in case of & | operations, but erase pointer in << >>
+       But what if we mask out the offset, and want to compare just the tag with some value/constant?
+       If the pointer is still there, the comparison will fail.
+       How does that work with 32-bit pointers? Only in low bits?
+       Easy solution is to introduce opcodes to return just the pointer, or offset parts.
+       Then the code will need to be shadow-pointer aware.
+       ---
+       It is enough to make | preserve pointer, and & >> << to reject pointer.
+       Tag extraction can be done with `ptr >> tag_offset`, or `ptr & tag_mask`
+       Tag setting can be done with `tag | ptr` or with `tag + ptr`
+       ---
+       Another option is to use `tag + ptr`, since addition already preserves pointer
+    10. How to separate pointer with offset into just pointer, or just offset?
+        `ptr | 0` to get the `offset`
+        `ptr - offset` to get pointer base
+    11. How to hash pointers?
+        If such hashes go into static memory, the content of the pointer will change, and the hash will change too.  
+        Probably best to forbid this
+        Pointer hash is just another kind of pointer/reference. Though even if I can know about where pointer hashes are located in memory and can fix them by rehashing, the data structures that use such hashes would become invalid.
 
 10. What should be done about padding within structs/arrays?
     I track initialization for each memory byte.
@@ -178,10 +197,12 @@ I decided to use 4 pointer kinds:
 
 13. If we overwrite the whole pointer with small writes, should it remain the pointer? (yes, we will overwrite just the offset)
 
-VM limitations:
+VM limitations/nuances:
 - Only aligned pointers (aligned by pointer size)
 - Pointers are only copied by the pointer-sized load/store or memcopy that covers whole pointer
 - Each allocation is in its own address space. You cannot subtract pointer to one allocation from pointer to a different one.
+- Pointers cannot be hashed (It is technically possible to add this, but the hash will change once memory is moved into static section)
+- Some operations on pointers copy the pointer into the result, which needs to be accounted for.
 
 I can choose the definition of safety for my lang. Accessing a dangling pointer is definitely a problem. Having dangling pointers in memory after the end of CTFE is also a problem. But triggering on programs that have some sort of allocator, where there can be some stale memory with old pointers feels not practical. At the same time triggering as early as possible seems the most convenient when trying to find the cause of a problem.
 Maybe the middle ground is to trigger conservatively. Then rerun all the computation looking for particular free operation and report it. I can do this if I make all the side-effects idempotent.
