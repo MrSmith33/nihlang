@@ -88,10 +88,9 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 
 	pragma(inline, true)
 	private static size_t getHash(Key key) {
-		import std.traits : isIntegral;
 		static if (Key.sizeof == 4) {
 			return int32_hash(key);
-		} else static if (isIntegral!Key) {
+		} else static if (Key.sizeof == 8 && is(typeof(cast(size_t)key))) {
 			return cast(size_t)key;
 		} else return hashOf(key);
 	}

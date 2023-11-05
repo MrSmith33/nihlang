@@ -220,6 +220,7 @@ struct GlobalSettings
 	bool printCallees;
 	bool verboseCallees;
 	bool printTotalTime;
+	bool timeTrace;
 
 	bool isCrossCompiling() const {
 		return targetOs != hostOs || targetArch != hostArch;
@@ -301,6 +302,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"no-libc", "", &settings.nolibc,
 			"customobject", "", &settings.customobject,
 			"color", "", &settings.color,
+			"time-trace", "", &settings.timeTrace,
 		);
 	}
 	catch(GetOptException e)
@@ -685,6 +687,7 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 	if (g.fuzzer) flags |= Flags.f_fuzzer;
 	if (g.nolibc) flags |= Flags.f_no_libc;
 	if (g.color) flags |= Flags.f_msg_color;
+	if (g.timeTrace) flags |= Flags.f_time_trace;
 
 	final switch(params.targetType) with(TargetType) {
 		case unknown: assert(false);
@@ -852,6 +855,12 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 				flags ~= "-fsanitize=fuzzer";
 				flags ~= "-fsanitize=address";
 				break;
+
+			case f_time_trace:
+				if (gs.compiler == Compiler.ldc) {
+					flags ~= "-ftime-trace";
+				}
+				break;
 		}
 
 		// Disable lowest set isolated bit
@@ -955,6 +964,7 @@ enum Flags : uint {
 	f_compile_imported   = 1 << 19,
 	f_coverage           = 1 << 20,
 	f_fuzzer             = 1 << 21,
+	f_time_trace         = 1 << 22,
 }
 
 enum TargetOs : ubyte {

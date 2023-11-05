@@ -12,13 +12,15 @@ import vox.vm.tests.infra;
 @nogc nothrow:
 
 void collectTests(alias M)(ref VoxAllocator allocator, ref TestSuite suite) {
-	import std.traits : hasUDA;
 	foreach(m; __traits(allMembers, M))
 	{
 		alias member = __traits(getMember, M, m);
-		static if (hasUDA!(member, VmTest)) {
-			suite.definitions.put(allocator, TestDefinition.init);
-			gatherTestDefinition!member(allocator, suite.definitions.back);
+		foreach (attr; __traits(getAttributes, member)) {
+			static if (is(attr == VmTest)) {
+				suite.definitions.put(allocator, TestDefinition.init);
+				gatherTestDefinition!member(allocator, suite.definitions.back);
+				break;
+			}
 		}
 	}
 	foreach(i, ref d; suite.definitions) {
