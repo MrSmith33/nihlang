@@ -42,7 +42,6 @@ int main(string[] args)
 		Config("nih-shared", "libnih.d", artifactDir, srcDir, TargetType.sharedLibrary, "nih"),
 		Config("vbe-static", "libvbe.d", artifactDir, srcDir, TargetType.staticLibrary, "vbe"),
 		Config("vbe-shared", "libvbe.d", artifactDir, srcDir, TargetType.sharedLibrary, "vbe"),
-		Config("testone",   "testone.d", artifactDir, srcDir, TargetType.executable),
 		Config("testsuite", "testsuite.d", artifactDir, srcDir, TargetType.executable),
 		Config("fuzzer", "fuzzer.d", artifactDir, srcDir, TargetType.executable),
 	];
@@ -263,7 +262,6 @@ void printConfigs() {
 	stderr.writeln("            nih-shared  Compiler dynamic library");
 	stderr.writeln("            vbe-static  Backend static library");
 	stderr.writeln("            vbe-shared  Backend dynamic library");
-	stderr.writeln("            testone     Single test executable");
 	stderr.writeln("            testsuite   Full test suite executable");
 }
 
