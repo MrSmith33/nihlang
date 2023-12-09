@@ -17,103 +17,109 @@ void formattedWriteln(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 
 void formattedWrite(Args...)(scope SinkDelegate sink, string fmt, Args args) {
 	u32 cursor = 0;
-	static void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) @nogc nothrow
-	{
-		u32 start = cursor;
-		while (true)
-		{
-			if (cursor >= fmt.length)
-				break;
-			if (fmt[cursor] == '%')
-			{
-				if (cursor + 1 >= fmt.length)
-					panic("Invalid format string. End of string after %%");
-				// peek char after %
-				if (fmt[cursor + 1] != '%')
-					break; // this is a format item
-				// consume first % to write it
-				++cursor;
-				// write literal including first %
-				sink(fmt[start .. cursor]);
-				// start after second %
-				start = cursor + 1;
-				// cursor is incremented after if
-			}
-			++cursor; // skip literal
-		}
-		if (cursor - start)
-			sink(fmt[start .. cursor]);
-	}
 
-	static FormatSpec consumeSpec(u32 argIndex, string fmt, ref u32 cursor) @nogc nothrow
-	{
-		FormatSpec spec;
-
-		if (cursor >= fmt.length)
-			panic("Invalid format string. Missing %%");
-
-		++cursor; // skip %
-
-		if (cursor >= fmt.length)
-			panic("Invalid format string. End of input after %%");
-
-		// flags
-		loop: while (true) {
-			if (cursor >= fmt.length)
-				panic("Invalid format string. Format item ended with end of string");
-
-			switch(fmt[cursor]) {
-				case '-': spec.flags |= FormatSpecFlags.dash;  break;
-				case '+': spec.flags |= FormatSpecFlags.plus;  break;
-				case '#': spec.flags |= FormatSpecFlags.hash;  break;
-				case '0': spec.flags |= FormatSpecFlags.zero;  break;
-				case ' ': spec.flags |= FormatSpecFlags.space; break;
-				default: break loop;
-			}
-
-			++cursor;
-		}
-
-		uint width;
-		while ('0' <= fmt[cursor] && fmt[cursor] <= '9') {
-			if (cursor >= fmt.length)
-				panic("Invalid format string. Format item ended with end of string");
-
-			width = width * 10 + (fmt[cursor] - '0');
-
-			if (width > 64)
-				panic("Invalid format string. Max width is 64");
-
-			++cursor;
-		}
-		spec.width = cast(ubyte)width;
-
-		// format char
-		if (cursor >= fmt.length)
-			panic("Invalid format string. Format item ended with end of string");
-
-		char c = fmt[cursor];
-		if ('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z') {
-			spec.spec = c;
-			++cursor;
-		} else {
-			panic("Invalid format string. Expected format char at the end. Got `%s`", c);
-		}
-
-		return spec;
-	}
-
-	foreach (i, arg; args)
-	{
+	foreach (i, arg; args) {
 		writeLiteral(sink, fmt, cursor);
 		FormatSpec spec = consumeSpec(i, fmt, cursor);
 		selectFormatter!(Args[i])(sink, arg, spec);
 	}
+
 	writeLiteral(sink, fmt, cursor);
 }
 
 void formatValue(T)(scope SinkDelegate sink, const auto ref T val, FormatSpec spec = FormatSpec()) {
 	selectFormatter!T(sink, val, spec);
+}
+
+private void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) @nogc nothrow {
+	u32 start = cursor;
+	while (true) {
+		if (cursor >= fmt.length){
+			break;
+		}
+
+		if (fmt[cursor] == '%')
+		{
+			if (cursor + 1 >= fmt.length)
+				panic("Invalid format string. End of string after %%");
+			// peek char after %
+			if (fmt[cursor + 1] != '%')
+				break; // this is a format item
+			// consume first % to write it
+			++cursor;
+			// write literal including first %
+			sink(fmt[start .. cursor]);
+			// start after second %
+			start = cursor + 1;
+			// cursor is incremented after if
+		}
+		++cursor; // skip literal
+	}
+	if (cursor - start)
+		sink(fmt[start .. cursor]);
+}
+
+private FormatSpec consumeSpec(u32 argIndex, string fmt, ref u32 cursor) @nogc nothrow {
+	FormatSpec spec;
+
+	if (cursor >= fmt.length) {
+		panic("Invalid format string. Missing %%");
+	}
+
+	++cursor; // skip %
+
+	if (cursor >= fmt.length) {
+		panic("Invalid format string. End of input after %%");
+	}
+
+	// flags
+	loop: while (true) {
+		if (cursor >= fmt.length) {
+			panic("Invalid format string. Format item ended with end of string");
+		}
+
+		switch(fmt[cursor]) {
+			case '-': spec.flags |= FormatSpecFlags.dash;  break;
+			case '+': spec.flags |= FormatSpecFlags.plus;  break;
+			case '#': spec.flags |= FormatSpecFlags.hash;  break;
+			case '0': spec.flags |= FormatSpecFlags.zero;  break;
+			case ' ': spec.flags |= FormatSpecFlags.space; break;
+			default: break loop;
+		}
+
+		++cursor;
+	}
+
+	uint width;
+	while ('0' <= fmt[cursor] && fmt[cursor] <= '9') {
+		if (cursor >= fmt.length) {
+			panic("Invalid format string. Format item ended with end of string");
+		}
+
+		width = width * 10 + (fmt[cursor] - '0');
+
+		if (width > 64) {
+			panic("Invalid format string. Max width is 64");
+		}
+
+		++cursor;
+	}
+	spec.width = cast(ubyte)width;
+
+	// format char
+	if (cursor >= fmt.length) {
+		panic("Invalid format string. Format item ended with end of string");
+	}
+
+	char c = fmt[cursor];
+	if ('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z') {
+		spec.spec = c;
+		++cursor;
+	} else {
+		panic("Invalid format string. Expected format char at the end. Got `%s`", c);
+	}
+
+	return spec;
 }
 
 template selectFormatter(T) {
