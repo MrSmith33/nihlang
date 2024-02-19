@@ -25,7 +25,7 @@ jobs:
         config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -46,7 +46,7 @@ jobs:
             no_deps:
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -54,8 +54,9 @@ jobs:
         run: |
           ./build/setup.sh
           ./build/builder --action=pack --remove-build --no-deps --build=${{matrix.build}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --pretty --color --color
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: artifact-${{ matrix.os }}-${{ matrix.build }}-${{ matrix.config }}
           path: bin/
   build_wasm:
     name: Build WASM
@@ -68,7 +69,7 @@ jobs:
             config: nih-cli
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -76,8 +77,9 @@ jobs:
         run: |
           ./build/setup.sh
           ./build/builder --action=pack --remove-build --no-deps --build=release-fast --target=${{matrix.target}} --config=${{matrix.config}} --compiler=ldc2 --print-commands --print-callees --pretty --color
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: artifact-${{ matrix.target }}-${{ matrix.config }}
           path: bin/
   test:
     name: Test suite
@@ -90,7 +92,7 @@ jobs:
             no_deps:
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dlang-community/setup-dlang@v1
         with:
           compiler: ${{ env.DC }}
@@ -105,15 +107,16 @@ jobs:
     needs: [build_no_deps, build_wasm, test]
     steps:
       # Cloning is needed for `gh release create` to work. It looks repository up in .git folder
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Download build artifacts of other jobs
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          pattern: artifact-*
+          merge-multiple: true
           path: bin/
       # Update tag, so that we get proper date and commit on github
       - name: Update CI tag
-        uses: richardsimko/update-tag@v1.0.10
+        uses: richardsimko/update-tag@v1.0.11
         if: github.ref == 'refs/heads/master'
         with:
           tag_name: CI
