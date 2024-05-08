@@ -1,6 +1,12 @@
 /// Copyright: Copyright (c) 2022 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
+
+// %s automatic
+// %b integer formatted as binary
+// %B for binary prefix (only integers, negative integers formatted with positive prefixes)
+// %m for metric prefix with u for micro (integers, floats and Duration)
+// %M for metric prefix with µ for micro (integers, floats and Duration)
 module vox.lib.format;
 
 import vox.lib;
@@ -133,7 +139,7 @@ template selectFormatter(T) {
 		alias selectFormatter = format_i64;
 	}
 	else static if (is(immutable T == immutable f32)) {
-		alias selectFormatter = format_f32;
+		alias selectFormatter = format_f64;
 	}
 	else static if (is(immutable T == immutable f64)) {
 		alias selectFormatter = format_f64;
@@ -225,9 +231,10 @@ void formatBool(scope SinkDelegate sink, bool val, FormatSpec spec) {
 }
 
 private enum INT_BUF_SIZE = 66;
-private enum FLT_BUF_SIZE = INT_BUF_SIZE*2+1;
+// Enough space to format 2 ints and dot
+private enum FMT_BUF_SIZE = INT_BUF_SIZE*2+1;
 
-void format_i64(scope SinkDelegate sink, i64 i, FormatSpec spec) {
+void format_i64(scope SinkDelegate sink, i64 i, FormatSpec spec = FormatSpec()) {
 	format_i64_impl(sink, i, spec, true);
 }
 
@@ -236,10 +243,13 @@ void format_u64(scope SinkDelegate sink, u64 i, FormatSpec spec) {
 }
 
 void format_i64_impl(scope SinkDelegate sink, u64 i, FormatSpec spec, bool signed) {
-	char[INT_BUF_SIZE] buf = void;
+	char[FMT_BUF_SIZE] buf = void;
 	u32 numDigits;
 
 	char padding = ' ';
+	bool minus = signed && (cast(i64)i < 0);
+
+	if (minus) i = -i;
 
 	if (spec.hasSpace) padding = ' ';
 	if (spec.hasZero) padding = '0';
@@ -249,7 +259,7 @@ void format_i64_impl(scope SinkDelegate sink, u64 i, FormatSpec spec, bool signe
 		numDigits = 1;
 	} else switch (spec.spec) {
 		case 'b':
-			numDigits = formatBinary(buf, i);
+			numDigits = formatBinaryBase(buf, i);
 			break;
 		case 'x':
 			numDigits = formatHex(buf, i, hexDigitsLower);
@@ -257,10 +267,23 @@ void format_i64_impl(scope SinkDelegate sink, u64 i, FormatSpec spec, bool signe
 		case 'X':
 			numDigits = formatHex(buf, i, hexDigitsUpper);
 			break;
+		case 'm':
+		case 'M':
+			auto dec = calcScaledDecimal(i);
+			formatMetricPrefix(buf, numDigits, dec.prefix, false);
+			formatScaledDecimal(buf, numDigits, dec);
+			break;
+		case 'B':
+			auto bin = calcScaledBinary(i);
+			formatBinaryPrefix(buf, numDigits, bin.prefix);
+			formatScaledDecimal(buf, numDigits, bin);
+			break;
 		default:
 			numDigits = formatDecimal(buf, i, signed);
 			break;
 	}
+
+	if (minus) buf[$ - ++numDigits] = '-';
 
 	while (spec.width > numDigits) {
 		buf[$ - ++numDigits] = padding;
@@ -269,15 +292,27 @@ void format_i64_impl(scope SinkDelegate sink, u64 i, FormatSpec spec, bool signe
 	sink(buf[$-numDigits..$]);
 }
 
-void format_f32(scope SinkDelegate sink, f32 f, FormatSpec spec) {
-	char[FLT_BUF_SIZE] buf = void;
-	u32 numDigits = formatFloat(buf, f);
-	sink(buf[$-numDigits..$]);
-}
+void format_f64(scope SinkDelegate sink, f64 f, FormatSpec spec = FormatSpec()) {
+	char[FMT_BUF_SIZE] buf = void;
+	u32 numDigits = 0;
 
-void format_f64(scope SinkDelegate sink, f64 f, FormatSpec spec) {
-	char[FLT_BUF_SIZE] buf = void;
-	u32 numDigits = formatFloat(buf, f);
+	bool minus = f < 0;
+	if (minus) f = -f;
+
+	switch (spec.spec) {
+		case 'm':
+		case 'M':
+			auto dec = calcScaledDecimal(f);
+			formatMetricPrefix(buf, numDigits, dec.prefix, spec.spec == 'M');
+			formatScaledDecimal(buf, numDigits, dec);
+			break;
+		default:
+			formatFloat(buf, numDigits, f);
+			break;
+	}
+
+	if (minus) buf[$ - ++numDigits] = '-';
+
 	sink(buf[$-numDigits..$]);
 }
 
@@ -287,7 +322,7 @@ void formatPointer(scope SinkDelegate sink, in void* ptr, FormatSpec spec) {
 		return;
 	}
 	sink("0x");
-	char[INT_BUF_SIZE] buf = void;
+	char[FMT_BUF_SIZE] buf = void;
 	u32 numDigits = formatHex(buf, cast(u64)ptr, hexDigitsUpper);
 	sink(buf[$-numDigits..$]);
 }
@@ -297,52 +332,200 @@ private immutable char[16] hexDigitsUpper = "0123456789ABCDEF";
 private immutable char[19] maxNegative_i64 = "9223372036854775808";
 
 // nonzero
-u32 formatHex(ref char[INT_BUF_SIZE] sink, u64 i, ref immutable(char)[16] chars) {
+u32 formatHex(ref char[FMT_BUF_SIZE] sink, u64 i, ref immutable(char)[16] chars) {
 	u32 numDigits = 0;
 	while (i) {
-		sink[INT_BUF_SIZE - ++numDigits] = chars[i & 0xF];
+		sink[$ - ++numDigits] = chars[i & 0xF];
 		i >>= 4;
 	}
 	return numDigits;
 }
 
 // nonzero
-u32 formatBinary(ref char[INT_BUF_SIZE] sink, u64 u) {
+u32 formatBinaryBase(ref char[FMT_BUF_SIZE] sink, u64 u) {
 	u32 numDigits = 0;
 	do {
 		char c = cast(char)('0' + (u & 1));
-		sink[INT_BUF_SIZE - ++numDigits] = c;
+		sink[$ - ++numDigits] = c;
 		u >>= 1;
 	} while (u != 0);
 	return numDigits;
 }
 
-u32 formatDecimalUnsigned(ref char[INT_BUF_SIZE] sink, u64 u) {
-	u32 numDigits = 0;
+void formatDecimalUnsigned(ref char[FMT_BUF_SIZE] sink, ref u32 numDigits, u64 u) {
 	do {
 		char c = cast(char)('0' + (u % 10));
-		sink[INT_BUF_SIZE - ++numDigits] = c;
+		sink[$ - ++numDigits] = c;
 		u /= 10;
 	} while (u != 0);
-	return numDigits;
 }
 
-u32 formatDecimal(ref char[INT_BUF_SIZE] sink, i64 i, bool signed) {
+u32 formatDecimal(ref char[FMT_BUF_SIZE] buf, i64 i, bool signed) {
 	u32 numDigits = 0;
 	u64 u = i;
 	if (signed && i < 0) { u = -i; }
 	do {
 		char c = cast(char)('0' + (u % 10));
-		sink[INT_BUF_SIZE - ++numDigits] = c;
+		buf[$ - ++numDigits] = c;
 		u /= 10;
 	} while (u != 0);
-	if (signed && i < 0) { sink[INT_BUF_SIZE - ++numDigits] = '-'; }
+	if (signed && i < 0) { buf[$ - ++numDigits] = '-'; }
 	return numDigits;
+}
+
+struct ScaledDecimal {
+	// 3-4 decimal digits or 0
+	u32 whole;
+	// 0-2
+	u8 fractionDigits;
+	// 0-6 (10^[0;30]) for u64
+	// -10 - 102 (10^[-30;306]) for f64
+	i8 prefix;
+}
+
+ScaledDecimal calcScaledDecimal(T)(T value)
+	if (is(T == u64) || is(T == f64))
+{
+	if (value == 0) return ScaledDecimal(cast(u32)value, 0, 0);
+
+	i32 power = 0;
+
+	// Bring any value to 4 digits
+	while(value < 1000) {
+		value *= 10;
+		power -= 1;
+	}
+	while(value >= 10000) {
+		value /= 10;
+		power += 1;
+	}
+
+	// Round to 3 digits
+	value = divNear(value, 10); // round to even
+	power += 3;
+
+	// Rounding may have produced 4th digit
+	if (value >= 1000) {
+		value /= 10;
+		power += 1;
+	}
+
+	const u32 fractionDigits = 2 - modEuclidean(power, 3);
+	const i32 prefix = divFloor(power, 3);
+
+	// too small
+	if (prefix < -10) return ScaledDecimal(0, 0, 0);
+
+	return ScaledDecimal(cast(u32)value, cast(u8)fractionDigits, cast(i8)prefix);
+}
+
+ScaledDecimal calcScaledBinary(u64 value) {
+	if (value == 0) return ScaledDecimal(cast(u32)value, 0);
+
+	// max is 63, for u64
+	i32 power = bsr(value);
+
+	// max is 6
+	const i32 prefix = divFloor(power, 10);
+	assert(prefix >= 0);
+	power = prefix * 10;
+
+	// Produces 4-7 digits
+	// branch select ordering to avoid overflow/underflow
+	if (value < (u64.max / 1000))
+		value = (value * 1000) >> power;
+	else
+		value = (value >> power) * 1000;
+
+	// Round to 3-5 digits
+	u32 fractionDigits = 0;
+	if (value >= 99950) {
+		// Cut off 3 digits, to get 3-4 digits
+		value = divNear(value, 1000);
+		fractionDigits = 0;
+	} else if (value >= 9950) {
+		// Cut off 2 digits, to get 3-4 digits
+		value = divNear(value, 100);
+		fractionDigits = 1;
+	} else {
+		// Cut off 1 digit, to get 3-4 digits
+		value = divNear(value, 10);
+		fractionDigits = 2;
+	}
+
+	return ScaledDecimal(cast(u32)value, cast(u8)fractionDigits, cast(i8)prefix);
+}
+
+void formatMetricPrefix(ref char[FMT_BUF_SIZE] buf, ref u32 numDigits, const i8 prefix, const bool useGreek) {
+	if (prefix == 0) return;
+
+	// print with scientific notation
+	if (prefix > 10) {
+		formatDecimalUnsigned(buf, numDigits, cast(u64)prefix * 3);
+		buf[$ - ++numDigits] = '+';
+		buf[$ - ++numDigits] = 'e';
+		return;
+	}
+
+	if (useGreek && prefix == -2) { // μ
+		buf[$ - ++numDigits] = 0xBC;
+		buf[$ - ++numDigits] = 0xCE;
+	} else {
+		buf[$ - ++numDigits] = scalePrefixesAscii[10 + prefix];
+	}
+}
+
+void formatBinaryPrefix(ref char[FMT_BUF_SIZE] buf, ref u32 numDigits, const i8 prefix) {
+	assert(prefix >= 0 && prefix <= 10);
+	if (prefix == 0) return;
+	buf[$ - ++numDigits] = 'i';
+	buf[$ - ++numDigits] = scalePrefixesAscii[10 + prefix];
+}
+
+void formatDecimalFraction(ref char[FMT_BUF_SIZE] buf, ref u32 numDigits, ref u32 value, bool skipTrailingZeroes, u8 fractionDigits) {
+	switch (fractionDigits) {
+		case 2:
+			if (skipTrailingZeroes && value % 100 == 0) {
+				value /= 100;
+				break;
+			}
+			buf[$ - ++numDigits] = cast(char)('0' + value % 10);
+			value /= 10;
+			buf[$ - ++numDigits] = cast(char)('0' + value % 10);
+			value /= 10;
+			buf[$ - ++numDigits] = '.';
+			break;
+		case 1:
+			if (skipTrailingZeroes && value % 100 == 0) {
+				value /= 10;
+				break;
+			}
+			buf[$ - ++numDigits] = cast(char)('0' + value % 10);
+			value /= 10;
+			buf[$ - ++numDigits] = '.';
+			break;
+		default:
+			break;
+	}
+}
+
+void formatScaledDecimal(ref char[FMT_BUF_SIZE] buf, ref u32 numDigits, const ScaledDecimal dec) {
+	// print fractional part
+	u32 value = dec.whole;
+	const bool skipTrailingZeroes = dec.prefix == 0;
+	formatDecimalFraction(buf, numDigits, value, skipTrailingZeroes, dec.fractionDigits);
+
+	// print whole part
+	do {
+		char c = cast(char)('0' + (value % 10));
+		buf[$ - ++numDigits] = c;
+		value /= 10;
+	} while (value != 0);
 }
 
 enum FP_PRECISION = 6;
 
-u32 formatFloat(ref char[FLT_BUF_SIZE] buf, f64 originalFloat) {
+u32 formatFloat(ref char[FMT_BUF_SIZE] buf, ref u32 numDigits, f64 originalFloat) {
 	f64 f = originalFloat;
 	if (originalFloat < 0) f = -f;
 	i64 ipart = cast(i64)(f + 0.00000001);
@@ -351,25 +534,24 @@ u32 formatFloat(ref char[FLT_BUF_SIZE] buf, f64 originalFloat) {
 
 	i64 ndigits = 0;
 	i64 nzeroes = -1;
-
 	while (frac - cast(i64)(frac) >= 0.0000001 && frac - cast(i64)(frac) <= 0.9999999 && ndigits < FP_PRECISION) {
 		if (cast(i64)(frac) == 0) nzeroes++;
 		ndigits++;
 		frac *= 10;
 	}
+	if (nzeroes < 0) nzeroes = 0;
+
 	if (frac - cast(i64)(frac) > 0.9999999) frac++;
 
-	auto bufPtr = cast(char[INT_BUF_SIZE]*)(buf.ptr+INT_BUF_SIZE+1);
-	u32 numDigits = formatDecimalUnsigned(*bufPtr, cast(u64)(frac));
+	// decimal after dot
+	formatDecimalUnsigned(buf, numDigits, cast(u64)(frac));
 	while (nzeroes) {
 		buf[$ - ++numDigits] = '0';
 		--nzeroes;
 	}
 
 	buf[$ - ++numDigits] = '.';
-
-	bufPtr = cast(char[INT_BUF_SIZE]*)(buf.ptr+FLT_BUF_SIZE-numDigits-INT_BUF_SIZE);
-	numDigits += formatDecimalUnsigned(*bufPtr, ipart);
+	formatDecimalUnsigned(buf, numDigits, ipart);
 
 	if (originalFloat < 0) {
 		buf[$ - ++numDigits] = '-';
@@ -401,6 +583,9 @@ enum FormatSpecFlags : ubyte {
 	hash   = 1 << 4,
 }
 
+
+// -30 .. 30, with step of 3. Or -10 to 10 with step of 1
+immutable(char[21]) scalePrefixesAscii = "qryzafpnum KMGTPEZYRQ";
 
 void testFormatting() @nogc nothrow {
 	char[512] buf = void;
@@ -483,4 +668,126 @@ void testFormatting() @nogc nothrow {
 	}
 	test("A(a : 42, b : 60)", "%s", A());
 	test("it's B", "%s", B());
+}
+
+void testFormatting2() {
+	char[512] buf = void;
+	u32 cursor;
+	void testSink(scope const(char)[] str) @nogc nothrow {
+		buf[cursor..cursor+str.length] = str;
+		cursor += str.length;
+	}
+
+	void test(T)(T num, string expected, string file = __MODULE__, int line = __LINE__) {
+		cursor = 0;
+		formattedWrite(&testSink, "%m", num);
+
+		if (expected != buf[0..cursor]) {
+			writefln("\033[1;31m[FAIL]\033[0m %s:%s", file, line);
+			writefln("Got:      %s", buf[0 .. cursor]);
+			writefln("Expected: %s", expected);
+			panic(line, file, 1, "panic");
+		}
+	}
+
+	test(-10_000_000_000_000_000_000_000_000_000_000_000.0, "-10.0e+33");
+	test(-1_000_000_000_000_000_000_000_000_000_000_000.0, "-1.00e+33");
+	test(-100_000_000_000_000_000_000_000_000_000_000.0, "-100Q");
+	test(-10_000_000_000_000_000_000_000_000_000_000.0, "-10.0Q");
+	test(-1_000_000_000_000_000_000_000_000_000_000.0, "-1.00Q");
+	test(-100_000_000_000_000_000_000_000_000_000.0, "-100R");
+	test(-10_000_000_000_000_000_000_000_000_000.0, "-10.0R");
+	test(-1_000_000_000_000_000_000_000_000_000.0, "-1.00R");
+	test(-100_000_000_000_000_000_000_000_000.0, "-100Y");
+	test(-10_000_000_000_000_000_000_000_000.0, "-10.0Y");
+	test(-1_000_000_000_000_000_000_000_000.0, "-1.00Y");
+	test(-100_000_000_000_000_000_000_000.0, "-100Z");
+	test(-10_000_000_000_000_000_000_000.0, "-10.0Z");
+	test(-1_000_000_000_000_000_000_000.0, "-1.00Z");
+	test(-100_000_000_000_000_000_000.0, "-100E");
+	test(-10_000_000_000_000_000_000.0, "-10.0E");
+
+	test(long.min, "-9.22E");
+	test(-9_223_372_036_854_775_807, "-9.22E");
+	test(-1_000_000_000_000_000_000, "-1.00E");
+	test(-100_000_000_000_000_000, "-100P");
+	test(-10_000_000_000_000_000, "-10.0P");
+	test(-1_000_000_000_000_000, "-1.00P");
+	test(-100_000_000_000_000, "-100T");
+	test(-10_000_000_000_000, "-10.0T");
+	test(-1_000_000_000_000, "-1.00T");
+	test(-100_000_000_000, "-100G");
+	test(-10_000_000_000, "-10.0G");
+	test(-1_000_000_000, "-1.00G");
+	test(-100_000_000, "-100M");
+	test(-10_000_000, "-10.0M");
+	test(-1_000_000, "-1.00M");
+	test(-100_000, "-100K");
+	test(-10_000, "-10.0K");
+	test(-1_000, "-1.00K");
+	test(-100, "-100");
+	test(-10, "-10");
+	test(-1, "-1");
+	test(0, "0");
+	test(1, "1");
+	test(10, "10");
+	test(100, "100");
+	test(1_000, "1.00K");
+	test(10_000, "10.0K");
+	test(100_000, "100K");
+	test(1_000_000, "1.00M");
+	test(10_000_000, "10.0M");
+	test(100_000_000, "100M");
+	test(1_000_000_000, "1.00G");
+	test(10_000_000_000, "10.0G");
+	test(100_000_000_000, "100G");
+	test(1_000_000_000_000, "1.00T");
+	test(10_000_000_000_000, "10.0T");
+	test(100_000_000_000_000, "100T");
+	test(1_000_000_000_000_000, "1.00P");
+	test(10_000_000_000_000_000, "10.0P");
+	test(100_000_000_000_000_000, "100P");
+	test(1_000_000_000_000_000_000, "1.00E");
+	test(ulong.max, "18.4E");
+
+	test(10_000_000_000_000_000_000.0, "10.0E");
+	test(100_000_000_000_000_000_000.0, "100E");
+	test(1_000_000_000_000_000_000_000.0, "1.00Z");
+	test(10_000_000_000_000_000_000_000.0, "10.0Z");
+	test(100_000_000_000_000_000_000_000.0, "100Z");
+	test(1_000_000_000_000_000_000_000_000.0, "1.00Y");
+	test(10_000_000_000_000_000_000_000_000.0, "10.0Y");
+	test(100_000_000_000_000_000_000_000_000.0, "100Y");
+	test(1_000_000_000_000_000_000_000_000_000.0, "1.00R");
+	test(10_000_000_000_000_000_000_000_000_000.0, "10.0R");
+	test(100_000_000_000_000_000_000_000_000_000.0, "100R");
+	test(1_000_000_000_000_000_000_000_000_000_000.0, "1.00Q");
+	test(10_000_000_000_000_000_000_000_000_000_000.0, "10.0Q");
+	test(100_000_000_000_000_000_000_000_000_000_000.0, "100Q");
+	test(1_000_000_000_000_000_000_000_000_000_000_000.0, "1.00e+33");
+	test(10_000_000_000_000_000_000_000_000_000_000_000.0, "10.0e+33");
+
+	test(0x1p-1022, "0");
+	test(double.max, "180e+306");
+
+	// numbers less than 1.0 or close to 1
+	test(1.234, "1.23");
+	test(1.000, "1");
+	test(0.9994, "999m");
+	test(0.9995, "1");
+	test(0.9996, "1");
+	test(0.1234, "123m");
+	test(0.01234, "12.3m");
+	test(0.001234, "1.23m");
+	test(0.0001234, "123u");
+
+	test(-1.234, "-1.23");
+	test(-1.000, "-1");
+	test(-0.9994, "-999m");
+	test(-0.9995, "-1");
+	test(-0.9996, "-1");
+	test(-0.1234, "-123m");
+	test(-0.01234, "-12.3m");
+	test(-0.001234, "-1.23m");
+	test(-0.0001234, "-123u");
 }

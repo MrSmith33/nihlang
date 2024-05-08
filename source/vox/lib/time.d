@@ -41,7 +41,7 @@ struct Duration {
 	i64 ticks;
 
 	void toString(scope SinkDelegate sink, FormatSpec spec) const {
-		sink.formattedWrite("%ss", cast(double)ticks / MonoTime.ticksPerSecond);
+		sink.formattedWrite("%ms", cast(double)ticks / MonoTime.ticksPerSecond);
 	}
 }
 

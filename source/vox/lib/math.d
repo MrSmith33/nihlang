@@ -8,7 +8,6 @@ import vox.lib;
 
 @nogc nothrow:
 
-
 T min(T)(T a, T b) pure {
 	if (a < b) return a;
 	return b;
@@ -19,12 +18,48 @@ T max(T)(T a, T b) pure {
 	return b;
 }
 
+T clamp(T)(T x, T min, T max) pure {
+	if (x < min) return min;
+	if (x > max) return max;
+	return x;
+}
+
+T abs(T)(T a) pure {
+	if (a < 0) return -a;
+	return a;
+}
+
+i64 round(f64 x) pure {
+	if (x < 0) return cast(i64)(x - 0.5);
+	return cast(i64)(x + 0.5);
+}
+
 i32 signum(T)(const T x) pure {
 	return (x > 0) - (x < 0);
 }
 
 T divCeil(T)(T a, T b) pure {
 	return a / b + (a % b > 0);
+}
+
+T divFloor(T)(T a, T b) pure {
+	return a / b - (a % b < 0);
+}
+
+T divNear(T)(T a, T b) pure {
+	if ((a<0) != (b<0)) {
+		return (a - b / 2) / b;
+	}
+	return (a + b / 2) / b;
+}
+
+// For b = 3
+// a -6 -5 -4 -3 -2 -1 0 1 2 3 4 5 6
+// r  0  1  2  0  1  2 0 1 2 0 1 2 0
+T modEuclidean(T)(T a, T b) pure {
+	T r = a % b;
+	if (r < 0) return r + b;
+	return r;
 }
 
 T nextPOT(T)(T x) pure {
