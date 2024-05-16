@@ -243,9 +243,9 @@ For now I will remove all permissions from the allocation and set the size to u3
 
 User may want to control runtime mutability of heap allocated memory, after it gets converted into static memory. This needs 1 bit of data to be stored on all heap allocations
 
-
 Representation (32-bit)
 =======================
+```
 1. 32-bit pointer (h10 + 0xFFFF_2211)
 +----+----+----+----+
 | 11 | 22 | FF | FF | memory bytes
@@ -267,9 +267,11 @@ Representation (32-bit)
 +----+----+----+----+----+----+----+----+
 |        ???        |        ???        | shadow pointer base
 +----+----+----+----+----+----+----+----+
+```
 
 Representation (64-bit)
 =======================
+```
 1. 64-bit pointer (h10 + 0xFFFF_FFFF_4433_2211)
 +----+----+----+----+----+----+----+----+
 | 11 | 22 | 33 | 44 | FF | FF | FF | FF | memory bytes
@@ -291,9 +293,11 @@ Representation (64-bit)
 +----+----+----+----+----+----+----+----+
 |                  ???                  | shadow pointer base
 +----+----+----+----+----+----+----+----+
+```
 
 Data size when everything is stored as arrays
 =========
+```
 ptr  | ptr  |                              | bits per
 size | data | 64 bits of memory            | raw bit
 -----+------+------------------------------+-------------
@@ -301,3 +305,4 @@ size | data | 64 bits of memory            | raw bit
   32 |  64  | 64 + 8 + 2 + 64x2 = 202 bits | 3.16
   64 |  32  | 64 + 8 + 1 + 32   = 105 bits | 1.64
   64 |  64  | 64 + 8 + 1 + 64   = 137 bits | 2.14
+```
