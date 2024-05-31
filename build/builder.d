@@ -18,9 +18,14 @@
 // one needs to use another linker, such as gold, via -linker=gold flag
 // https://github.com/ldc-developers/ldc/issues/4289
 //
-// https://wiki.dlang.org/Generating_WebAssembly_with_LDC
-// https://webassembly.org/roadmap/
-// ldc2 -mtriple=wasm32-wasi -mattr=help
+// Webassembly
+//   https://github.com/bytecodealliance/wasmtime/issues/8697 wasi threads
+//   https://wiki.dlang.org/Generating_WebAssembly_with_LDC
+//   https://webassembly.org/roadmap/
+//   ldc2 -mtriple=wasm32-wasi -mattr=help
+//   (start $__wasm_init_memory) is produced by the compiler. `start` shouldn't be overridden
+//   __wasm_init_memory performs thread-safe static memory init.
+//   `start` function is called by every thread before running entry point
 //
 // source ~/dlang/ldc-1.32.0/activate
 module builder;
@@ -489,7 +494,8 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 		args : args,
 		artifacts : artifacts,
 		extraArtifacts : extraArtifacts,
-		printOutput : gs.printCallees };
+		printOutput : gs.printCallees,
+	};
 	return job;
 }
 
@@ -897,8 +903,34 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 		case x64, arm64: break;
 		case wasm32: {
 			linkerFlags ~= "-allow-undefined";
+
 			// Needed for atomic operations in threads
 			linkerFlags ~= "--shared-memory";
+
+			// Without this other threads do not see any changes to memory
+			linkerFlags ~= "--import-memory";
+
+			// Without export WASI functions do not work
+			// Memory is exported by default, unless --import-memory is specified
+			linkerFlags ~= "--export-memory";
+
+			// --initial-memory=<size> can be used to control initial memory size
+			// linkerFlags ~= "--initial-memory=2228224";
+
+			enum MiB = 1024 * 1024;
+			enum MAX_MEM = 64 * MiB;
+
+			// When using --shared-memory, the memory cannot grow past its max size
+			// By default max size is equal to initial size
+			// so set it to something enough for the whole execution (64MiB)
+			// See: https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md#resizing
+			// (memory (;0;) 17 1024 shared)
+			//                |    |
+			//                |    max size (64KiB pages)
+			//                initial size (64KiB pages)
+			// in bytes
+			linkerFlags ~= format("--max-memory=%s", MAX_MEM);
+
 			flags ~= "-mattr=+bulk-memory,+atomics";
 			flags ~= "-fvisibility=hidden";
 			break;
