@@ -98,3 +98,11 @@ noreturn proc_exit(
 	/// The exit code returned by the process.
 	u32 rval
 );
+
+// Negative result means error
+@llvmAttr("wasm-import-module", "wasi")
+@llvmAttr("wasm-import-name", "thread-spawn")
+i32 thread_spawn(
+	// A pointer to an opaque struct to be passed to the module's entry function.
+	void* start_arg
+);
