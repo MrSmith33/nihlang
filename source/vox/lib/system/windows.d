@@ -8,7 +8,7 @@ version(Windows) version(X86_64) @nogc nothrow @system:
 import vox.lib.types;
 
 void writeString(const(char)[] str) {
-	void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	//SetConsoleOutputCP(65001);
 	u32 numWritten;
 	WriteFile(
@@ -26,31 +26,71 @@ extern(Windows):
 alias HANDLE = void*;
 
 pragma(lib, "kernel32.lib");
-noreturn ExitProcess(uint uExitCode);
+bool CloseHandle(HANDLE hObject);
+noreturn ExitProcess(u32 uExitCode);
+HANDLE CreateThread(void* lpThreadAttributes, usz dwStackSize, void* lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
+u32 GetThreadId(HANDLE Thread);
+enum u32 INFINITE = 0xFFFFFFFF;
+u32 WaitForSingleObject(HANDLE hHandle, u32 dwMilliseconds);
 HANDLE GetCurrentProcess();
 HANDLE GetStdHandle(u32 nStdHandle);
 void GetCurrentThreadStackLimits(void** stackLow, void** stackHigh);
-bool WriteFile(
-	void* hFile,
-	u8* lpBuffer,
-	u32 nNumberOfCharsToWrite,
-	u32* lpNumberOfCharsWritten,
-	void* lpOverlapped
+HANDLE CreateFileA(
+	const(char)*         lpFileName,
+	u32                  dwDesiredAccess,
+	u32                  dwShareMode,
+	SECURITY_ATTRIBUTES* lpSecurityAttributes,
+	u32                  dwCreationDisposition,
+	u32                  dwFlagsAndAttributes,
+	HANDLE               hTemplateFile
 );
+bool WriteFile(
+	HANDLE hFile,
+	u8*          lpBuffer,
+	u32          nNumberOfBytesToWrite,
+	u32*         lpNumberOfBytesWritten,
+	OVERLAPPED*  lpOverlapped
+);
+bool ReadFile(
+	HANDLE      hFile,
+	u8*         lpBuffer,
+	u32         nNumberOfBytesToRead,
+	u32*        lpNumberOfBytesRead,
+	OVERLAPPED* lpOverlapped
+);
+enum HANDLE INVALID_HANDLE_VALUE = cast(HANDLE)-1;
 enum u32 STD_INPUT_HANDLE  = 0xFFFFFFF6;
 enum u32 STD_OUTPUT_HANDLE = 0xFFFFFFF5;
 enum u32 STD_ERROR_HANDLE  = 0xFFFFFFF4;
+// dwCreationDisposition
+enum u32 CREATE_NEW            = 0x00000001;
+enum u32 CREATE_ALWAYS         = 0x00000002;
+enum u32 OPEN_EXISTING         = 0x00000003;
+enum u32 OPEN_ALWAYS           = 0x00000004;
+enum u32 TRUNCATE_EXISTING     = 0x00000005;
+// dwFlagsAndAttributes
+enum u32 FILE_ATTRIBUTE_READONLY  = 0x00000001;
+enum u32 FILE_ATTRIBUTE_HIDDEN    = 0x00000002;
+enum u32 FILE_ATTRIBUTE_SYSTEM    = 0x00000004;
+enum u32 FILE_ATTRIBUTE_ARCHIVE   = 0x00000020;
+enum u32 FILE_ATTRIBUTE_NORMAL    = 0x00000080;
+enum u32 FILE_ATTRIBUTE_TEMPORARY = 0x00000100;
+enum u32 FILE_ATTRIBUTE_OFFLINE   = 0x00001000;
+enum u32 FILE_ATTRIBUTE_ENCRYPTED = 0x00004000;
 
-void* VirtualAlloc(void* lpAddress, size_t dwSize, uint flAllocationType, uint flProtect);
-bool VirtualFree(void* lpAddress, size_t dwSize, uint dwFreeType);
-bool VirtualProtect(void* lpAddress, size_t dwSize, uint flNewProtect, uint* lpflOldProtect);
-bool FlushInstructionCache(void* hProcess, void* lpBaseAddress, size_t dwSize);
-uint GetLastError() @trusted;
+enum u32 GENERIC_WRITE         = 0x40000000;
+void* VirtualAlloc(void* lpAddress, usz dwSize, u32 flAllocationType, u32 flProtect);
+bool VirtualFree(void* lpAddress, usz dwSize, u32 dwFreeType);
+bool VirtualProtect(void* lpAddress, usz dwSize, u32 flNewProtect, u32* lpflOldProtect);
+bool FlushInstructionCache(void* hProcess, void* lpBaseAddress, usz dwSize);
+u32 GetLastError();
 
-bool QueryPerformanceCounter(long* lpPerformanceCount);
-void QueryPerformanceFrequency(long* frequency);
+bool QueryPerformanceCounter(i64* lpPerformanceCount);
+void QueryPerformanceFrequency(i64* frequency);
 
-enum : uint {
+u32 GetCurrentThreadId();
+
+enum : u32 {
 	PAGE_NOACCESS          = 0x0001,
 	PAGE_READONLY          = 0x0002,
 	PAGE_READWRITE         = 0x0004,
@@ -63,7 +103,7 @@ enum : uint {
 	PAGE_NOCACHE           = 0x0200,
 }
 
-enum : uint {
+enum : u32 {
 	MEM_COMMIT      = 0x00001000,
 	MEM_RESERVE     = 0x00002000,
 	MEM_DECOMMIT    = 0x00004000,
@@ -78,9 +118,49 @@ enum : uint {
 	MEM_4MB_PAGES   = 0x80000000,
 }
 
+struct SECURITY_ATTRIBUTES {
+	u32 nLength;
+	void* lpSecurityDescriptor;
+	bool bInheritHandle;
+}
+
+struct OVERLAPPED {
+	u64* Internal;
+	u64* InternalHigh;
+	union {
+		struct {
+			u32 Offset;
+			u32 OffsetHigh;
+		}
+		void* Pointer;
+	}
+	HANDLE hEvent;
+}
+
 
 pragma(lib, "ntdll.lib");
+alias NTSTATUS = i32;
+enum NTSTATUS STATUS_SUCCESS = 0x00000000;
+enum NTSTATUS STATUS_INVALID_PARAMETER = 0xC000000D;
+enum NTSTATUS STATUS_TIMEOUT = 0x00000102;
+
 u16 RtlWalkFrameChain(void** BackTrace, u32 FramesToCapture, u32 flags);
+// Windows 8+
+// [in, opt] Timeout
+//           Multiple of 100ns
+//           Positive values are absolute date and time
+//           Negative values are relative to now
+//           0 - immediate return
+//           null - infinite wait
+//           See also: https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
+NTSTATUS RtlWaitOnAddress(
+	void* Address,
+	void* CompareAddress,
+	usz AddressSize,
+	i64* Timeout
+);
+void RtlWakeAddressAll(void* addr);
+void RtlWakeAddressSingle(void* addr);
 
 
 pragma(lib, "dbghelp.lib");

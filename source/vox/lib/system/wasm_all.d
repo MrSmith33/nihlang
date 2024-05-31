@@ -5,9 +5,12 @@
 /// This is for all versions of WebAssembly, without or without WASI
 module vox.lib.system.wasm_all;
 
+import vox.lib.types;
+
 version(WebAssembly) @nogc nothrow @system:
 
-pragma(LDC_intrinsic, "llvm.wasm.memory.grow.i32")
+enum WASM_PAGE = 64 * 1024;
+
 /// mem: 0
 /// pageIncrease: The number of WebAssembly pages you want to grow the memory by (each one is 64KiB in size).
 /// Returns: The previous size of the memory, in units of WebAssembly pages, or -1 on fail.
@@ -16,6 +19,10 @@ pragma(LDC_intrinsic, "llvm.wasm.memory.grow.i32")
 /// defined that would be exceeded. However, failure can occur in other cases as well. In practice,
 /// the choice depends on the resources available to the embedder.
 /// https://webassembly.github.io/spec/core/exec/instructions.html#exec-memory-grow
+// Shared memories are not growable past the max size.
+// --max-memory=<size> needs to be used
+// --shared-memory linker flag
+pragma(LDC_intrinsic, "llvm.wasm.memory.grow.i32")
 int wasm_memory_grow(int mem, int pageIncrease);
 
 pragma(LDC_intrinsic, "llvm.wasm.memory.size.i32")
@@ -45,3 +52,14 @@ extern(C) void* memcpy(void* dest, const void* src, size_t len) {
 	wasm_memory_copy(0, cast(uint)dest, cast(uint)src, len);
 	return dest;
 }
+
+// https://webassembly.github.io/threads/core/syntax/instructions.html#syntax-instr-atomic-memory
+pragma(LDC_intrinsic, "llvm.wasm.memory.atomic.notify")
+u32 wasm_memory_atomic_notify(u32* ptr, u32 waiters);
+
+// when timeout_ns is -1 - it is infinite
+pragma(LDC_intrinsic, "llvm.wasm.memory.atomic.wait32")
+u32 wasm_memory_atomic_wait32(u32* ptr, u32 expression, i64 timeout_ns);
+
+pragma(LDC_intrinsic, "llvm.wasm.memory.atomic.wait64")
+u32 wasm_memory_atomic_wait64(u64* ptr, u64 expression, i64 timeout_ns);

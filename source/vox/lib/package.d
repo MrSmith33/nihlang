@@ -4,6 +4,7 @@
 module vox.lib;
 
 public import vox.lib.algo;
+public import vox.lib.atomic;
 public import vox.lib.bits;
 public import vox.lib.error;
 public import vox.lib.format;
