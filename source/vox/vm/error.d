@@ -58,7 +58,7 @@ usz memOpSize(ref VmState vm) {
 		case store_m64: return 8;
 		case memcopy:
 			VmReg* len = &vm.regs[vm.code[vm.ip+3]];
-			return len.as_s64;
+			return cast(usz)len.as_s64;
 		default: panic("Opcode %s is not a memory opcode", op);
 	}
 }

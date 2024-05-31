@@ -17,8 +17,8 @@ struct VmTestContext {
 	SinkDelegate sink;
 	Test test;
 
-	this(ref VoxAllocator allocator, SinkDelegate _sink) {
-		vm.allocator = &allocator;
+	this(VoxAllocator* allocator, SinkDelegate _sink) {
+		vm.allocator = allocator;
 
 		enum static_bytes = 1*1024;
 		enum heap_bytes = 1*1024;

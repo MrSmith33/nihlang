@@ -803,11 +803,14 @@ void instr_memcopy(ref VmState vm) {
 		return vm.setTrap(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 	}
 
-	i64 length = len.as_s64;
+	u64 length64 = len.as_u64;
+	usz length   = cast(usz)length64;
 
-	i64 dstOffset = dst.as_s64;
-	if (dstOffset < 0) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
-	if (dstOffset + length > dstAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+	i64 dstOffset64 = dst.as_s64;
+	if (dstOffset64 < 0) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+	if (dstOffset64 + length64 > dstAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+
+	usz dstOffset = cast(usz)dstOffset64;
 
 	Memory* srcMem = &vm.memories[src.pointer.kind];
 	Allocation* srcAlloc = &srcMem.allocations[src.pointer.index];
@@ -818,18 +821,20 @@ void instr_memcopy(ref VmState vm) {
 		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
-	i64 srcOffset = src.as_s64;
-	if (srcOffset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
-	if (srcOffset + length > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
+	i64 srcOffset64 = src.as_s64;
+	if (srcOffset64 < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
+	if (srcOffset64 + length64 > srcAlloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
+
+	usz srcOffset = cast(usz)srcOffset64;
 
 	auto dstFromMem = cast(u32)roundUp(dstAlloc.offset + dstOffset, vm.ptrSize.inBytes);
-	auto dstToMem   = max(dstFromMem, cast(u32)roundDown(dstAlloc.offset + dstOffset + length, vm.ptrSize.inBytes));
+	auto dstToMem   = max(dstFromMem, cast(u32)roundDown(dstAlloc.offset + dstOffset + length64, vm.ptrSize.inBytes));
 	PointerId dstFromMemSlot = memOffsetToPtrIndex(dstFromMem, vm.ptrSize);
 	PointerId dstToMemSlot   = memOffsetToPtrIndex(dstToMem, vm.ptrSize);
 	assert(dstFromMemSlot <= dstToMemSlot);
 
 	auto srcFromMem = cast(u32)roundUp(srcAlloc.offset + srcOffset, vm.ptrSize.inBytes);
-	auto srcToMem   = max(srcFromMem, cast(u32)roundDown(srcAlloc.offset + srcOffset + length, vm.ptrSize.inBytes));
+	auto srcToMem   = max(srcFromMem, cast(u32)roundDown(srcAlloc.offset + srcOffset + length64, vm.ptrSize.inBytes));
 	PointerId srcFromMemSlot = memOffsetToPtrIndex(srcFromMem, vm.ptrSize);
 	PointerId srcToMemSlot   = memOffsetToPtrIndex(srcToMem, vm.ptrSize);
 	assert(srcFromMemSlot <= srcToMemSlot);

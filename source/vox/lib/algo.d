@@ -20,36 +20,39 @@ version(VANILLA_D) {
 	public import core.stdc.string : memmove;
 }
 
-version(NO_DEPS) version (LDC) {
-	public import core.stdc.string : memmove;
+version(NO_DEPS) version(LDC) {
+	version(WebAssembly) {
+		extern(C) void memmove(void* dst, const(void)* src, size_t len)
+		{
+			import ldc.intrinsics : llvm_memmove;
+			llvm_memmove!size_t(dst, src, len);
+		}
+	} else {
+		public import core.stdc.string : memmove;
+	}
 }
 
 version(NO_DEPS) version(DigitalMars)
 extern(C) void memmove(void* dst, const(void)* src, size_t len)
 {
-	version (LDC) {
-		import ldc.intrinsics : llvm_memmove;
-		llvm_memmove!size_t(dst, src, len);
-	} else {
-		if (src < dst) {
-			if (src + len <= dst) {
-				dst[0..len] = src[0..len];
-			} else {
-				for (size_t size = len; size > 0; --size) {
-					*cast(ubyte*)(dst+size-1) = *cast(ubyte*)(src+size-1);
-				}
-			}
-		} else if (src > dst) {
-			if (dst + len <= src) {
-				dst[0..len] = src[0..len];
-			} else {
-				for (size_t size = len; size > 0; --size) {
-					*cast(ubyte*)dst++ = *cast(ubyte*)src++;
-				}
-			}
+	if (src < dst) {
+		if (src + len <= dst) {
+			dst[0..len] = src[0..len];
 		} else {
-			// noop
+			for (size_t size = len; size > 0; --size) {
+				*cast(ubyte*)(dst+size-1) = *cast(ubyte*)(src+size-1);
+			}
 		}
+	} else if (src > dst) {
+		if (dst + len <= src) {
+			dst[0..len] = src[0..len];
+		} else {
+			for (size_t size = len; size > 0; --size) {
+				*cast(ubyte*)dst++ = *cast(ubyte*)src++;
+			}
+		}
+	} else {
+		// noop
 	}
 }
 
@@ -175,7 +178,7 @@ version (DigitalMars) {
 }
 
 pragma(inline, true)
-int popcnt(size_t x) pure {
+int popcnt(u64 x) pure {
 	return cast(int)_popcnt(x);
 }
 

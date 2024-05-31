@@ -14,7 +14,7 @@ import vox.vm.tests.tests;
 
 i32 runVmTests() {
 	VoxAllocator allocator;
-	auto context = VmTestContext(allocator, stdoutSink);
+	auto context = VmTestContext(&allocator, stdoutSink);
 
 	TestSuite suite;
 	vox.vm.tests.tests.vmTests(allocator, suite);

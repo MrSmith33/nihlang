@@ -14,11 +14,11 @@ void test_copyBitRange() {
 	foreach(usize length; 0..65 - max(src, dst))
 	foreach(usize setBit; 0..64) {
 		u64 input = 0;
-		setBitAt(&input, setBit);
+		setBitAt(cast(usz*)&input, setBit);
 		// different ptr
 		foreach(usize dstBit; 0..64) {
 			u64 dstInput = 0;
-			setBitAt(&dstInput, dstBit);
+			setBitAt(cast(usz*)&dstInput, dstBit);
 
 			u64 resultSrc = input;
 			u64 resultDst = dstInput;
@@ -63,7 +63,7 @@ void testCase(
 	u64 inputBits;
 	usize index = 0;
 	foreach(char bit; input) {
-		if (bit == '1') setBitAt(&inputBits, index);
+		if (bit == '1') setBitAt(cast(usz*)&inputBits, index);
 		if (bit == '0' || bit == '1') ++index;
 	}
 	testCase(inputBits, dst, src, length, file, line);
@@ -204,12 +204,12 @@ void testCase2(
 	u64 srcBits;
 	usize index = 0;
 	foreach(char bit; dstMem) {
-		if (bit == '1') setBitAt(&dstBits, index);
+		if (bit == '1') setBitAt(cast(usz*)&dstBits, index);
 		if (bit == '0' || bit == '1') ++index;
 	}
 	index = 0;
 	foreach(char bit; srcMem) {
-		if (bit == '1') setBitAt(&srcBits, index);
+		if (bit == '1') setBitAt(cast(usz*)&srcBits, index);
 		if (bit == '0' || bit == '1') ++index;
 	}
 	testCase2(dstBits, srcBits, dst, src, length, file, line);
