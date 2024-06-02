@@ -462,7 +462,7 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	extraArtifacts ~= params.makeArtifactPath(osObjExt[gs.targetOs]);
 
 	Flags flags = selectFlags(gs, params);
-	string[] flagsStrings = flagsToStrings(gs, cast(size_t)flags);
+	string[] flagsStrings = flagsToStrings(gs, cast(size_t)flags, params);
 
 	flagsStrings ~= gs.makeTargetTripleFlag;
 
@@ -728,10 +728,15 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 			break;
 	}
 
+	if (g.compiler == Compiler.ldc) {
+		// Enable caching
+		flags |= Flags.f_cache;
+	}
+
 	return flags;
 }
 
-string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
+string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams params) {
 	import core.bitop : bsf;
 	import std.conv : text;
 
@@ -869,6 +874,12 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits) {
 					flags ~= "-ftime-trace";
 				}
 				break;
+
+			case f_cache:
+				if (gs.compiler != Compiler.ldc) break;
+				string cacheDir = params.artifactDir.buildPath("cache");
+				flags ~= format("--cache=%s", cacheDir);
+				break;
 		}
 
 		// Disable lowest set isolated bit
@@ -1001,6 +1012,7 @@ enum Flags : uint {
 	f_coverage           = 1 << 20,
 	f_fuzzer             = 1 << 21,
 	f_time_trace         = 1 << 22,
+	f_cache              = 1 << 23,
 }
 
 enum TargetOs : ubyte {
