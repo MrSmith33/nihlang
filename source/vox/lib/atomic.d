@@ -62,6 +62,23 @@ version (Windows) {
 	}
 }
 
+version(linux) {
+	import vox.lib.system.linux;
+
+	// Wake up a single thread waiting on the address
+	void notify(void* address) {
+		futex_wake(cast(u32*)address, 1);
+	}
+	// Wake all threads waiting on the address
+	void notifyAll(void* address) {
+		futex_wake(cast(u32*)address, u32.max);
+	}
+
+	void wait(void* onAddress, u32 untilThisChanges) {
+		futex_wait(cast(u32*)onAddress, untilThisChanges, null);
+	}
+}
+
 version(DigitalMars) {
 	private {
 		enum : int {

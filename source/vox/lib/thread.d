@@ -56,8 +56,8 @@ version(Windows) {
 	void spawnThread(ref Thread thread, ThreadFunc func, void* userData) {
 		usz stackPtr = wasm_memory_grow(0, thread.stackSize / WASM_PAGE) * WASM_PAGE;
 		// Stack grows to lower addresses in LLVM
-		stackPtr += thread.stackSize;
-		thread.stackPtr = cast(void*)stackPtr;
+		usz stackTop = stackPtr + thread.stackSize;
+		thread.stackTop = cast(void*)stackTop;
 		thread.func = func;
 		thread.userData = userData;
 		thread.status = 0;
@@ -73,7 +73,7 @@ version(Windows) {
 		@nogc nothrow:
 
 		// TODO: reuse stack memory after thread is stopped for new threads/other allocations
-		void* stackPtr;
+		void* stackTop;
 		usz stackSize = 1*MiB;
 		ThreadFunc func;
 		void* userData;
@@ -95,14 +95,14 @@ version(Windows) {
 		import ldc.llvmasm;
 		__asm("
 			local.get 1                # Thread* thread
-			i32.load  0#offset         # thread.stackPtr
-			global.set __stack_pointer # __stack_pointer = thread.stackPtr
+			i32.load  0#offset         # thread.stackTop
+			global.set __stack_pointer # __stack_pointer = thread.stackTop
 
 			local.get 0                # tid
 			local.get 1                # start_arg
 			call __wasi_thread_start_user
 			return", "");
-			// compiler adds unreachable after call
+			// compiler adds unreachable after __asm
 			// add return to avoid hitting it
 	}
 
@@ -116,7 +116,7 @@ version(Windows) {
 	}
 } else {
 	enum threads_supported = false;
-	Thread spawnThread(ThreadFunc func, void* userData) {
+	void spawnThread(ref Thread thread, ThreadFunc func, void* userData) {
 		panic("Threads are not implemented on this target");
 	}
 
