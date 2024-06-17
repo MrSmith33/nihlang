@@ -14,7 +14,7 @@ void runTests() {
 }
 
 void testWaitNotify() {
-	import vox.lib.atomic: atomicFence, atomicStore, notify, wait;
+	import vox.lib.atomic: atomicFence, atomicStore, notifyOne, wait;
 
 	__gshared u32 g_flag;
 	__gshared void* g_arg;
@@ -26,7 +26,7 @@ void testWaitNotify() {
 		atomicFence();
 		// notify the main
 		atomicStore(g_flag, 1);
-		notify(&g_flag);
+		notifyOne(&g_flag);
 		// returning from threadFunc terminates only this thread
 		return 18;
 	}

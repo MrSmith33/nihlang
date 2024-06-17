@@ -36,6 +36,8 @@ enum MAP_FAILED    = cast(void*)-1;
 enum MAP_SHARED    = 0x0001;
 enum MAP_PRIVATE   = 0x0002;
 enum MAP_FIXED     = 0x0010;
+enum MAP_GROWSDOWN = 0x00100;
+enum MAP_STACK     = 0x20000;
 
 enum MS_ASYNC      = 0x0001;
 enum MS_INVALIDATE = 0x0002;

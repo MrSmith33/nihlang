@@ -15,7 +15,7 @@ version(WebAssembly) {
 	import vox.lib.system.wasm_all;
 
 	// Wake up a single thread waiting on the address
-	void notify(void* address) {
+	void notifyOne(void* address) {
 		wasm_memory_atomic_notify(cast(usz*)address, 1);
 	}
 	// Wake all threads waiting on the address
@@ -44,7 +44,7 @@ version (Windows) {
 	import vox.lib.system.windows;
 
 	// Wake up a single thread waiting on the address
-	void notify(void* address) {
+	void notifyOne(void* address) {
 		RtlWakeAddressSingle(address);
 	}
 	// Wake all threads waiting on the address
@@ -66,7 +66,7 @@ version(linux) {
 	import vox.lib.system.linux;
 
 	// Wake up a single thread waiting on the address
-	void notify(void* address) {
+	void notifyOne(void* address) {
 		futex_wake(cast(u32*)address, 1);
 	}
 	// Wake all threads waiting on the address

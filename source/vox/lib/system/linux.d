@@ -33,3 +33,8 @@ i32 futex_wake(u32* address, u32 count) {
 	return cast(i32)syscall(sys_futex, cast(u64)address,
 		FUTEX_WAKE_PRIVATE, count);
 }
+
+import vox.lib.system.syscall : clone_args, syscall, sys_clone3;
+i32 clone3(clone_args* uargs, usz size) {
+	return cast(i32)syscall(sys_clone3, cast(ulong)uargs, size);
+}

@@ -80,10 +80,17 @@ noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
 	ExitProcess(exitCode);
 }
 
-version(Posix)
+version(linux)
 noreturn vox_exit_process(u32 exitCode) {
-	import vox.lib.system.syscall : syscall, EXIT;
-	syscall(EXIT, exitCode);
+	import vox.lib.system.syscall : syscall, sys_exit_group;
+	syscall(sys_exit_group, exitCode);
+	assert(0);
+}
+
+version(OSX)
+noreturn vox_exit_process(u32 exitCode) {
+	import vox.lib.system.syscall : syscall, sys_exit;
+	syscall(sys_exit, exitCode);
 	assert(0);
 }
 
