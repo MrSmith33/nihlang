@@ -35,6 +35,7 @@ import std.algorithm : filter, joiner, canFind, map, filter, move;
 import std.range : empty, array, chain;
 import std.file : thisExePath;
 import std.path : dirName, buildPath, setExtension;
+import std.conv : text;
 import std.stdio;
 import std.string : format, lineSplitter, strip;
 
@@ -231,6 +232,10 @@ struct GlobalSettings
 	bool isCrossCompiling() const {
 		return targetOs != hostOs || targetArch != hostArch;
 	}
+
+	bool runWithQemu() const {
+		return targetOs == hostOs && targetOs == TargetOs.linux && targetArch != hostArch;
+	}
 }
 
 void printOptions() {
@@ -344,6 +349,10 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			settings.targetOs = TargetOs.linux;
 			settings.targetArch = TargetArch.x64;
 			break;
+		case "linux-arm64":
+			settings.targetOs = TargetOs.linux;
+			settings.targetArch = TargetArch.arm64;
+			break;
 		case "macos-x64":
 			settings.targetOs = TargetOs.macos;
 			settings.targetArch = TargetArch.x64;
@@ -434,7 +443,6 @@ struct Job {
 
 Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	import std.path : buildPath;
-	import std.conv : text;
 
 	string[] artifacts;
 	string[] extraArtifacts;
@@ -531,7 +539,9 @@ Job makeGitTagJob(in GlobalSettings gs, JobResult res) {
 
 Job makeRunJob(in GlobalSettings gs, JobResult compileRes) {
 	final switch(gs.targetOs) with(TargetOs) {
-		case windows, linux, macos: return makeRunNativeExecutableJob(gs, compileRes);
+		case windows, linux, macos:
+			if (gs.runWithQemu()) return makeRunQemuJob(gs, compileRes);
+			return makeRunNativeExecutableJob(gs, compileRes);
 		case wasi: return makeRunWasmWasiJob(gs, compileRes);
 		case wasm: assert(false, "Cannot run artifact of wasm target");
 	}
@@ -539,6 +549,15 @@ Job makeRunJob(in GlobalSettings gs, JobResult compileRes) {
 
 Job makeRunNativeExecutableJob(in GlobalSettings gs, JobResult compileRes) {
 	string[] args;
+	args ~= compileRes.job.artifacts[0];
+	string workDir = compileRes.job.params.artifactDir;
+	Job job = { args : args, workDir : workDir, printOutput : true };
+	return job;
+}
+
+Job makeRunQemuJob(in GlobalSettings gs, JobResult compileRes) {
+	string[] args;
+	args ~= text("qemu-", archTripleName[gs.targetArch]);
 	args ~= compileRes.job.artifacts[0];
 	string workDir = compileRes.job.params.artifactDir;
 	Job job = { args : args, workDir : workDir, printOutput : true };
@@ -738,7 +757,6 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 
 string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams params) {
 	import core.bitop : bsf;
-	import std.conv : text;
 
 	string[] flags;
 	string[] versions;
@@ -1135,7 +1153,6 @@ immutable string[3] archTripleName = [
 ];
 
 string makeTargetTripleFlag(in GlobalSettings gs) {
-	import std.conv : text;
 	if (gs.targetArch == TargetArch.x64 && gs.targetOs == hostOs) return "-m64";
 	return text("-mtriple=", archTripleName[gs.targetArch], "-", osTripleName[gs.targetOs]);
 }
