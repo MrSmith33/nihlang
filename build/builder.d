@@ -216,6 +216,7 @@ struct GlobalSettings
 	bool fuzzer;
 	bool betterc;
 	bool nolibc;
+	bool useCompileCache;
 	bool customobject; // Use custom object.d from source/druntime/object.d
 	bool color;
 	Compiler compiler;
@@ -310,6 +311,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			"fuzzer", "", &settings.fuzzer,
 			"betterc", "", &settings.betterc,
 			"no-libc", "", &settings.nolibc,
+			"compile-cache", "", &settings.useCompileCache,
 			"customobject", "", &settings.customobject,
 			"color", "", &settings.color,
 			"time-trace", "", &settings.timeTrace,
@@ -747,7 +749,7 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 			break;
 	}
 
-	if (g.compiler == Compiler.ldc) {
+	if (g.useCompileCache) {
 		// Enable caching
 		flags |= Flags.f_cache;
 	}
