@@ -57,12 +57,8 @@ alias ptrdiff_t = typeof(cast(void*)0 - cast(void*)0);
 alias string = immutable(char)[];
 alias noreturn = typeof(*null);
 
-// If this is present with LDC release build we get
-// lld-link: error: undefined symbol: _fltused
-// >>> referenced by nihlang\bin\testsuite.exe.lto.obj
 // https://stackoverflow.com/questions/1583196/building-visual-c-app-that-doesnt-use-crt-functions-still-references-some/1583220#1583220
-version(DigitalMars)
-extern(C) __gshared int _fltused = 0;
+export extern(C) __gshared int _fltused = 0;
 
 
 
