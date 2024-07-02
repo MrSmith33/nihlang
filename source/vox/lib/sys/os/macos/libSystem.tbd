@@ -1,0 +1,22 @@
+--- !tapi-tbd-v2
+archs:           [ i386, x86_64 ]
+uuids:           [ 'i386: A79B6A65-DDAA-31C5-B66B-95FB343125BE', 'x86_64: C50D02BC-A333-3313-B787-02F255A6783F' ]
+platform:        macosx
+install-name:    /usr/lib/system/libdyld.dylib
+current-version: 519.2.2
+objc-constraint: none
+exports:
+  - archs:           [ i386, x86_64 ]
+    symbols:         [ dyld_stub_binder ]
+--- !tapi-tbd-v2
+archs:           [ i386, x86_64 ]
+uuids:           [ 'i386: FBC48404-D7AD-31FA-BDE2-5B6A1D8EFC7A', 'x86_64: D2E842AA-3B8D-31BF-8234-8C1BE11CFE32' ]
+platform:        macosx
+install-name:    /usr/lib/system/libsystem_kernel.dylib
+current-version: 4570.31.3
+objc-constraint: none
+parent-umbrella: System
+exports:
+  - archs:           [ i386, x86_64 ]
+    symbols:         [ _mach_absolute_time, _mach_timebase_info ]
+...
