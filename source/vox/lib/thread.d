@@ -174,6 +174,25 @@ version(Windows) {
 			"={rax},~{rax},~{rdi},~{rsi},~{rdx},~{rcx},~{r11}");
 	}
 
+	version(AArch64)
+	pragma(inline, false) private @naked i64 spawnLinuxThread(OnStackData* data) {
+		import ldc.llvmasm;
+		return __asm!i64("
+			mov  x1, x0
+			mov  w8, #220
+			mov  w0, #3840
+			movk w0, #5, lsl #16
+
+			svc  #0
+			cbnz x0, 1f
+
+			${:comment} load &__linux_thread_start_user into x30
+			${:comment} load thread into x0 (thread arg of __linux_thread_start_user)
+			ldp  x30, x0, [sp]
+		1:",
+			"={x0},~{x8},~{x0},~{x1}");
+	}
+
 	// Data that is passed through stack to the new thread
 	// First slot is always a function pointer, that is being popped of the stack
 	// See: Practical libc-free threading on Linux - https://nullprogram.com/blog/2023/03/23/
