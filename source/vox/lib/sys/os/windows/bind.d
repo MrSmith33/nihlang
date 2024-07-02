@@ -1,9 +1,9 @@
-/// Copyright: Copyright (c) 2022 Andrey Penechko
+/// Copyright: Copyright (c) 2022-2024 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.lib.system.windows;
+module vox.lib.sys.os.windows.bind;
 
-version(Windows) version(X86_64) @nogc nothrow @system:
+@nogc nothrow @system:
 
 import vox.lib.types;
 
@@ -17,6 +17,41 @@ void writeString(const(char)[] str) {
 		cast(u32)str.length,
 		&numWritten,
 		null);
+}
+
+void writeFile(const(char)[] filename, const(u8)[] data) {
+	import vox.lib.error;
+	HANDLE file;
+	file = CreateFileA(filename.ptr,           // name of the write
+	                   GENERIC_WRITE,          // open for writing
+	                   0,                      // do not share
+	                   null,                   // default security
+	                   CREATE_ALWAYS,          // create new file only
+	                   FILE_ATTRIBUTE_NORMAL,  // normal file
+	                   null);                  // no attr. template
+
+	if (file == INVALID_HANDLE_VALUE) {
+		panic("Cannot open file \"%s\" for write.", filename);
+	}
+
+	u32 numWritten;
+	bool success = WriteFile(file,
+	                         cast(u8*)data.ptr,
+	                         cast(u32)data.length,
+	                         &numWritten,
+	                         null);
+
+	if (!success) {
+		CloseHandle(file);
+		panic("Cannot write to file \"%s\".", filename);
+	} else {
+		if (numWritten != data.length) {
+			CloseHandle(file);
+			panic("Number of bytes to write (%s) != bytes written (%s) to file \"%s\".", data.length, numWritten, filename);
+		}
+	}
+
+	CloseHandle(file);
 }
 
 

@@ -3,7 +3,7 @@
 /// Authors: Andrey Penechko
 ///
 /// Entry points for executable and shared library targets
-module vox.lib.system.entrypoint;
+module vox.lib.sys.entrypoint;
 
 import vox.all;
 
@@ -15,7 +15,7 @@ version(EXECUTABLE) {
 	version(NO_DEPS) {
 		version(Windows) extern(System)
 		noreturn exe_main(void* hInstance, void* hPrevInstance,
-		                  char* lpCmdLine, i32 nCmdShow)
+						  char* lpCmdLine, i32 nCmdShow)
 		{
 			initDbgHelp;
 			vox_init();
@@ -23,14 +23,18 @@ version(EXECUTABLE) {
 			vox_exit_process(ret);
 		}
 
-		version(Posix) export extern(C)
-		noreturn exe_main() {
-			asm @nogc nothrow {
-				sub RSP, 8;
+		version(Posix) {
+			export extern(C)
+			noreturn exe_main() {
+				version(X86_64) {
+					asm @nogc nothrow {
+						sub RSP, 8;
+					}
+				}
+				vox_init();
+				i32 ret = vox_main(null);
+				vox_exit_process(ret);
 			}
-			vox_init();
-			i32 ret = vox_main(null);
-			vox_exit_process(ret);
 		}
 
 		version(OSX) export extern(C)
@@ -75,23 +79,24 @@ version(SHARED_LIB) {
 	}
 }
 
-version(Windows)
-noreturn vox_exit_process(u32 exitCode) @nogc nothrow {
-	ExitProcess(exitCode);
-}
-
 version(linux)
 noreturn vox_exit_process(u32 exitCode) {
-	import vox.lib.system.syscall : syscall, sys_exit_group;
+	import vox.lib.sys.syscall : syscall, sys_exit_group;
 	syscall(sys_exit_group, exitCode);
 	assert(0);
 }
 
 version(OSX)
 noreturn vox_exit_process(u32 exitCode) {
-	import vox.lib.system.syscall : syscall, sys_exit;
+	import vox.lib.sys.syscall : syscall, sys_exit;
 	syscall(sys_exit, exitCode);
 	assert(0);
+}
+
+version(Windows)
+noreturn vox_exit_process(u32 exitCode) {
+	import vox.lib.sys.os.windows.bind : ExitProcess;
+	ExitProcess(exitCode);
 }
 
 version(WebAssembly) {

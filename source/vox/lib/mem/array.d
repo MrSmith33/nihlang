@@ -12,7 +12,7 @@ struct Array(T)
 	import vox.lib.math : isPowerOfTwo, nextPOT, max;
 	import vox.lib.format : SinkDelegate, FormatSpec, formattedWrite;
 	import vox.lib.error : enforce;
-	import vox.lib.algo : memmove;
+	import vox.lib.memory : memmove;
 	import vox.lib.mem.allocator : VoxAllocator;
 
 	// Can be 0

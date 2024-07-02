@@ -63,7 +63,7 @@ MonoTime currTime() {
         return MonoTime(ts.tv_sec * 1_000_000_000L + ts.tv_nsec);
 	}
 	else version(WASI) {
-		import vox.lib.system.wasm_wasi;
+		import vox.lib.sys.os.wasi;
 		u64 time;
 		__wasi_errno_t errno = clock_time_get(WASI_CLOCKID.MONOTONIC, 1, &time);
 		if (errno != 0) panic("clock_time_get errno is %s", errno);

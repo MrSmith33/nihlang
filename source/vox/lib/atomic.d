@@ -12,7 +12,7 @@ version(LDC) {
 @nogc nothrow @system:
 
 version(WebAssembly) {
-	import vox.lib.system.wasm_all;
+	import vox.lib.sys.arch.wasm;
 
 	// Wake up a single thread waiting on the address
 	void notifyOne(void* address) {
@@ -41,7 +41,7 @@ version(WebAssembly) {
 }
 
 version (Windows) {
-	import vox.lib.system.windows;
+	import vox.lib.sys.os.windows;
 
 	// Wake up a single thread waiting on the address
 	void notifyOne(void* address) {
@@ -63,7 +63,7 @@ version (Windows) {
 }
 
 version(linux) {
-	import vox.lib.system.linux;
+	import vox.lib.sys.os.linux;
 
 	// Wake up a single thread waiting on the address
 	void notifyOne(void* address) {

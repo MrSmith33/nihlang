@@ -1,11 +1,12 @@
-/// Copyright: Copyright (c) 2022 Andrey Penechko
+/// Copyright: Copyright (c) 2024 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
 
-/// This is for pure WebAssembly, without WASI
-module vox.lib.system.wasm_pure;
+/// This is API for pure WebAssembly, without WASI
+/// Host must define functions specified below
+module vox.lib.sys.os.unknown.api.wasm;
 
-version(WebAssembly) @nogc nothrow @system:
+@nogc nothrow @system:
 
 import ldc.attributes : llvmAttr;
 

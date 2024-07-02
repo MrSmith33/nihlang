@@ -44,6 +44,7 @@ Exploring ways of doing:
   - Target:
     - `windows-x64`
     - `linux-x64`
+    - `linux-arm64`
     - `macos-x64`
     - `wasm32-wasi`
     - `wasm32`

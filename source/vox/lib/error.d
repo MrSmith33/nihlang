@@ -10,7 +10,7 @@ noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line 
 }
 noreturn panic(Args...)(int line, string file, int topFramesToSkip, string fmt, Args args) {
 	import vox.lib.io : writefln, writef, writeln;
-	import vox.lib.system.entrypoint : vox_exit_process;
+	import vox.lib.sys.entrypoint : vox_exit_process;
 	//writefln("\033[1;31mPanic:\033[0m %s:%s", file, line);
 	writefln("Panic at %s:%s", file, line);
 	writef(fmt, args);
@@ -23,11 +23,15 @@ noreturn panic(Args...)(int line, string file, int topFramesToSkip, string fmt, 
 	vox_exit_process(1);
 }
 
+noreturn panicStr(string str, string file = __FILE__, int line = __LINE__) {
+	panic(line, file, 0, str);
+}
+
 T enforce(T, Args...)(T value, string fmt, Args args, string file = __FILE__, int line = __LINE__)
 	if (is(typeof(() { if (!value) { } } )))
 {
 	import vox.lib.io : writefln, writef, writeln;
-	import vox.lib.system.entrypoint : vox_exit_process;
+	import vox.lib.sys.entrypoint : vox_exit_process;
 	if (value) return value;
 
 	writefln("Enforce: %s:%s", file, line);
@@ -46,7 +50,7 @@ version(D_BetterC) {
 	}
 	extern(C) void _assert(const(char)* msg, const(char)* file, uint line) {
 		import vox.lib.io : writefln, writef, writeln;
-		import vox.lib.system.entrypoint : vox_exit_process;
+		import vox.lib.sys.entrypoint : vox_exit_process;
 		import vox.lib.string : fromStringz;
 		writef("%s:%s Assert: ", file.fromStringz, line);
 		msg.fromStringz.writeln;
@@ -55,5 +59,11 @@ version(D_BetterC) {
 			simpleNamedStackTrace(3,2);
 		}
 		vox_exit_process(1);
+	}
+	version(OSX) extern(C) void __assert_rtn(const(char)* func, const(char)* file, uint line, const(char)* msg) {
+		_assert(msg, file, line);
+	}
+	version(AArch64) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
+		_assert(msg, file, line);
 	}
 }

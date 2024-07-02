@@ -53,8 +53,8 @@ version(Windows) {
 	enum threads_supported = true;
 
 	import ldc.attributes;
-	import vox.lib.system.wasm_all;
-	import vox.lib.system.wasm_wasi;
+	import vox.lib.sys.arch.wasm;
+	import vox.lib.sys.os.wasi;
 
 	void spawnThread(ref Thread thread, ThreadFunc func, void* userData) {
 		usz stackPtr = wasm_memory_grow(0, thread.stackSize / WASM_PAGE) * WASM_PAGE;
@@ -123,7 +123,7 @@ version(Windows) {
 
 	enum threads_supported = true;
 	void spawnThread(ref Thread thread, ThreadFunc func, void* userData) {
-		import vox.lib.system.posix;
+		import vox.lib.sys.os.posix;
 		void* p = mmap(null, thread.stackSize, PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANON, -1, 0);
 
@@ -142,7 +142,7 @@ version(Windows) {
 		OnStackData* data = &typedBuf[$-1];
 		*data = OnStackData(cast(void*)&__linux_thread_start_user, &thread);
 
-		auto tid = spawnLinuxThread(data);
+		auto tid = cast(i32)spawnLinuxThread(data);
 		if (tid < 0) {
 			panic("linux thread spawn failed. tid = %s", tid);
 		}
@@ -150,26 +150,28 @@ version(Windows) {
 		thread.tid = Tid(tid);
 	}
 
-	private extern(C) void __linux_thread_start_user(OnStackData* data) {
+	private extern(C) void __linux_thread_start_user(Thread* thread) {
 		// atomicStore(thread.tid.value, tid);
-		u32 status = data.thread.func(data.thread.userData);
-		atomicStore(data.thread.status, status);
+		u32 status = thread.func(thread.userData);
+		atomicStore(thread.status, status);
 		atomicFence();
-		atomicStore(data.thread.isFinished, 1);
-		notifyAll(&data.thread.isFinished);
-		import vox.lib.system.syscall : syscall, sys_exit;
+		atomicStore(thread.isFinished, 1);
+		notifyAll(&thread.isFinished);
+		import vox.lib.sys.syscall : syscall, sys_exit;
 		syscall(sys_exit, status);
 	}
 
-	private @naked i32 spawnLinuxThread(OnStackData* data) {
+	version(X86_64)
+	pragma(inline, false) private @naked i64 spawnLinuxThread(OnStackData* data) {
+		import vox.lib.sys.os.linux.syscall.x64 : sys_clone;
 		import ldc.llvmasm;
-		return __asm!i32("
+		return __asm!i64("
 			movq  %rdi, %rsi
 			movl  $$0x50f00, %edi
 			movl  $$56, %eax
 			syscall
-			movq  %rsp, %rdi",
-			"={rax} ~{rax} ~{rdi} ~{rsi} ~{rdx} ~{rcx} ~{r11}");
+			movq 8(%rsp), %rdi", // (thread arg of __linux_thread_start_user)
+			"={rax},~{rax},~{rdi},~{rsi},~{rdx},~{rcx},~{r11}");
 	}
 
 	// Data that is passed through stack to the new thread

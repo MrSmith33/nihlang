@@ -7,8 +7,6 @@ import vox.lib;
 
 @nogc nothrow:
 
-debug import vox.lib.bitcopy_test : printTestCase;
-
 // Bit level memmove
 // Handles overlapping dst and src ranges if dstPtr == srcPtr
 // Otherwise dstPtr and srcPtr must not overlap

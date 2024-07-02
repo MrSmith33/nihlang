@@ -788,13 +788,9 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 			case f_no_libc:
 				versions ~= "NO_DEPS";
 				if (gs.targetOs == TargetOs.windows) {
-					if (gs.compiler == Compiler.dmd) {
-						// ldc need memset and memcpy from those libs
-						// Unlike dmd ldc produces compact artifact, so leaving those out is fine
-						linkerFlags ~= "/nodefaultlib:libcmt";
-						linkerFlags ~= "/nodefaultlib:libvcruntime";
-						linkerFlags ~= "/nodefaultlib:oldnames";
-					}
+					linkerFlags ~= "/nodefaultlib:libcmt";
+					linkerFlags ~= "/nodefaultlib:libvcruntime";
+					linkerFlags ~= "/nodefaultlib:oldnames";
 				} else if (gs.targetOs == TargetOs.linux || gs.targetOs == TargetOs.macos) {
 					if (gs.compiler == Compiler.ldc) {
 						// Remove -lrt -ldl -lpthread -lm libraries

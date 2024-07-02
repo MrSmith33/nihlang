@@ -1,30 +1,30 @@
 /// Copyright: Copyright (c) 2023 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.lib.system.posix;
+module vox.lib.sys.os.posix;
 
 import vox.lib.types;
 
-version(Posix) version(X86_64) @nogc nothrow @system:
+@nogc nothrow @system:
 
 void writeString(const(char)[] str) {
-	import vox.lib.system.syscall : syscall, WRITE;
-	syscall(WRITE, 1, cast(usize)str.ptr, str.length);
+	import vox.lib.sys.syscall : syscall, sys_write;
+	syscall(sys_write, 1, cast(usize)str.ptr, str.length);
 }
 
 void* mmap(void* addr, size_t len, int prot, int flags, int fd, long off) {
-	import vox.lib.system.syscall : syscall, MMAP;
-	return cast(void*)syscall(MMAP, cast(ulong)addr, len, prot, flags, fd, off);
+	import vox.lib.sys.syscall : syscall, sys_mmap;
+	return cast(void*)syscall(sys_mmap, cast(ulong)addr, len, prot, flags, fd, off);
 }
 
 int mprotect(void* addr, size_t len, int prot) {
-	import vox.lib.system.syscall : syscall, MPROTECT;
-	return cast(int)syscall(MPROTECT, cast(ulong)addr, len, prot);
+	import vox.lib.sys.syscall : syscall, sys_mprotect;
+	return cast(int)syscall(sys_mprotect, cast(ulong)addr, len, prot);
 }
 
 int munmap(void* addr, size_t len) {
-	import vox.lib.system.syscall : syscall, MUNMAP;
-	return cast(int)syscall(MUNMAP, cast(ulong)addr, len);
+	import vox.lib.sys.syscall : syscall, sys_munmap;
+	return cast(int)syscall(sys_munmap, cast(ulong)addr, len);
 }
 
 enum PROT_NONE     = 0x0000;
@@ -41,7 +41,6 @@ enum MAP_STACK     = 0x20000;
 
 enum MS_ASYNC      = 0x0001;
 enum MS_INVALIDATE = 0x0002;
-
 
 version (all) {
 version (linux) {

@@ -1,13 +1,13 @@
-/// Copyright: Copyright (c) 2022 Andrey Penechko
+/// Copyright: Copyright (c) 2024 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
 
 /// This is for WASI only
 /// Get function names from https://github.com/WebAssembly/wasi-http-proxy/blob/84438a7e776f962f58d324747d0bf0ad28112a90/phases/snapshot/docs.md
 /// Get function signature from https://github.com/WebAssembly/wasi-libc/blob/main/libc-bottom-half/headers/public/wasi/api.h
-module vox.lib.system.wasm_wasi;
+module vox.lib.sys.os.wasi;
 
-version(WASI) @nogc nothrow @system:
+@nogc nothrow @system:
 
 import vox.lib.types;
 import ldc.attributes;

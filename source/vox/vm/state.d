@@ -153,6 +153,8 @@ struct VmState {
 		return id;
 	}
 
+	import vox.lib;
+
 	void setFunction(
 		AllocId id,
 		NumResults numResults,
