@@ -897,6 +897,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 
 			case f_cache:
 				if (gs.compiler != Compiler.ldc) break;
+				// On darling caching doesn't work (errno 78: Function not implemented)
 				string cacheDir = params.artifactDir.buildPath("cache");
 				flags ~= format("--cache=%s", cacheDir);
 				break;
@@ -914,14 +915,22 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 	final switch(gs.targetOs) with(TargetOs) {
 		case windows, linux, wasi: break;
 		case macos: {
+			if (bits & Flags.f_no_libc) {
+				// find missing symbols with
+				// Darling [/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib]$ grep -Rnw './' -e 'dyld_stub_binder'
+				linkerFlags ~= params.srcDir.buildPath("vox/lib/sys/os/macos/libSystem.tbd");
+			}
+
 			if (gs.targetArch == TargetArch.x64) {
 				linkerFlags ~= "-arch";
 				linkerFlags ~= "x86_64";
+
 				linkerFlags ~= "-platform_version";
 				linkerFlags ~= "macos";
 				linkerFlags ~= "11.0.0";
 				linkerFlags ~= "11.7";
 			}
+
 			break;
 		}
 		case wasm: {
