@@ -9,7 +9,7 @@ on:
   release: # test + build + release
     types: [ published ]
 env:
-  DC: ldc-1.30.0
+  DC: ldc-1.38.0
   WASM-DC: ldc-1.38.0
 
 defaults:
@@ -63,6 +63,9 @@ jobs:
             build: release-fast
             config: nih-cli
             target: wasm32-wasi
+        exclude:
+          - config: testsuite
+            build: release-fast
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
