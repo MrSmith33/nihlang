@@ -91,18 +91,20 @@ jobs:
           name: artifact-${{ matrix.os.target }}-${{ matrix.v.build }}-${{ matrix.v.config }}
           path: bin/
   test:
-    name: Test suite
+    name: Test suite ${{ matrix.os.target }}
     strategy:
       matrix:
         os:
           - runner: ubuntu-latest
-            target: linux
+            target: x64-linux
           - runner: macos-12
-            target: macos
+            target: x64-macos
           - runner: windows-latest
-            target: windows
+            target: x64-windows
           - runner: ubuntu-latest
             target: wasm32-wasi
+          - runner: ubuntu-latest
+            target: arm64-linux
     runs-on: ${{ matrix.os.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +113,9 @@ jobs:
           compiler: ${{ env.DC }}
       - uses: jcbhmr/setup-wasmtime@v2
         if: ${{ matrix.os.target == 'wasm32-wasi' }}
+      - if: ${{ matrix.os.target == 'arm64-linux' }}
+        run: |
+          sudo apt install qemu-user
       - name: Test
         run: |
           ./build/setup.sh
