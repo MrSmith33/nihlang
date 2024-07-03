@@ -42,6 +42,8 @@ jobs:
         os:
           - runner: ubuntu-latest
             target: linux
+          - runner: ubuntu-latest
+            target: arm64-linux
           - runner: macos-12
             target: macos
           - runner: windows-latest
@@ -61,6 +63,18 @@ jobs:
           - os:
               runner: ubuntu-latest
               target: wasm32-wasi
+            v:
+              build: release-fast
+              config: nih-cli
+          - os:
+              runner: ubuntu-latest
+              target: arm64-linux
+            v:
+              build: debug
+              config: testsuite
+          - os:
+              runner: ubuntu-latest
+              target: arm64-linux
             v:
               build: release-fast
               config: nih-cli
