@@ -54,10 +54,7 @@ jobs:
           - runner: windows-latest
             target: windows
         v:
-          - build: debug-fast
-            config: nih-cli,nih-static,nih-shared,vbe-static,vbe-shared
-            action: pack
-          - build: release-fast
+          - build: debug-fast,release-fast
             config: nih-cli,nih-static,nih-shared,vbe-static,vbe-shared
             action: pack
           - build: debug

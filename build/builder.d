@@ -80,8 +80,10 @@ int runSelectedConfigs(in GlobalSettings gs, in Config[] configs)
 			return 1;
 		}
 
-		int status = runConfig(gs, config);
-		if (status != 0) return status;
+		foreach(buildType; gs.buildTypes) {
+			int status = runConfig(gs, config, buildType);
+			if (status != 0) return status;
+		}
 	}
 	return 0;
 }
@@ -91,15 +93,15 @@ void printTime(in GlobalSettings gs, string fmt, Duration duration) {
 	stderr.writefln(fmt, scaledNumberFmt(duration));
 }
 
-int runConfig(in GlobalSettings gs, in Config config)
+int runConfig(in GlobalSettings gs, in Config config, in BuildType buildType)
 {
 	CompileParams params = {
 		targetName : config.targetName,
 		targetType : config.targetType,
 		artifactDir : config.artifactDir,
 		srcDir : config.srcDir,
-		buildType : gs.buildType,
-		compiler : gs.compiler,
+		buildType : buildType,
+		compiler : selectCompiler(gs, buildType),
 		targetOs : gs.targetOs,
 		targetArch : gs.targetArch,
 		rootFile : config.rootFile,
@@ -205,7 +207,7 @@ Config findConfig(in Config[] configs, string configName) {
 struct GlobalSettings
 {
 	Action action;
-	BuildType buildType;
+	BuildType[] buildTypes;
 	TargetOs targetOs = hostOs;
 	TargetArch targetArch = hostArch;
 	void nodeps() {
@@ -219,7 +221,7 @@ struct GlobalSettings
 	bool useCompileCache;
 	bool customobject; // Use custom object.d from source/druntime/object.d
 	bool color;
-	Compiler compiler;
+	string compiler;
 	const(string)[] configNames;
 	bool dryRun;
 	bool removeBuild;
@@ -335,7 +337,7 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 	GlobalSettings settings;
 	string compiler;
 	string target;
-	string buildType;
+	string[] buildTypes;
 
 	settings.needsHelp = false;
 	GetoptResult optResult;
@@ -348,7 +350,7 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 		optResult = getopt(
 			args,
 			"action", "", &settings.action,
-			"build", "", &buildType,
+			"build", "", &buildTypes,
 			"target", "", &settings.setTarget,
 			"target-relaxed", "", &settings.setTarget,
 			"compiler", "", &compiler,
@@ -388,12 +390,13 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 		}
 	}
 
+	foreach(buildType; buildTypes)
 	if (!isValidBuildType(buildType)) {
 		stderr.writefln("Invalid build type: %s. Supported options: debug, debug-fast, release-fast", buildType);
 		settings.needsHelp = true;
 		return settings;
 	}
-	settings.buildType = selectBuildType(buildType);
+	settings.buildTypes = parseBuildType(buildTypes);
 
 	if (!isValidCompiler(compiler)) {
 		stderr.writefln("Invalid compiler name: %s. Supported options: dmd, ldc2", compiler);
@@ -405,7 +408,7 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 		settings.needsHelp = true;
 		return settings;
 	}
-	settings.compiler = selectCompiler(settings, compiler);
+	settings.compiler = compiler;
 
 	if (optResult.helpWanted) settings.needsHelp = true;
 
@@ -431,8 +434,7 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 	return settings;
 }
 
-struct CompileParams
-{
+struct CompileParams {
 	string rootFile;
 	string srcDir;
 	string artifactDir;
@@ -682,8 +684,8 @@ bool isValidCompiler(in string c) {
 	return [null, "dmd", "ldc2"].canFind(c);
 }
 
-Compiler selectCompiler(in GlobalSettings gs, in string providedCompiler) {
-	switch(providedCompiler) {
+Compiler selectCompiler(in GlobalSettings gs, BuildType buildType) {
+	switch(gs.compiler) {
 		case "dmd": return Compiler.dmd;
 		case "ldc2": return Compiler.ldc;
 		default: break;
@@ -697,19 +699,23 @@ Compiler selectCompiler(in GlobalSettings gs, in string providedCompiler) {
 		return Compiler.ldc;
 	}
 
-	if (gs.buildType == BuildType.dbg)
+	if (buildType == BuildType.dbg)
 		return Compiler.dmd;
 	else
 		return Compiler.ldc;
 }
 
 bool isValidBuildType(in string b) {
-	return [null, "debug", "debug-fast", "release-fast"].canFind(b);
+	return ["debug", "debug-fast", "release-fast"].canFind(b);
 }
 
-BuildType selectBuildType(in string providedBuildType) {
-	switch(providedBuildType) {
-		case null: return BuildType.dbg;
+BuildType[] parseBuildType(in string[] buildTypes) {
+	if (buildTypes.length == 0) return [BuildType.dbg];
+	return buildTypes.map!parseBuildType.array;
+}
+
+BuildType parseBuildType(string buildType) {
+	switch(buildType) {
 		case "debug": return BuildType.dbg;
 		case "debug-fast": return BuildType.dbg_fast;
 		case "release-fast": return BuildType.rel_fast;
@@ -799,12 +805,12 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 			case f_warn_info: flags ~= "-wi"; break;
 			case f_msg_columns: flags ~= "-vcolumns"; break;
 			case f_msg_context:
-				if (gs.compiler == Compiler.dmd)
+				if (params.compiler == Compiler.dmd)
 					flags ~= "-verrors=context";
 				else
 					flags ~= "-verrors-context";
 				break;
-			case f_msg_color: if (gs.compiler == Compiler.dmd) flags ~= "-color"; break;
+			case f_msg_color: if (params.compiler == Compiler.dmd) flags ~= "-color"; break;
 			case f_better_c: flags ~= "-betterC"; break;
 			case f_no_libc:
 				versions ~= "NO_DEPS";
@@ -813,7 +819,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 					linkerFlags ~= "/nodefaultlib:libvcruntime";
 					linkerFlags ~= "/nodefaultlib:oldnames";
 				} else if (gs.targetOs == TargetOs.linux || gs.targetOs == TargetOs.macos) {
-					if (gs.compiler == Compiler.ldc) {
+					if (params.compiler == Compiler.ldc) {
 						// Remove -lrt -ldl -lpthread -lm libraries
 						flags ~= "--platformlib=";
 					}
@@ -829,7 +835,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 						}
 						linkerFlags ~= "/subsystem:console";
 					} else if (gs.targetOs == TargetOs.linux) {
-						if (gs.compiler == Compiler.ldc) {
+						if (params.compiler == Compiler.ldc) {
 							if (bits & Flags.f_no_libc) {
 								linkerFlags ~= "--entry=" ~ osExecutableEntry[gs.targetOs];
 							}
@@ -847,7 +853,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 				if (gs.targetArch != TargetArch.wasm32) {
 					flags ~= "-shared";
 				}
-				if (gs.compiler == Compiler.ldc) {
+				if (params.compiler == Compiler.ldc) {
 					flags ~= "-fvisibility=hidden";
 					if ((bits & Flags.f_better_c) == 0) {
 						flags ~= "-link-defaultlib-shared=false";
@@ -862,7 +868,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 				break;
 			case f_release: flags ~= "-release"; break;
 			case f_debug:
-				if (gs.compiler == Compiler.dmd)
+				if (params.compiler == Compiler.dmd)
 					flags ~= "-debug";
 				else
 					flags ~= "-d-debug";
@@ -871,10 +877,10 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 			case f_msg_gnu: flags ~= "-verror-style=gnu"; break;
 			case f_checkaction_halt: flags ~= "-checkaction=halt"; break;
 			case f_link_internally:
-				if (gs.compiler == Compiler.ldc) flags ~= "-link-internally";
+				if (params.compiler == Compiler.ldc) flags ~= "-link-internally";
 				break;
 			case f_opt:
-				if (gs.compiler == Compiler.dmd)
+				if (params.compiler == Compiler.dmd)
 					flags ~= "-O";
 				else {
 					flags ~= ["-O3", "-boundscheck=off", "-enable-inlining"]; // "-linkonce-templates"
@@ -907,13 +913,13 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 				break;
 
 			case f_time_trace:
-				if (gs.compiler == Compiler.ldc) {
+				if (params.compiler == Compiler.ldc) {
 					flags ~= "-ftime-trace";
 				}
 				break;
 
 			case f_cache:
-				if (gs.compiler != Compiler.ldc) break;
+				if (params.compiler != Compiler.ldc) break;
 				// On darling caching doesn't work (errno 78: Function not implemented)
 				string cacheDir = params.artifactDir.buildPath("cache");
 				flags ~= format("--cache=%s", cacheDir);
@@ -1005,8 +1011,8 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 		flags ~= text("-L", flag);
 
 	foreach(ver; versions) {
-		if (gs.compiler == Compiler.dmd) flags ~= text("-version=", ver);
-		if (gs.compiler == Compiler.ldc) flags ~= text("-d-version=", ver);
+		if (params.compiler == Compiler.dmd) flags ~= text("-version=", ver);
+		if (params.compiler == Compiler.ldc) flags ~= text("-d-version=", ver);
 	}
 
 	return flags;
