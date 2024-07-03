@@ -22,7 +22,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-12, windows-latest]
         build: [debug-fast, release-fast]
-        config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +35,7 @@ jobs:
             --action=build \
             --remove-build \
             --build=${{matrix.build}} \
-            --config=${{matrix.config}} \
+            --config=nih-cli,nih-static,nih-shared,vbe-static,vbe-shared \
             --compiler=ldc2 \
             --print-commands \
             --print-total-time \
@@ -50,8 +49,6 @@ jobs:
         os:
           - runner: ubuntu-latest
             target: linux
-          - runner: ubuntu-latest
-            target: wasm32-unknown
           - runner: ubuntu-latest
             target: wasm32-wasi
           - runner: macos-12
@@ -71,6 +68,12 @@ jobs:
           - build: debug
             config: testsuite
             action: run
+        include:
+          - os.runner: ubuntu-latest
+            os.target: wasm32-unknown
+            v.build: release-fast
+            v.config: nih-cli,nih-shared,vbe-shared
+            v.action: pack
     runs-on: ${{ matrix.os.runner }}
     steps:
       - uses: actions/checkout@v4
