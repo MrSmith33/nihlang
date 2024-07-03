@@ -930,7 +930,7 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 	}
 
 	final switch(gs.targetOs) with(TargetOs) {
-		case windows, linux, wasi: break;
+		case windows, linux: break;
 		case macos: {
 			if (bits & Flags.f_no_libc) {
 				// find missing symbols with
@@ -950,6 +950,11 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 
 			break;
 		}
+		case wasi:
+			if (params.targetType != TargetType.executable) {
+				linkerFlags ~= "--no-entry";
+			}
+			break;
 		case unknown: {
 			if (gs.targetArch == TargetArch.wasm32) {
 				linkerFlags ~= "--no-entry";

@@ -49,8 +49,6 @@ jobs:
         os:
           - runner: ubuntu-latest
             target: linux
-          - runner: ubuntu-latest
-            target: wasm32-wasi
           - runner: macos-12
             target: macos
           - runner: windows-latest
@@ -69,11 +67,27 @@ jobs:
             config: testsuite
             action: run
         include:
-          - os.runner: ubuntu-latest
-            os.target: wasm32-unknown
-            v.build: release-fast
-            v.config: nih-cli,nih-shared,vbe-shared
-            v.action: pack
+          - os:
+              runner: ubuntu-latest
+              target: wasm32-wasi
+            v:
+              build: debug
+              config: testsuite
+              action: pack
+          - os:
+              runner: ubuntu-latest
+              target: wasm32-wasi
+            v:
+              build: release-fast
+              config: nih-cli
+              action: pack
+          - os:
+              runner: ubuntu-latest
+              target: wasm32-unknown
+            v:
+              build: release-fast
+              config: nih-cli,nih-shared,vbe-shared
+              action: pack
     runs-on: ${{ matrix.os.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -81,7 +95,7 @@ jobs:
         with:
           compiler: ${{ env.DC }}
       - uses: jcbhmr/setup-wasmtime@v2
-        if: ${{ matrix.os.target }} == 'wasm32-wasi' && ${{ matrix.v.action }} == 'run'
+        if: ${{ matrix.os.target == 'wasm32-wasi' && matrix.v.action == 'run' }}
       - name: Build
         run: |
           ./build/setup.sh
@@ -99,9 +113,9 @@ jobs:
             --pretty \
             --color
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.v.action }} == 'pack'
+        if: ${{ matrix.v.action == 'pack' }}
         with:
-          name: artifact-${{ matrix.target }}-${{ matrix.v.build }}-${{ matrix.v.config }}
+          name: artifact-${{ matrix.os.target }}-${{ matrix.v.build }}-${{ matrix.v.config }}
           path: bin/
   test:
     name: Test suite
