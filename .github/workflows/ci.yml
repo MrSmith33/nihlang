@@ -48,7 +48,7 @@ jobs:
     name: Build no deps
     strategy:
       matrix:
-        dc: [ldc-1.30.0]
+        dc: [ldc-1.38.0]
         os: [ubuntu-latest, macos-12, windows-latest]
         build: [debug-fast, release-fast]
         config: [nih-cli, nih-static, nih-shared, vbe-static, vbe-shared, testsuite]
