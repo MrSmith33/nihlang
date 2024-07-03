@@ -40,6 +40,7 @@ int memcmp(const(void)* buf1, const(void)* buf2, size_t len) {
 	return *cast(ubyte*)buf1 - *cast(ubyte*)buf2;
 }
 
+version(WebAssembly) {} else {
 void* memset(void* dest, ubyte val, size_t len) {
 	for(size_t i = 0; i < len; ++i) (cast(ubyte*)dest)[i] = val;
 	return dest;
@@ -48,4 +49,5 @@ void* memset(void* dest, ubyte val, size_t len) {
 void* memcpy(void* dest, const void* src, size_t len) {
 	for(size_t i = 0; i < len; ++i) (cast(ubyte*)dest)[i] = (cast(ubyte*)src)[i];
 	return dest;
+}
 }
