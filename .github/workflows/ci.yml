@@ -63,7 +63,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: wasm32
+          - target: wasm32-unknown
             config: nih-cli,nih-shared,vbe-shared
           - target: wasm32-wasi
             config: nih-cli

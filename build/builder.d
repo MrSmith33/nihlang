@@ -31,12 +31,13 @@
 module builder;
 
 import core.time : MonoTime, Duration;
-import std.algorithm : filter, joiner, canFind, map, filter, move;
+import std.algorithm : countUntil, filter, splitter, joiner, canFind, map, filter, move;
 import std.range : empty, array, chain;
 import std.file : thisExePath;
 import std.path : dirName, buildPath, setExtension;
 import std.conv : text;
 import std.stdio;
+import std.uni : asLowerCase;
 import std.string : format, lineSplitter, strip;
 
 int main(string[] args)
@@ -54,10 +55,9 @@ int main(string[] args)
 		Config("fuzzer", "fuzzer.d", artifactDir, srcDir, TargetType.executable),
 	];
 
-	bool needsHelp;
-	GlobalSettings gs = args.parseSettings(needsHelp, configs);
+	GlobalSettings gs = args.parseSettings(configs);
 
-	if (needsHelp) {
+	if (gs.needsHelp) {
 		printHelp;
 		return 1;
 	}
@@ -140,7 +140,7 @@ int runConfig(in GlobalSettings gs, in Config config)
 		case Action.pack:
 			Job packageJob = gs.makePackageJob(res1);
 			JobResult res2 = gs.runJob(packageJob);
-			gs.printTime("- Run: %ss", res2.duration);
+			gs.printTime("- Pack: %ss", res2.duration);
 			if (res2.status != 0) return res2.status;
 
 			break;
@@ -188,7 +188,7 @@ struct Config
 			case wasm32:
 				final switch(os) with(TargetOs) {
 					case windows, linux, macos: assert(0);
-					case wasm: return targetType != TargetType.staticLibrary;
+					case unknown: return targetType != TargetType.staticLibrary;
 					case wasi: return targetType == TargetType.executable;
 				}
 		}
@@ -207,7 +207,7 @@ struct GlobalSettings
 	Action action;
 	BuildType buildType;
 	TargetOs targetOs = hostOs;
-	TargetArch targetArch;
+	TargetArch targetArch = hostArch;
 	void nodeps() {
 		betterc = true;
 		nolibc = true;
@@ -230,6 +230,8 @@ struct GlobalSettings
 	bool printTotalTime;
 	bool timeTrace;
 
+	bool needsHelp = false;
+
 	bool isCrossCompiling() const {
 		return targetOs != hostOs || targetArch != hostArch;
 	}
@@ -237,7 +239,53 @@ struct GlobalSettings
 	bool runWithQemu() const {
 		return targetOs == hostOs && targetOs == TargetOs.linux && targetArch != hostArch;
 	}
+
+	// settings parser
+	void setTarget(string option, string target) {
+		foreach(component; target.asLowerCase.text.splitter('-')) {
+			auto aliasIndex = countUntil(targetAliases[].map!(a => a.from), component);
+			if (aliasIndex >= 0) {
+				component = targetAliases[aliasIndex].to;
+			}
+			auto osIndex = countUntil(osName[], component);
+			if (osIndex >= 0) {
+				targetOs = cast(TargetOs)osIndex;
+				continue;
+			}
+			auto archIndex = countUntil(archName[], component);
+			if (archIndex >= 0) {
+				targetArch = cast(TargetArch)archIndex;
+				continue;
+			}
+			if (option == "target-relaxed") continue;
+			stderr.writefln("Unknown target: %s", target);
+			stderr.writeln( "Valid target components:");
+			stderr.writefln("- os: %(%s, %)", osName);
+			stderr.writefln("- arch: %(%s, %)", archName);
+			stderr.writeln( "Use --target-relaxed to ignore unknown os/arch");
+			stderr.writeln;
+			needsHelp = true;
+		}
+	}
 }
+
+// `from` is treared as `to` when parsing each target component
+struct TargetAlias {
+	string from;
+	string to;
+	void toString(scope void delegate(const(char)[]) sink) const {
+		sink(from);
+		sink(" -> ");
+		sink(to);
+	}
+}
+
+immutable TargetAlias[] targetAliases = [
+	{"ubuntu", "linux"},
+	{"a64", "arm64"},
+	{"aarch64", "arm64"},
+	{"x86_64", "x64"},
+];
 
 void printOptions() {
 	stderr.writeln("Usage: builder [options]...");
@@ -246,7 +294,11 @@ void printOptions() {
 	stderr.writeln("            build     Build artifact");
 	stderr.writeln("            run       Build and run resulting executable");
 	stderr.writeln("            pack      Build artifact and package into a .zip");
-	stderr.writeln("   --target=<target>  Select target [windows-x64, linux-x64, macos-x64, wasm32, wasm32-wasi]");
+	stderr.writeln("   --target=<arch-os>  Select target. Components are dash-separated, case-insensitive, in any order. x64-windows, linux-arm64, etc.");
+	stderr.writefln("       os: %(%s, %)", osName);
+	stderr.writefln("     arch: %(%s, %)", archName);
+	stderr.writefln("  aliases: %(%s, %)", targetAliases);
+	stderr.writeln("   --target-relaxed   Same as target, but unknown components are ignored. Can process Github os names");
 	stderr.writeln("   --build=<type>     Select build type [debug(default), debug-fast, release-fast]");
 	stderr.writeln("   --compiler=<name>  Select compiler [dmd, ldc2] (by default dmd is used for debug and ldc2 for release)");
 	stderr.writeln("   --config=<name>    Select config. Can be specified multiple times, or comma-separated (--config=a,b,c)");
@@ -278,14 +330,14 @@ void printConfigs() {
 	stderr.writeln("            testsuite   Full test suite executable");
 }
 
-GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] configs) {
+GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 	import std.getopt : GetoptResult, GetOptException, getopt, arraySep;
 	GlobalSettings settings;
 	string compiler;
 	string target;
 	string buildType;
 
-	needsHelp = false;
+	settings.needsHelp = false;
 	GetoptResult optResult;
 
 	arraySep = ",";
@@ -297,7 +349,8 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 			args,
 			"action", "", &settings.action,
 			"build", "", &buildType,
-			"target", "", &target,
+			"target", "", &settings.setTarget,
+			"target-relaxed", "", &settings.setTarget,
 			"compiler", "", &compiler,
 			"config", "", &settings.configNames,
 			"dry-run", "", &settings.dryRun,
@@ -322,14 +375,14 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 		import std.algorithm.mutation : remove;
 
 		stderr.writeln(e.msg);
-		needsHelp = true;
+		settings.needsHelp = true;
 		args = args.remove(1);
 		goto retry_parse_opts;
 	}
 
 	if (args.length > 1) {
 		// we have unrecognized options
-		needsHelp = true;
+		settings.needsHelp = true;
 		foreach(opt; args[1..$]) {
 			stderr.writefln("Unknown option: %s", opt);
 		}
@@ -337,56 +390,24 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 
 	if (!isValidBuildType(buildType)) {
 		stderr.writefln("Invalid build type: %s. Supported options: debug, debug-fast, release-fast", buildType);
-		needsHelp = true;
+		settings.needsHelp = true;
 		return settings;
 	}
 	settings.buildType = selectBuildType(buildType);
 
-	switch(target) {
-		case "windows-x64":
-			settings.targetOs = TargetOs.windows;
-			settings.targetArch = TargetArch.x64;
-			break;
-		case "linux-x64":
-			settings.targetOs = TargetOs.linux;
-			settings.targetArch = TargetArch.x64;
-			break;
-		case "linux-arm64":
-			settings.targetOs = TargetOs.linux;
-			settings.targetArch = TargetArch.arm64;
-			break;
-		case "macos-x64":
-			settings.targetOs = TargetOs.macos;
-			settings.targetArch = TargetArch.x64;
-			break;
-		case "wasm32":
-			settings.targetOs = TargetOs.wasm;
-			settings.targetArch = TargetArch.wasm32;
-			break;
-		case "wasm32-wasi":
-			settings.targetOs = TargetOs.wasi;
-			settings.targetArch = TargetArch.wasm32;
-			break;
-		case null:
-			break;
-		default:
-			stderr.writefln("Unknown target: %s", target);
-			needsHelp = true;
-	}
-
 	if (!isValidCompiler(compiler)) {
 		stderr.writefln("Invalid compiler name: %s. Supported options: dmd, ldc2", compiler);
-		needsHelp = true;
+		settings.needsHelp = true;
 		return settings;
 	}
 	if (settings.isCrossCompiling && compiler == "dmd") {
 		stderr.writefln("dmd cannot cross-compile");
-		needsHelp = true;
+		settings.needsHelp = true;
 		return settings;
 	}
 	settings.compiler = selectCompiler(settings, compiler);
 
-	if (optResult.helpWanted) needsHelp = true;
+	if (optResult.helpWanted) settings.needsHelp = true;
 
 	if (settings.configNames.canFind("all")) {
 		// Select all configs
@@ -401,7 +422,7 @@ GlobalSettings parseSettings(string[] args, out bool needsHelp, const(Config)[] 
 		foreach(name; settings.configNames) {
 			if (!configs.map!(c => c.name).canFind(name)) {
 				stderr.writeln("Unknown config: ", name);
-				needsHelp = true;
+				settings.needsHelp = true;
 				return settings;
 			}
 		}
@@ -545,7 +566,7 @@ Job makeRunJob(in GlobalSettings gs, JobResult compileRes) {
 			if (gs.runWithQemu()) return makeRunQemuJob(gs, compileRes);
 			return makeRunNativeExecutableJob(gs, compileRes);
 		case wasi: return makeRunWasmWasiJob(gs, compileRes);
-		case wasm: assert(false, "Cannot run artifact of wasm target");
+		case unknown: assert(false, "Cannot run artifact of wasm target");
 	}
 }
 
@@ -654,7 +675,7 @@ string makeCanonicalPath(in string path) {
 
 string makeArchiveName(in CompileParams params) {
 	string buildType = params.makeBuildTypeSuffix;
-	return format("%s-%s-%s-%s", params.archiveName, osName[params.targetOs], archName[params.targetArch], buildType);
+	return format("%s-%s-%s-%s", params.archiveName, archName[params.targetArch], osName[params.targetOs], buildType);
 }
 
 bool isValidCompiler(in string c) {
@@ -929,8 +950,10 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 
 			break;
 		}
-		case wasm: {
-			linkerFlags ~= "--no-entry";
+		case unknown: {
+			if (gs.targetArch == TargetArch.wasm32) {
+				linkerFlags ~= "--no-entry";
+			}
 			break;
 		}
 	}
@@ -1041,11 +1064,11 @@ enum Flags : uint {
 }
 
 enum TargetOs : ubyte {
-	windows,
 	linux,
 	macos,
-	wasm,
+	unknown,
 	wasi,
+	windows,
 }
 
 version(Windows) {
@@ -1057,92 +1080,92 @@ version(Windows) {
 } else version(WASI) {
 	enum TargetOs hostOs = TargetOs.wasi;
 } else version(WebAssembly) {
-	enum TargetOs hostOs = TargetOs.wasm;
+	enum TargetOs hostOs = TargetOs.unknown;
 } else static assert(false, "Unsupported OS");
 
 immutable string[5] osTripleName = [
-	TargetOs.windows : "windows-msvc",
 	TargetOs.linux : "linux-gnu",
 	TargetOs.macos : "apple-darwin",
-	TargetOs.wasm : "webassembly",
+	TargetOs.unknown : "webassembly",
 	TargetOs.wasi : "wasi",
+	TargetOs.windows : "windows-msvc",
 ];
 
 immutable string[5] osName = [
-	TargetOs.windows : "windows",
 	TargetOs.linux : "linux",
 	TargetOs.macos : "macos",
-	TargetOs.wasm : "wasm",
+	TargetOs.unknown : "unknown",
 	TargetOs.wasi : "wasi",
+	TargetOs.windows : "windows",
 ];
 
 immutable string[5] osExeExt = [
-	TargetOs.windows : ".exe",
 	TargetOs.linux : "",
 	TargetOs.macos : "",
-	TargetOs.wasm : ".wasm",
+	TargetOs.unknown : "",
 	TargetOs.wasi : ".wasm",
+	TargetOs.windows : ".exe",
 ];
 
 immutable string[5] osObjExt = [
-	TargetOs.windows : ".obj",
 	TargetOs.linux : ".o",
 	TargetOs.macos : ".o",
-	TargetOs.wasm : ".o",
+	TargetOs.unknown : ".o",
 	TargetOs.wasi : ".o",
+	TargetOs.windows : ".obj",
 ];
 
 immutable string[5] osStaticLibExt = [
-	TargetOs.windows : ".lib",
 	TargetOs.linux : ".a",
 	TargetOs.macos : ".a",
-	TargetOs.wasm : ".a",
+	TargetOs.unknown : ".a",
 	TargetOs.wasi : ".a",
+	TargetOs.windows : ".lib",
 ];
 
 immutable string[5] osSharedLibExt = [
-	TargetOs.windows : ".dll",
 	TargetOs.linux : ".so",
 	TargetOs.macos : ".dylib",
-	TargetOs.wasm : ".wasm",
+	TargetOs.unknown : "",
 	TargetOs.wasi : ".wasm",
+	TargetOs.windows : ".dll",
 ];
 
 immutable string[5] osDebugInfoExt = [
-	TargetOs.windows : ".pdb",
 	TargetOs.linux : "",
 	TargetOs.macos : "",
-	TargetOs.wasm : "",
+	TargetOs.unknown : "",
 	TargetOs.wasi : "",
+	TargetOs.windows : ".pdb",
 ];
 
 immutable string[5] osExecutableEntry = [
-	TargetOs.windows : "exe_main",
 	TargetOs.linux : "exe_main",
 	TargetOs.macos : "exe_main",
-	TargetOs.wasm : "_entry",
+	TargetOs.unknown : "_entry",
 	TargetOs.wasi : "_entry",
+	TargetOs.windows : "exe_main",
 ];
 
 immutable string[5] osSharedLibEntry = [
-	TargetOs.windows : "DllMain",
 	TargetOs.linux : "shared_main",
 	TargetOs.macos : "shared_main",
-	TargetOs.wasm : "shared_main",
+	TargetOs.unknown : "shared_main",
 	TargetOs.wasi : "shared_main",
+	TargetOs.windows : "DllMain",
 ];
 
 
 enum TargetArch : ubyte {
-	x64,
 	arm64,
 	wasm32,
+	x64,
 }
 
 immutable string[3] archName = [
-	TargetArch.x64 : "x64",
 	TargetArch.arm64 : "arm64",
 	TargetArch.wasm32 : "wasm32",
+	TargetArch.x64 : "x64",
 ];
 
 version(X86_64) {
@@ -1154,9 +1177,9 @@ version(X86_64) {
 } else static assert(false, "Unsupported architecture");
 
 immutable string[3] archTripleName = [
-	TargetArch.x64 : "x86_64",
 	TargetArch.arm64 : "aarch64",
 	TargetArch.wasm32 : "wasm32",
+	TargetArch.x64 : "x86_64",
 ];
 
 string makeTargetTripleFlag(in GlobalSettings gs) {

@@ -45,6 +45,9 @@ T enforce(T, Args...)(T value, string fmt, Args args, string file = __FILE__, in
 }
 
 version(D_BetterC) {
+	version(linux) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
+		_assert(msg, file, line);
+	}
 	version(WebAssembly) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
 		_assert(msg, file, line);
 	}
@@ -61,9 +64,6 @@ version(D_BetterC) {
 		vox_exit_process(1);
 	}
 	version(OSX) extern(C) void __assert_rtn(const(char)* func, const(char)* file, uint line, const(char)* msg) {
-		_assert(msg, file, line);
-	}
-	version(AArch64) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
 		_assert(msg, file, line);
 	}
 }
