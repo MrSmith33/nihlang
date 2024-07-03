@@ -43,7 +43,6 @@ jobs:
             --pretty \
             --color
   build_no_deps:
-    name: Build no deps
     strategy:
       matrix:
         os:
@@ -85,6 +84,7 @@ jobs:
               build: release-fast
               config: nih-cli,nih-shared,vbe-shared
               action: pack
+    name: ${{ matrix.v.action }}-${{ matrix.os.target }}-${{ matrix.v.build }}-${{ matrix.v.config }}
     runs-on: ${{ matrix.os.runner }}
     steps:
       - uses: actions/checkout@v4
