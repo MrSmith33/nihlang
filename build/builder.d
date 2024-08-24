@@ -287,6 +287,7 @@ immutable TargetAlias[] targetAliases = [
 	{"a64", "arm64"},
 	{"aarch64", "arm64"},
 	{"x86_64", "x64"},
+	{"amd64", "x64"},
 ];
 
 void printOptions() {
