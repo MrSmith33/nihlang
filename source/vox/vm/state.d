@@ -232,13 +232,41 @@ struct VmState {
 		return registers[index];
 	}
 
-	// Assumes parameter registers to be setup
-	void beginCall(AllocId funcId) {
-		if(funcId.index >= functions.length) panic("Invalid function index (%s), only %s functions exist", funcId.index, functions.length);
-		if(funcId.kind != MemoryKind.func_id) panic("Invalid AllocId kind, expected func_id, got %s", memoryKindString[funcId.kind]);
-		func = FuncId(funcId.index);
-		regs = &registers[0];
-		code = functions[func].code[].ptr;
+	// Takes exactly VmFunction.numStackParams arguments from the stack
+	VmReg[] call(AllocId funcId, VmReg[] regParams...) {
+		VmFunction* func = setupCall(funcId, 0, regParams);
+		run();
+		// runVerbose(stdoutSink);
+		return registers[0..func.numResults];
+	}
+
+	// Sets status
+	VmFunction* setupCall(AllocId funcId, u8 arg0_idx, VmReg[] regParams) {
+		status = VmStatus.RUNNING;
+
+		if(funcId.index >= functions.length) {
+			panic("Invalid function index (%s), only %s functions exist",
+				funcId.index, functions.length);
+		}
+		if(funcId.kind != MemoryKind.func_id) {
+			panic("Invalid AllocId kind, expected func_id, got %s",
+				memoryKindString[funcId.kind]);
+		}
+		VmFunction* func = &functions[funcId.index];
+		if(regParams.length < func.numRegParams) {
+			panic("Invalid number of register parameters provided, expected at least %s, got %s",
+				func.numRegParams, regParams.length);
+		}
+
+		// set register parameters (skip excess register parameters)
+		foreach(i; arg0_idx..arg0_idx+func.numRegParams) {
+			regs[i] = regParams[i];
+		}
+
+		// Sets status
+		instr_call_impl(this, FuncId(funcId.index), arg0_idx);
+
+		return func;
 	}
 
 	void run() {
@@ -262,6 +290,7 @@ struct VmState {
 				return;
 			}
 			u32 ipCopy = ip;
+			// sink.formattedWrite("f%s ", func.index);
 			disasmOne(sink, functions[func].code[], ipCopy);
 			sink("\n");
 			vmStep(this);

@@ -175,10 +175,9 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 		}
 	}
 
-	// vm.ip already points to the next instruction for bytecode function
+	// vm.ip still points to the call instruction of bytecode function
 	VmFrame callerFrame = {
 		func : vm.func,
-		// native functions do not care about ip
 		ip : vm.ip+7,
 		regDelta : arg0_idx,
 		numStackSlots : numCallerStackSlots,
@@ -186,6 +185,7 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	vm.callerFrames.put(*vm.allocator, callerFrame);
 
 	vm.func = calleeId;
+	// native functions do not care about ip
 	vm.ip = 0;
 	u32 regIndex = vm.frameFirstReg;
 	vm.pushRegisters(arg0_idx);
@@ -202,6 +202,14 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 			vm.code = null;
 			// call
 			callee.external(vm, callee.externalUserData);
+
+			// In case native function called into the bytecode function, the status will be FINISHED
+			// Each time we return from bytecode to native the status is set to FINISHED
+			if (vm.status == VmStatus.FINISHED) {
+				// Set it back to RUNNING to continue execution of the bytecode caller
+				vm.status = VmStatus.RUNNING;
+			}
+
 			// restore
 			instr_ret(vm);
 			return;
@@ -320,11 +328,16 @@ void instr_ret(ref VmState vm) {
 	vm.ip = frame.ip;
 	vm.func = frame.func;
 	vm.regs -= frame.regDelta;
-	if (vm.callerFrames.length == 1) {
-		vm.status = VmStatus.FINISHED;
-		vm.code = null;
-	} else {
-		vm.code = vm.functions[vm.func].code[].ptr;
+
+	final switch(vm.functions[vm.func].kind) {
+		case VmFuncKind.bytecode:
+			vm.code = vm.functions[vm.func].code[].ptr;
+			break;
+
+		case VmFuncKind.external:
+			vm.code = null;
+			vm.status = VmStatus.FINISHED;
+			break;
 	}
 
 	vm.popRegisters(frame.regDelta);
@@ -783,6 +796,7 @@ void instr_store(ref VmState vm) {
 	vm.ip += 3;
 }
 
+// TODO: make null src/dst valid when len is 0
 void instr_memcopy(ref VmState vm) {
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];

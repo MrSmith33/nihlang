@@ -40,21 +40,21 @@ Exploring ways of doing:
   - Stack trace generation
   - Exception handler
   - Structured logging for errors and other textual output
-- Build artifacts (15 permutations):
+- Build artifacts:
   - Target:
-    - `windows-x64`
-    - `linux-x64`
-    - `linux-arm64`
-    - `macos-x64`
+    - `x64-windows`
+    - `x64-linux`
+    - `arm64-linux`
+    - `x64-macos`
     - `wasm32-wasi`
     - `wasm32`
   - CLI lang compiler executable
   - Lang compiler as a library
-    - dll
+    - shared lib
     - static lib
   - Backend as a library
+    - shared lib
     - static lib
-    - dll
   - Debug info: on/off
   - Should compile with both dmd and ldc compilers
   - Make dub package for using Lang and Backend from D

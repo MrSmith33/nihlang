@@ -1958,6 +1958,55 @@ void test_call_1(ref VmTestContext c) {
 	c.expectResult(VmReg(57));
 }
 
+@VmTest
+void test_call_2(ref VmTestContext c) {
+	// Bytecode -> external -> bytecode call
+
+	AllocId funcA = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+
+	struct UserData {
+		AllocId funcB;
+	}
+
+	// u64 extern(u64 number) {
+	//     assert(number == 10);
+	//     return b(42);
+	// }
+	static extern(C) void externFunc(ref VmState vm, UserData* userData) {
+		assert(vm.regs[0] == VmReg(10));
+		VmReg[] res = vm.call(userData.funcB, VmReg(42));
+		assert(vm.status == VmStatus.FINISHED);
+		assert(vm.registers[0] == VmReg(42 + 21));
+	}
+	auto user_data = UserData(funcB);
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, cast(VmExternalFn)&externFunc, &user_data);
+
+	// u64 a() {
+	//     return extern(10);
+	// }
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_const_s8(0, 10);
+	a.emit_call(0, 1, extFuncId.index);
+	a.emit_ret();
+
+	c.vm.functions[funcA.index].code = a.code;
+
+	// u64 b(u64 number) {
+	//     return number + 21;
+	// }
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_const_s8(1, 21);
+	b.emit_add_i64(0, 0, 1);
+	b.emit_ret();
+
+	c.vm.functions[funcB.index].code = b.code;
+
+	VmReg[] res = c.call(funcA);
+	c.expectResult(VmReg(42 + 21));
+	c.expectNumExecutedInstructions(6);
+}
+
 
 @VmTest
 void test_tail_call_0(ref VmTestContext c) {
