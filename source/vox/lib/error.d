@@ -45,7 +45,11 @@ T enforce(T, Args...)(T value, string fmt, Args args, string file = __FILE__, in
 }
 
 version(D_BetterC) {
-	version(linux) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
+	version(X86_64) version(linux) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
+		_assert(msg, file, line);
+	}
+	// https://github.com/ldc-developers/ldc/commit/c497e0aed8b5956f10cfc3ac6600af788c51ffab
+	version(AArch64) version(linux) extern(C) void __assert_fail(const(char)* msg, const(char)* file, uint line, const(char)* func) {
 		_assert(msg, file, line);
 	}
 	version(WebAssembly) extern(C) void __assert(const(char)* msg, const(char)* file, uint line) {
