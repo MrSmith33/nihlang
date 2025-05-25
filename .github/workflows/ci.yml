@@ -41,11 +41,13 @@ jobs:
       matrix:
         os:
           - runner: ubuntu-latest
-            target: linux
+            target: x64-linux
           - runner: macos-13
-            target: macos
+            target: x64-macos
+          #- runner: macos-14
+          #  target: arm64-macos
           - runner: windows-latest
-            target: windows
+            target: x64-windows
         v:
           - build: debug-fast,release-fast
             config: nih-cli,nih-static,nih-shared,vbe-static,vbe-shared
@@ -118,6 +120,8 @@ jobs:
             target: x64-linux
           - runner: macos-13
             target: x64-macos
+          #- runner: macos-14
+          #  target: arm64-macos
           - runner: windows-latest
             target: x64-windows
           - runner: ubuntu-latest

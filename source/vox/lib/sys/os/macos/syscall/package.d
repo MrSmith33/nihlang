@@ -4,3 +4,4 @@
 module vox.lib.sys.os.macos.syscall;
 
 version(X86_64)  public import vox.lib.sys.os.macos.syscall.x64;
+version(AArch64) public import vox.lib.sys.os.macos.syscall.arm64;
