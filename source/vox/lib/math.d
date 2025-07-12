@@ -144,3 +144,13 @@ u32 int32_hash(u32 x) {
     x ^= x >> 15;
     return x;
 }
+
+// murmurhash3 64-bit finalizer
+u64 hash_u64(u64 x) {
+	x ^= x >> 33;
+	x *= 0xff51afd7ed558ccd;
+	x ^= x >> 33;
+	x *= 0xc4ceb9fe1a85ec53;
+	x ^= x >> 33;
+	return x;
+}
