@@ -5,6 +5,7 @@ module vox.vm.state;
 
 import vox.lib;
 import vox.vm;
+import vox.types;
 
 @nogc nothrow:
 

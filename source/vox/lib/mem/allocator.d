@@ -7,6 +7,7 @@ import vox.lib;
 
 @nogc nothrow:
 
+enum PAGE_SIZE = 4096;
 enum ALLOC_GRANULARITY = 65_536;
 
 version(Posix) {
@@ -38,6 +39,13 @@ version(Posix) {
 		import vox.lib.sys.os.windows : VirtualFree, MEM_RELEASE;
 		if (b.ptr is null) return;
 		VirtualFree(b.ptr, 0, MEM_RELEASE);
+	}
+	void markAsExecutable(void* addr, size_t numPages) {
+		if (numPages == 0) return;
+		uint val;
+		int res = VirtualProtect(addr, numPages*PAGE_SIZE, PAGE_EXECUTE, &val);
+		enforce(res != 0, "VirtualProtect(%X, %s, PAGE_EXECUTE, %s) failed", addr, numPages*PAGE_SIZE, val);
+		FlushInstructionCache(GetCurrentProcess(), addr, numPages*PAGE_SIZE);
 	}
 } else version(WebAssembly) {
 	ubyte[] os_allocate(size_t bytes) {

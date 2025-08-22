@@ -6,7 +6,7 @@ module testsuite;
 @nogc nothrow:
 
 import nih.all;
-import vox.vm.tests.infra.runner;
+import vox.lib.types;
 
 pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
@@ -16,7 +16,15 @@ i32 vox_main(string[] args)
 		import vox.lib.tests.atomic;
 		vox.lib.tests.atomic.runTests();
 	}
-	runVmTests();
+
+	VoxAllocator allocator;
+
+	import vox.vm.tests.tests;
+	runVmTests(allocator);
+
+	import vox.tests.tests;
+	runVoxTests(allocator);
+
 	// import vox.lib.bitcopy_test;
 	// test_copyBitRange;
 	//testFormatting;

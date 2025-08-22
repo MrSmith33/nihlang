@@ -4,6 +4,7 @@
 module vox.vm.code_builder;
 
 import vox.lib;
+import vox.types;
 import vox.vm.opcode;
 import vox.vm.memory;
 

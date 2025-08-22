@@ -3,19 +3,24 @@
 /// Authors: Andrey Penechko
 ///
 /// Data structures
-module vox.vm.tests.infra.context;
+module vox.vm.tests.context;
 
 import vox.lib;
+import vox.types;
 import vox.vm;
-import vox.vm.tests.infra;
+import vox.tests.infra;
+import vox.tests.infra.context;
 
 @nogc nothrow:
 
 struct VmTestContext {
 	@nogc nothrow:
+	BaseTestContext!VmTestContext base;
+	alias base this;
+
 	VmState vm;
-	SinkDelegate sink;
-	Test test;
+	//SinkDelegate sink;
+	//TestInstance test;
 
 	this(VoxAllocator* allocator, SinkDelegate _sink) {
 		vm.allocator = allocator;
@@ -31,8 +36,22 @@ struct VmTestContext {
 		sink = _sink;
 	}
 
+	void runTest(ref TestInstance test) {
+		prepareForTest(test);
+		//writef("-- test");
+		//foreach(ref param; test.parameters) {
+		//	writef(" (%s %s)", param.id, param.value);
+		//}
+		//writeln;
+		test.test_handler(&this);
+
+		static if (SLOW_CHECKS) {
+			vm.reset;
+		}
+	}
+
 	// Called before each test
-	void prepareForTest(ref Test _test) {
+	void prepareForTest(ref TestInstance _test) {
 		test = _test;
 		vm.ptrSize = test.ptrSize;
 		vm.memories[MemoryKind.static_mem].ptrSize = test.ptrSize;

@@ -1,13 +1,13 @@
-/// Copyright: Copyright (c) 2023 Andrey Penechko
+/// Copyright: Copyright (c) 2025 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
 ///
 /// Data structures
-module vox.vm.tests.infra.test_maker;
+module vox.tests.infra.test_maker;
 
 import vox.lib;
-import vox.vm;
-import vox.vm.tests.infra;
+import vox.types;
+import vox.tests.infra;
 
 @nogc nothrow:
 
@@ -16,7 +16,7 @@ void collectTests(alias M)(ref VoxAllocator allocator, ref TestSuite suite) {
 	{
 		alias member = __traits(getMember, M, m);
 		foreach (attr; __traits(getAttributes, member)) {
-			static if (is(attr == VmTest)) {
+			static if (is(attr == Test)) {
 				suite.definitions.put(allocator, TestDefinition.init);
 				gatherTestDefinition!member(allocator, suite.definitions.back);
 				break;
@@ -34,39 +34,21 @@ void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefini
 	def.name = __traits(identifier, test);
 	def.file = __traits(getLocation, test)[0];
 	def.line = __traits(getLocation, test)[1];
-	def.test_handler = &test;
+	def.test_handler = cast(TestHandler)&test;
 	foreach (attr; __traits(getAttributes, test)) {
 		static if (is(attr == TestPtrSize32)) {
 			def.attrPtrSize32 = true;
 		} else static if (is(attr == TestPtrSize64)) {
 			def.attrPtrSize64 = true;
-		} else static if (is(attr == VmTestOnly)) {
+		} else static if (is(attr == TestOnly)) {
 			def.onlyThis = true;
-		} else static if (is(attr == VmTestIgnore)) {
+		} else static if (is(attr == TestIgnore)) {
 			def.ignore = true;
-		} else static if (is(typeof(attr) == VmTestParam)) {
+		} else static if (is(typeof(attr) == TestParam)) {
 			static __gshared u32[] attr_values = attr.values;
 			def.parameters.put(allocator, TestDefinition.Param(attr.id, attr_values));
 		}
 	}
-}
-
-struct TestDefinition {
-	@nogc nothrow:
-	string name;
-	string file;
-	u32 line;
-	u32 index;
-	static struct Param {
-		TestParamId id;
-		u32[] values;
-	}
-	bool attrPtrSize32;
-	bool attrPtrSize64;
-	bool onlyThis;
-	bool ignore;
-	Array!Param parameters;
-	void function(ref VmTestContext) test_handler;
 }
 
 void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
@@ -75,7 +57,7 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 	if (def.onlyThis) {
 		if (suite.filter.enabled) {
 			auto otherDef = suite.definitions[suite.filter.definition];
-			panic("VmTestOnly attribute found in multiple places:\n  %s at %s:%s\n  %s at %s:%s\n",
+			panic("TestOnly attribute found in multiple places:\n  %s at %s:%s\n  %s at %s:%s\n",
 				otherDef.name, otherDef.file, otherDef.line,
 				def.name, def.file, def.line);
 		}
@@ -86,7 +68,7 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 	u32 numPermutations = 1;
 
 	static struct Param {
-		TestParamId id;
+		u8 id;
 		Array!u32 values;
 		u32 currentIndex;
 	}
@@ -122,15 +104,15 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 	// create all permutations
 	while(numPermutations) {
 		// gather parameters
-		Array!(Test.Param) testParameters;
+		Array!(TestInstance.Param) testParameters;
 		testParameters.voidPut(allocator, parameters.length);
 		foreach(i, ref param; parameters) {
-			testParameters[i] = Test.Param(param.id, param.values[param.currentIndex]);
+			testParameters[i] = TestInstance.Param(param.id, param.values[param.currentIndex]);
 			//writef(" (%s %s)", param.id, param.values[param.currentIndex]);
 		}
 		//writeln;
 
-		Test t = {
+		TestInstance t = {
 			name : def.name,
 			definition : def.index,
 			permutation : numPermutations - 1,

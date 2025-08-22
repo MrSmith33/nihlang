@@ -4,3 +4,4 @@
 module vox.all;
 
 public import vox.lib;
+public import vox.types;

@@ -4,6 +4,7 @@
 module vox.vm.memory;
 
 import vox.lib;
+import vox.types;
 import vox.vm.feature_flags;
 
 @nogc nothrow:
@@ -513,11 +514,6 @@ enum MemoryFlags : u8 {
 	runtime_write = 1 << 2,
 	isFreed       = 1 << 3,
 	isMarked      = 1 << 4,
-}
-
-enum PtrSize : u8 {
-	_32 = 0,
-	_64 = 1,
 }
 
 u32 as_u32(PtrSize s) {

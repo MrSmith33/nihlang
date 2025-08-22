@@ -4,13 +4,18 @@
 module vox.vm.tests.tests;
 
 import vox.lib;
+import vox.types;
 import vox.vm;
-import vox.vm.tests.infra;
+import vox.tests.infra;
+import vox.vm.tests.context;
 
 @nogc nothrow:
 
-void vmTests(ref VoxAllocator allocator, ref TestSuite suite) {
-	return collectTests!(vox.vm.tests.tests)(allocator, suite);
+i32 runVmTests(ref VoxAllocator allocator) {
+	auto context = VmTestContext(&allocator, stdoutSink);
+	TestSuite suite;
+	collectTests!(vox.vm.tests.tests)(allocator, suite);
+	return runTests(context.toInterface, suite);
 }
 
 // Test ideas:
@@ -22,7 +27,7 @@ void vmTests(ref VoxAllocator allocator, ref TestSuite suite) {
 //   the value is not overwritten before it is read
 
 
-@VmTest @TestPtrSize64
+@Test @TestPtrSize64
 void test_warmup(ref VmTestContext c) {
 	// Big code to warmup the memory and caches
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -40,7 +45,7 @@ void test_warmup(ref VmTestContext c) {
 }
 
 
-@VmTest @TestPtrSize32
+@Test @TestPtrSize32
 void test_runner_32bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == PtrSize._32);
 	assert(c.vm.memories[MemoryKind.static_mem].ptrSize == PtrSize._32);
@@ -48,7 +53,7 @@ void test_runner_32bit_ptr(ref VmTestContext c) {
 	assert(c.vm.memories[MemoryKind.stack_mem].ptrSize == PtrSize._32);
 }
 
-@VmTest @TestPtrSize64
+@Test @TestPtrSize64
 void test_runner_64bit_ptr(ref VmTestContext c) {
 	assert(c.vm.ptrSize == PtrSize._64);
 	assert(c.vm.memories[MemoryKind.static_mem].ptrSize == PtrSize._64);
@@ -57,7 +62,7 @@ void test_runner_64bit_ptr(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_ret_0(ref VmTestContext c) {
 	// Test return with 0 results 0 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -69,7 +74,7 @@ void test_ret_0(ref VmTestContext c) {
 	assert(c.vm.registers.length == 256);
 }
 
-@VmTest
+@Test
 void test_ret_1(ref VmTestContext c) {
 	// Test return with 0 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -81,7 +86,7 @@ void test_ret_1(ref VmTestContext c) {
 	assert(c.vm.registers.length == 256);
 }
 
-@VmTest
+@Test
 void test_ret_2(ref VmTestContext c) {
 	// Test return with 2 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -94,7 +99,7 @@ void test_ret_2(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_stack_0(ref VmTestContext c) {
 	// Test insufficient stack slot args (native -> bytecode)
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -106,7 +111,7 @@ void test_stack_0(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
-@VmTest
+@Test
 void test_stack_1(ref VmTestContext c) {
 	// Test insufficient stack slot args call (bytecode -> bytecode)
 	AllocId funcA = c.vm.addFunction();
@@ -126,7 +131,7 @@ void test_stack_1(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
-@VmTest
+@Test
 void test_stack_2(ref VmTestContext c) {
 	// Test insufficient stack slot args tailcall (bytecode -> bytecode)
 	AllocId funcA = c.vm.addFunction();
@@ -146,7 +151,7 @@ void test_stack_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
 }
 
-@VmTest
+@Test
 void test_stack_3(ref VmTestContext c) {
 	// Test incorrect stack slot size of an argument (native -> bytecode)
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -159,7 +164,7 @@ void test_stack_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
-@VmTest
+@Test
 void test_stack_4(ref VmTestContext c) {
 	// Test incorrect stack slot size of an argument (bytecode -> bytecode)
 	AllocId funcA = c.vm.addFunction();
@@ -180,7 +185,7 @@ void test_stack_4(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
-@VmTest
+@Test
 void test_stack_5(ref VmTestContext c) {
 	// Test incorrect stack slot size of an argument tailcall (bytecode -> bytecode)
 	AllocId funcA = c.vm.addFunction();
@@ -201,7 +206,7 @@ void test_stack_5(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
 
-@VmTest
+@Test
 void test_stack_6(ref VmTestContext c) {
 	// Test that native memory stack is preserved after return
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -216,7 +221,7 @@ void test_stack_6(ref VmTestContext c) {
 	assert(c.vm.numFrameStackSlots == 1);
 }
 
-@VmTest
+@Test
 void test_stack_7(ref VmTestContext c) {
 	// Test local stack slots
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -232,7 +237,7 @@ void test_stack_7(ref VmTestContext c) {
 	assert(c.vm.numFrameStackSlots == 1);
 }
 
-@VmTest
+@Test
 void test_stack_8(ref VmTestContext c) {
 	// Should not leak stack slots from previous test
 	assert(c.vm.numFrameStackSlots == 0);
@@ -252,7 +257,7 @@ void test_stack_8(ref VmTestContext c) {
 	assert(c.vm.numFrameStackSlots == 1); // parameter was consumed by the callee
 }
 
-@VmTest
+@Test
 void test_stack_addr_0(ref VmTestContext c) {
 	// Test stack_addr
 	assert(c.vm.numFrameStackSlots == 0);
@@ -269,7 +274,7 @@ void test_stack_addr_0(ref VmTestContext c) {
 	c.expectResult(VmReg(42));
 }
 
-@VmTest
+@Test
 void test_stack_9(ref VmTestContext c) {
 	// Test local stack slots clear. Check that mem init bits are cleared
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -283,8 +288,8 @@ void test_stack_9(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId);
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_stack_10(ref VmTestContext c) {
 	// Test memory pointer bits clear.
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -292,7 +297,7 @@ void test_stack_10(ref VmTestContext c) {
 	c.memWritePtr(memId, 0, memId);
 }
 
-@VmTest
+@Test
 void test_stack_11(ref VmTestContext c) {
 	// Test local stack slots clear. Check that mem pointer bits are cleared
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -305,7 +310,7 @@ void test_stack_11(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId);
 }
 
-@VmTest
+@Test
 void test_stack_12(ref VmTestContext c) {
 	// Check that pointer bits are removed from stack allocation on tail call
 	AllocId funcA = c.vm.addFunction();
@@ -329,7 +334,7 @@ void test_stack_12(ref VmTestContext c) {
 	c.call(funcA, VmReg(memId));
 }
 
-@VmTest
+@Test
 void test_stack_13(ref VmTestContext c) {
 	// External function tail call with stack parameter
 	static extern(C) void externFunc(ref VmState vm, void* userData) {
@@ -349,7 +354,7 @@ void test_stack_13(ref VmTestContext c) {
 	VmReg[] res = c.call(funcId);
 }
 
-@VmTest
+@Test
 void test_stack_14(ref VmTestContext c) {
 	// External function tail call with stack parameter
 	// Check with local stack
@@ -372,7 +377,7 @@ void test_stack_14(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_stack_alloc_0(ref VmTestContext c) {
 	// Test stack_alloc
 	static extern(C) void externFunc(ref VmState vm, void* userData) {
@@ -394,7 +399,7 @@ void test_stack_alloc_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_refs_0(ref VmTestContext c) {
 	// Check stack reference escape via result register
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -407,7 +412,7 @@ void test_refs_0(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
-@VmTest
+@Test
 void test_refs_1(ref VmTestContext c) {
 	// Check stack reference doesn't escape via local register
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -419,7 +424,7 @@ void test_refs_1(ref VmTestContext c) {
 	c.call(funcId);
 }
 
-@VmTest
+@Test
 void test_refs_2(ref VmTestContext c) {
 	// Check stack reference escape via result register, tail call
 	AllocId funcA = c.vm.addFunction();
@@ -440,8 +445,8 @@ void test_refs_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_refs_3(ref VmTestContext c) {
 	// Check stack reference escape via pointer in memory (on return)
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -457,8 +462,8 @@ void test_refs_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_refs_4(ref VmTestContext c) {
 	// Check stack reference escape via pointer in memory (on tail call)
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -483,7 +488,7 @@ void test_refs_4(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
 }
 
-@VmTest
+@Test
 void test_refs_5(ref VmTestContext c) {
 	// Check that pointers are removed from stack allocation and references are correctly decremented
 	// If they were not removed, escape error occurs
@@ -497,7 +502,7 @@ void test_refs_5(ref VmTestContext c) {
 	c.call(funcId);
 }
 
-@VmTest
+@Test
 void test_refs_6(ref VmTestContext c) {
 	// Check that pointers are removed from stack allocation and references are correctly decremented
 	// If they were not removed, escape error occurs
@@ -521,7 +526,7 @@ void test_refs_6(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -532,13 +537,13 @@ void test_trap_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_budget_0(ref VmTestContext c) {
 	// check that budget gets reset per test
 	c.vm.budget = 0;
 }
 
-@VmTest
+@Test
 void test_budget_1(ref VmTestContext c) {
 	// Test budget error
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -551,7 +556,7 @@ void test_budget_1(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_BUDGET);
 }
 
-@VmTest
+@Test
 void test_budget_2(ref VmTestContext c) {
 	// Check that budget of 1 is enough to run a single instruction
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -564,7 +569,7 @@ void test_budget_2(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_jump_0(ref VmTestContext c) {
 	// Test jump
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -580,7 +585,7 @@ void test_jump_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_branch_0(ref VmTestContext c) {
 	// Test branch
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -607,7 +612,7 @@ void test_branch_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_branch_zero_0(ref VmTestContext c) {
 	// Test branch zero
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -634,7 +639,7 @@ void test_branch_zero_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_mov_0(ref VmTestContext c) {
 	// Test mov of non-pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -645,7 +650,7 @@ void test_mov_0(ref VmTestContext c) {
 	c.expectResult(VmReg(42));
 }
 
-@VmTest
+@Test
 void test_mov_1(ref VmTestContext c) {
 	// Test mov of pointer from parameter to result
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -656,7 +661,7 @@ void test_mov_1(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId));
 }
 
-@VmTest
+@Test
 void test_mov_2(ref VmTestContext c) {
 	// Test mov of pointer with offset
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -667,7 +672,7 @@ void test_mov_2(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, 42));
 }
 
-@VmTest
+@Test
 void test_mov_3(ref VmTestContext c) {
 	// Test mov of non-pointer from uninitialized local to result
 	// TODO: This may be either catched during validation, or we could have a bit per register and check it
@@ -679,7 +684,7 @@ void test_mov_3(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_cmp_0(ref VmTestContext c) {
 	// Test cmp OOB condition
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -691,7 +696,7 @@ void test_cmp_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_cmp_4(ref VmTestContext c) {
 	// Test cmp.m64.eq
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -719,7 +724,7 @@ void test_cmp_4(ref VmTestContext c) {
 	c.expectResult(VmReg(0));
 }
 
-@VmTest
+@Test
 void test_cmp_5(ref VmTestContext c) {
 	// Test cmp.m64.ne
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -747,7 +752,7 @@ void test_cmp_5(ref VmTestContext c) {
 	c.expectResult(VmReg(1));
 }
 
-@VmTest
+@Test
 void test_cmp_6(ref VmTestContext c) {
 	// Test cmp.u64.gt
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -774,7 +779,7 @@ void test_cmp_6(ref VmTestContext c) {
 	c.expectResult(VmReg(1));
 }
 
-@VmTest
+@Test
 void test_cmp_7(ref VmTestContext c) {
 	// Test cmp.u64.ge
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -801,8 +806,8 @@ void test_cmp_7(ref VmTestContext c) {
 	c.expectResult(VmReg(1));
 }
 
-@VmTest
-@VmTestParam(TestParamId.user, [VmBinCond.u64_gt, VmBinCond.u64_ge])
+@Test
+@TestParam(TestParamId.user, [VmBinCond.u64_gt, VmBinCond.u64_ge])
 void test_cmp_8(ref VmTestContext c) {
 	// Test cmp.u64.gt/ge different pointers
 	VmBinCond cond = cast(VmBinCond)c.test.getParam(TestParamId.user);
@@ -816,8 +821,8 @@ void test_cmp_8(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CMP_DIFFERENT_PTR);
 }
 
-@VmTest
-@VmTestParam(TestParamId.user, [
+@Test
+@TestParam(TestParamId.user, [
 	VmBinCond.s64_gt, VmBinCond.s64_ge, VmBinCond.f32_gt, VmBinCond.f32_ge, VmBinCond.f64_gt, VmBinCond.f64_ge,])
 void test_cmp_9(ref VmTestContext c) {
 	// Test cmp condition that requires pointers to be null
@@ -835,7 +840,7 @@ void test_cmp_9(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 }
 
-@VmTest
+@Test
 void test_cmp_10(ref VmTestContext c) {
 	// Test cmp.s64.gt
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -859,7 +864,7 @@ void test_cmp_10(ref VmTestContext c) {
 	c.expectResult(VmReg(1));
 }
 
-@VmTest
+@Test
 void test_cmp_11(ref VmTestContext c) {
 	// Test cmp.s64.ge
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -883,7 +888,7 @@ void test_cmp_11(ref VmTestContext c) {
 	c.expectResult(VmReg(1));
 }
 
-@VmTest
+@Test
 void test_cmp_12(ref VmTestContext c) {
 	// Test cmp.f32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -903,7 +908,7 @@ void test_cmp_12(ref VmTestContext c) {
 	assert(res[3] == VmReg(1)); // 100 >= 100
 }
 
-@VmTest
+@Test
 void test_cmp_13(ref VmTestContext c) {
 	// Test cmp.f64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -924,7 +929,7 @@ void test_cmp_13(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_add_i64_0(ref VmTestContext c) {
 	// Test add_i64 number addition, same register
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -935,7 +940,7 @@ void test_add_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(20));
 }
 
-@VmTest
+@Test
 void test_add_i64_1(ref VmTestContext c) {
 	// Test add_i64 ptr + number
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -946,7 +951,7 @@ void test_add_i64_1(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, 30));
 }
 
-@VmTest
+@Test
 void test_add_i64_2(ref VmTestContext c) {
 	// Test add_i64 ptr + ptr
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -957,7 +962,7 @@ void test_add_i64_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
 
-@VmTest
+@Test
 void test_add_i64_3(ref VmTestContext c) {
 	// Test add_i64 num + ptr
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -969,7 +974,7 @@ void test_add_i64_3(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_sub_i64_0(ref VmTestContext c) {
 	// Test sub_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -982,7 +987,7 @@ void test_sub_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(34));
 }
 
-@VmTest
+@Test
 void test_sub_i64_1(ref VmTestContext c) {
 	// Test sub_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -995,7 +1000,7 @@ void test_sub_i64_1(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, 34));
 }
 
-@VmTest
+@Test
 void test_sub_i64_2(ref VmTestContext c) {
 	// Test sub_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1008,7 +1013,7 @@ void test_sub_i64_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
 
-@VmTest
+@Test
 void test_sub_i64_3(ref VmTestContext c) {
 	// Test sub_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1022,7 +1027,7 @@ void test_sub_i64_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_SUB_DIFFERENT_PTR);
 }
 
-@VmTest
+@Test
 void test_sub_i64_4(ref VmTestContext c) {
 	// Test sub_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1037,7 +1042,7 @@ void test_sub_i64_4(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_mul_i64_0(ref VmTestContext c) {
 	// Test mul_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1049,7 +1054,7 @@ void test_mul_i64_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_div_u64_0(ref VmTestContext c) {
 	// Test div_u64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1061,7 +1066,7 @@ void test_div_u64_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_div_s64_0(ref VmTestContext c) {
 	// Test div_s64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1073,7 +1078,7 @@ void test_div_s64_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_rem_u64_0(ref VmTestContext c) {
 	// Test rem_u64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1085,7 +1090,7 @@ void test_rem_u64_0(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_rem_s64_0(ref VmTestContext c) {
 	// Test rem_s64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1096,7 +1101,7 @@ void test_rem_s64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(-32 % 18));
 }
 
-@VmTest
+@Test
 void test_not_i64_0(ref VmTestContext c) {
 	// Test not_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1107,7 +1112,7 @@ void test_not_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0));
 }
 
-@VmTest
+@Test
 void test_and_i64_0(ref VmTestContext c) {
 	// Test and_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1118,7 +1123,7 @@ void test_and_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xAAAAAAAA_AAAAAAAA));
 }
 
-@VmTest
+@Test
 void test_or_i64_0(ref VmTestContext c) {
 	// Test or_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1129,7 +1134,7 @@ void test_or_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(u64.max));
 }
 
-@VmTest
+@Test
 void test_xor_i64_0(ref VmTestContext c) {
 	// Test xor_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1140,7 +1145,7 @@ void test_xor_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0x55555555_55555555));
 }
 
-@VmTest
+@Test
 void test_shl_i64_0(ref VmTestContext c) {
 	// Test shl_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1151,7 +1156,7 @@ void test_shl_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFFFFFFF_FFFFFFFELU));
 }
 
-@VmTest
+@Test
 void test_shl_i32_0(ref VmTestContext c) {
 	// Test shl_i32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1162,7 +1167,7 @@ void test_shl_i32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFFF_FFFE));
 }
 
-@VmTest
+@Test
 void test_shl_i16_0(ref VmTestContext c) {
 	// Test shl_i16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1173,7 +1178,7 @@ void test_shl_i16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFFE));
 }
 
-@VmTest
+@Test
 void test_shl_i8_0(ref VmTestContext c) {
 	// Test shl_i8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1184,7 +1189,7 @@ void test_shl_i8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFE));
 }
 
-@VmTest
+@Test
 void test_shr_u64_0(ref VmTestContext c) {
 	// Test shr_u64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1195,7 +1200,7 @@ void test_shr_u64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0x7FFFFFFF_FFFFFFF8));
 }
 
-@VmTest
+@Test
 void test_shr_u32_0(ref VmTestContext c) {
 	// Test shr_u32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1206,7 +1211,7 @@ void test_shr_u32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0x7FFF_FFF8));
 }
 
-@VmTest
+@Test
 void test_shr_u16_0(ref VmTestContext c) {
 	// Test shr_u16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1217,7 +1222,7 @@ void test_shr_u16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0x7FF8));
 }
 
-@VmTest
+@Test
 void test_shr_u8_0(ref VmTestContext c) {
 	// Test shr_u8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1228,7 +1233,7 @@ void test_shr_u8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0x78));
 }
 
-@VmTest
+@Test
 void test_shr_s64_0(ref VmTestContext c) {
 	// Test shr_s64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1239,7 +1244,7 @@ void test_shr_s64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFFFFFFF_FFFFFFF8LU));
 }
 
-@VmTest
+@Test
 void test_shr_s32_0(ref VmTestContext c) {
 	// Test shr_s32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1250,7 +1255,7 @@ void test_shr_s32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFFF_FFF8));
 }
 
-@VmTest
+@Test
 void test_shr_s16_0(ref VmTestContext c) {
 	// Test shr_s16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1261,7 +1266,7 @@ void test_shr_s16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xFFF8));
 }
 
-@VmTest
+@Test
 void test_shr_s8_0(ref VmTestContext c) {
 	// Test shr_s8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1272,7 +1277,7 @@ void test_shr_s8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xF8));
 }
 
-@VmTest
+@Test
 void test_rotl_i8_0(ref VmTestContext c) {
 	// Test rotl_i8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1283,7 +1288,7 @@ void test_rotl_i8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xB1));
 }
 
-@VmTest
+@Test
 void test_rotl_i16_0(ref VmTestContext c) {
 	// Test rotl_i16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1294,7 +1299,7 @@ void test_rotl_i16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xB001));
 }
 
-@VmTest
+@Test
 void test_rotl_i32_0(ref VmTestContext c) {
 	// Test rotl_i32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1305,7 +1310,7 @@ void test_rotl_i32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xB000_0001));
 }
 
-@VmTest
+@Test
 void test_rotl_i64_0(ref VmTestContext c) {
 	// Test rotl_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1316,7 +1321,7 @@ void test_rotl_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xB000_0000_0000_0001));
 }
 
-@VmTest
+@Test
 void test_rotr_i8_0(ref VmTestContext c) {
 	// Test rotr_i8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1327,7 +1332,7 @@ void test_rotr_i8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xD8));
 }
 
-@VmTest
+@Test
 void test_rotr_i16_0(ref VmTestContext c) {
 	// Test rotr_i16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1338,7 +1343,7 @@ void test_rotr_i16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xD800));
 }
 
-@VmTest
+@Test
 void test_rotr_i32_0(ref VmTestContext c) {
 	// Test rotr_i32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1349,7 +1354,7 @@ void test_rotr_i32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xD800_0000));
 }
 
-@VmTest
+@Test
 void test_rotr_i64_0(ref VmTestContext c) {
 	// Test rotr_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1360,7 +1365,7 @@ void test_rotr_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(0xD800_0000_0000_0000));
 }
 
-@VmTest
+@Test
 void test_clz_i8_0(ref VmTestContext c) {
 	// Test clz_i8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1377,7 +1382,7 @@ void test_clz_i8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(8));
 }
 
-@VmTest
+@Test
 void test_clz_i16_0(ref VmTestContext c) {
 	// Test clz_i16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1392,7 +1397,7 @@ void test_clz_i16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(16));
 }
 
-@VmTest
+@Test
 void test_clz_i32_0(ref VmTestContext c) {
 	// Test clz_i32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1407,7 +1412,7 @@ void test_clz_i32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(32));
 }
 
-@VmTest
+@Test
 void test_clz_i64_0(ref VmTestContext c) {
 	// Test clz_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1422,7 +1427,7 @@ void test_clz_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(64));
 }
 
-@VmTest
+@Test
 void test_ctz_i8_0(ref VmTestContext c) {
 	// Test ctz_i8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1437,7 +1442,7 @@ void test_ctz_i8_0(ref VmTestContext c) {
 	c.expectResult(VmReg(8));
 }
 
-@VmTest
+@Test
 void test_ctz_i16_0(ref VmTestContext c) {
 	// Test ctz_i16
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1452,7 +1457,7 @@ void test_ctz_i16_0(ref VmTestContext c) {
 	c.expectResult(VmReg(16));
 }
 
-@VmTest
+@Test
 void test_ctz_i32_0(ref VmTestContext c) {
 	// Test ctz_i32
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1467,7 +1472,7 @@ void test_ctz_i32_0(ref VmTestContext c) {
 	c.expectResult(VmReg(32));
 }
 
-@VmTest
+@Test
 void test_ctz_i64_0(ref VmTestContext c) {
 	// Test ctz_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1482,7 +1487,7 @@ void test_ctz_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(64));
 }
 
-@VmTest
+@Test
 void test_popcnt_i64_0(ref VmTestContext c) {
 	// Test popcnt_i64
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1497,7 +1502,7 @@ void test_popcnt_i64_0(ref VmTestContext c) {
 	c.expectResult(VmReg(3));
 }
 
-@VmTest
+@Test
 void test_const_s8_0(ref VmTestContext c) {
 	// Test const_s8
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -1511,8 +1516,8 @@ void test_const_s8_0(ref VmTestContext c) {
 }
 
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_2(ref VmTestContext c) {
 	// Test load_mXX src pointer undefined
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1524,8 +1529,8 @@ void test_load_mXX_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_3(ref VmTestContext c) {
 	// Test load_mXX src memory is not readable
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1537,9 +1542,9 @@ void test_load_mXX_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_4(ref VmTestContext c) {
 	// Test load_mXX src allocation is not readable
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1553,9 +1558,9 @@ void test_load_mXX_4(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_5(ref VmTestContext c) {
 	// Test load_mXX src memory offset is negative
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1569,9 +1574,9 @@ void test_load_mXX_5(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_6(ref VmTestContext c) {
 	// Test load_mXX src memory offset is too big
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1586,9 +1591,9 @@ void test_load_mXX_6(ref VmTestContext c) {
 }
 
 static if (SANITIZE_UNINITIALIZED_MEM)
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_7(ref VmTestContext c) {
 	// Test load_mXX src memory uninitialized
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1602,9 +1607,9 @@ void test_load_mXX_7(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_READ_UNINIT);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_8(ref VmTestContext c) {
 	// Test load_mXX raw bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1640,9 +1645,9 @@ void test_load_mXX_8(ref VmTestContext c) {
 	}
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_load_mXX_9(ref VmTestContext c) {
 	// Test load_mXX on pointer bytes with offset from 0 to 8
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1682,8 +1687,8 @@ void test_load_mXX_9(ref VmTestContext c) {
 	}
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.load_m8, VmOpcode.load_m16, VmOpcode.load_m32, VmOpcode.load_m64])
 void test_load_mXX_10(ref VmTestContext c) {
 	// Test load_mXX src memory was freed
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1698,8 +1703,8 @@ void test_load_mXX_10(ref VmTestContext c) {
 }
 
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
 void test_store_mXX_1(ref VmTestContext c) {
 	// Test store_mXX dst pointer undefined
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1711,8 +1716,8 @@ void test_store_mXX_1(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
 void test_store_mXX_2(ref VmTestContext c) {
 	// Test store_mXX dst memory is not writable
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1724,9 +1729,9 @@ void test_store_mXX_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_3(ref VmTestContext c) {
 	// Test store_mXX dst allocation is not writable
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1740,9 +1745,9 @@ void test_store_mXX_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_4(ref VmTestContext c) {
 	// Test store_mXX dst memory offset is negative
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1756,9 +1761,9 @@ void test_store_mXX_4(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_5(ref VmTestContext c) {
 	// Test store_mXX dst memory offset is too big
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1772,9 +1777,9 @@ void test_store_mXX_5(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
-@VmTest
-@VmTestParam(TestParamId.user, [0, 1, 2, 3])
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.user, [0, 1, 2, 3])
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_6(ref VmTestContext c) {
 	// Test store_mXX raw bytes with offset from 0 to 8
 	// Check that init bits are set
@@ -1808,8 +1813,8 @@ void test_store_mXX_6(ref VmTestContext c) {
 	}
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_7(ref VmTestContext c) {
 	// Test store_mXX of pointers to unaligned address
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1831,8 +1836,8 @@ void test_store_mXX_7(ref VmTestContext c) {
 	}
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_8(ref VmTestContext c) {
 	// Test store_mXX of pointers to aligned address
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1848,8 +1853,8 @@ void test_store_mXX_8(ref VmTestContext c) {
 	c.expectResult(VmReg(memId));
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_9(ref VmTestContext c) {
 	// Test store_mXX of pointers to aligned address that overwrites an existing pointer
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1867,8 +1872,8 @@ void test_store_mXX_9(ref VmTestContext c) {
 	c.expectResult(VmReg(memId2));
 }
 
-@VmTest
-@VmTestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
+@Test
+@TestParam(TestParamId.memory, [MemoryKind.heap_mem, MemoryKind.stack_mem, MemoryKind.static_mem])
 void test_store_mXX_10(ref VmTestContext c) {
 	// Test store_mXX of non-pointer to aligned address that removes an existing pointer
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
@@ -1885,8 +1890,8 @@ void test_store_mXX_10(ref VmTestContext c) {
 	c.expectResult(VmReg(0));
 }
 
-@VmTest
-@VmTestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
+@Test
+@TestParam(TestParamId.instr, [VmOpcode.store_m8, VmOpcode.store_m16, VmOpcode.store_m32, VmOpcode.store_m64])
 void test_store_mXX_11(ref VmTestContext c) {
 	// Test store_mXX dst memory was freed
 	VmOpcode op = cast(VmOpcode)c.test.getParam(TestParamId.instr);
@@ -1906,7 +1911,7 @@ static extern(C) void externPrint(ref VmState state, void* userData) {
 }
 
 
-@VmTest
+@Test
 void test_call_0(ref VmTestContext c) {
 	// External function call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
@@ -1926,7 +1931,7 @@ void test_call_0(ref VmTestContext c) {
 	c.expectResult(VmReg(42));
 }
 
-@VmTest
+@Test
 void test_call_1(ref VmTestContext c) {
 	// Bytecode function call
 
@@ -1958,7 +1963,7 @@ void test_call_1(ref VmTestContext c) {
 	c.expectResult(VmReg(57));
 }
 
-@VmTest
+@Test
 void test_call_2(ref VmTestContext c) {
 	// Bytecode -> external -> bytecode call
 
@@ -2008,7 +2013,7 @@ void test_call_2(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_tail_call_0(ref VmTestContext c) {
 	// External function tail call
 	static extern(C) void externFunc(ref VmState state, void* userData) {
@@ -2028,7 +2033,7 @@ void test_tail_call_0(ref VmTestContext c) {
 	c.expectResult(VmReg(42));
 }
 
-@VmTest
+@Test
 void test_tail_call_1(ref VmTestContext c) {
 	// External function call
 	// Check that caller local variable is removed from stack correctly
@@ -2051,7 +2056,7 @@ void test_tail_call_1(ref VmTestContext c) {
 	assert(c.vm.numFrameStackSlots == 0);
 }
 
-@VmTest
+@Test
 void test_tail_call_2(ref VmTestContext c) {
 	// Bytecode function tail call, non-zero first reg
 
@@ -2096,7 +2101,7 @@ void test_tail_call_2(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_memcopy_0(ref VmTestContext c) {
 	// memcopy instruction, dst is not a pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2108,7 +2113,7 @@ void test_memcopy_0(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
 
-@VmTest
+@Test
 void test_memcopy_1(ref VmTestContext c) {
 	// memcopy instruction, dst memory is not writable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2121,7 +2126,7 @@ void test_memcopy_1(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
 
-@VmTest
+@Test
 void test_memcopy_2(ref VmTestContext c) {
 	// memcopy instruction, dst allocation is not writable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2134,7 +2139,7 @@ void test_memcopy_2(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
 
-@VmTest
+@Test
 void test_memcopy_3(ref VmTestContext c) {
 	// memcopy instruction, dst allocation is freed
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2149,7 +2154,7 @@ void test_memcopy_3(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_DST_ALLOC_FREED);
 }
 
-@VmTest
+@Test
 void test_memcopy_4(ref VmTestContext c) {
 	// memcopy instruction, src is not a pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2162,7 +2167,7 @@ void test_memcopy_4(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
 }
 
-@VmTest
+@Test
 void test_memcopy_5(ref VmTestContext c) {
 	// memcopy instruction, src memory is not readable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2175,7 +2180,7 @@ void test_memcopy_5(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
 
-@VmTest
+@Test
 void test_memcopy_6(ref VmTestContext c) {
 	// memcopy instruction, src allocation is not readable
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2189,7 +2194,7 @@ void test_memcopy_6(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
 
-@VmTest
+@Test
 void test_memcopy_7(ref VmTestContext c) {
 	// memcopy instruction, src allocation is freed
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2204,7 +2209,7 @@ void test_memcopy_7(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_SRC_ALLOC_FREED);
 }
 
-@VmTest
+@Test
 void test_memcopy_8(ref VmTestContext c) {
 	// memcopy instruction, len is a pointer
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2217,7 +2222,7 @@ void test_memcopy_8(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_LEN_IS_PTR);
 }
 
-@VmTest
+@Test
 void test_memcopy_9(ref VmTestContext c) {
 	// memcopy instruction, dst memory offset is negative
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2230,7 +2235,7 @@ void test_memcopy_9(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
-@VmTest
+@Test
 void test_memcopy_10(ref VmTestContext c) {
 	// memcopy instruction, dst memory offset is too big
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2243,7 +2248,7 @@ void test_memcopy_10(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
 
-@VmTest
+@Test
 void test_memcopy_11(ref VmTestContext c) {
 	// memcopy instruction, src memory offset is negative
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2256,7 +2261,7 @@ void test_memcopy_11(ref VmTestContext c) {
 	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
 
-@VmTest
+@Test
 void test_memcopy_12(ref VmTestContext c) {
 	// memcopy instruction, src memory offset is too big
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2270,7 +2275,7 @@ void test_memcopy_12(ref VmTestContext c) {
 }
 
 static if (SANITIZE_UNINITIALIZED_MEM)
-@VmTest
+@Test
 void test_memcopy_13(ref VmTestContext c) {
 	// memcopy instruction, copying uninitialized memory
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2289,7 +2294,7 @@ void test_memcopy_13(ref VmTestContext c) {
 	}
 }
 
-@VmTest
+@Test
 void test_memcopy_14(ref VmTestContext c) {
 	// memcopy instruction, check that non-pointers are written
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2305,7 +2310,7 @@ void test_memcopy_14(ref VmTestContext c) {
 	c.expectResult(VmReg(-1));
 }
 
-@VmTest
+@Test
 void test_memcopy_15(ref VmTestContext c) {
 	// memcopy instruction, different allocations, non-overlapping memcopy
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2324,7 +2329,7 @@ void test_memcopy_15(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
-@VmTest
+@Test
 void test_memcopy_16(ref VmTestContext c) {
 	// memcopy instruction, same allocation, non-overlapping memcopy
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2342,7 +2347,7 @@ void test_memcopy_16(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
-@VmTest
+@Test
 void test_memcopy_17(ref VmTestContext c) {
 	// memcopy instruction, unaligned pointer write
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2367,7 +2372,7 @@ void test_memcopy_17(ref VmTestContext c) {
 	}
 }
 
-@VmTest
+@Test
 void test_memcopy_18(ref VmTestContext c) {
 	// memcopy instruction, same allocation, src < dst
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2386,7 +2391,7 @@ void test_memcopy_18(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
-@VmTest
+@Test
 void test_memcopy_19(ref VmTestContext c) {
 	// memcopy instruction, same allocation, src > dst
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2405,7 +2410,7 @@ void test_memcopy_19(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
-@VmTest
+@Test
 void test_memcopy_20(ref VmTestContext c) {
 	// memcopy instruction, same allocation, dst == src, noop
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2424,7 +2429,7 @@ void test_memcopy_20(ref VmTestContext c) {
 	c.expectResult(VmReg(funcId, value & sizeMask));
 }
 
-@VmTest
+@Test
 void test_memcopy_21(ref VmTestContext c) {
 	// memcopy instruction, same allocation, length == 0, noop
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
@@ -2444,7 +2449,7 @@ void test_memcopy_21(ref VmTestContext c) {
 }
 
 
-@VmTest
+@Test
 void test_ctfe_finalize(ref VmTestContext c) {
 	// Test moveMemToStatic
 	// Give unique sizes, so we can check them later
@@ -2498,9 +2503,9 @@ void test_ctfe_finalize(ref VmTestContext c) {
 }
 
 
-@VmTest
-@VmTestIgnore
-@VmTestOnly
+@Test
+@TestIgnore
+@TestOnly
 @TestPtrSize64
 void bench_0(ref VmTestContext c) {
 	// Benchmark fib
