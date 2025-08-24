@@ -9,10 +9,12 @@ import vox.lib;
 import vox.tests.infra;
 
 struct VoxTestContext {
+	mixin TestContextUtils;
+
 	@nogc nothrow:
 
-	BaseTestContext!VoxTestContext base;
-	alias base this;
+	SinkDelegate sink;
+	TestInstance test;
 
 	this(VoxAllocator* allocator, SinkDelegate _sink) {
 		sink = _sink;

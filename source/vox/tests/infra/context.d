@@ -24,16 +24,13 @@ struct ITestContext {
 	}
 }
 
-struct BaseTestContext(T) {
+mixin template TestContextUtils() {
 	@nogc nothrow:
-	SinkDelegate sink;
-	TestInstance test;
 
 	ITestContext toInterface() {
-		auto realThis = cast(T*)&this;
 		ITestContext res = {
-			instance : realThis,
-			runTestPtr : (&realThis.runTest).funcptr
+			instance : &this,
+			runTestPtr : (&this.runTest).funcptr
 		};
 		return res;
 	}

@@ -14,13 +14,13 @@ import vox.tests.infra.context;
 @nogc nothrow:
 
 struct VmTestContext {
+	mixin TestContextUtils;
+
 	@nogc nothrow:
-	BaseTestContext!VmTestContext base;
-	alias base this;
 
 	VmState vm;
-	//SinkDelegate sink;
-	//TestInstance test;
+	SinkDelegate sink;
+	TestInstance test;
 
 	this(VoxAllocator* allocator, SinkDelegate _sink) {
 		vm.allocator = allocator;
