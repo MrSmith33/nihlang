@@ -31,14 +31,14 @@
 module builder;
 
 import core.time : MonoTime, Duration;
-import std.algorithm : countUntil, filter, splitter, joiner, canFind, map, filter, move;
+import std.algorithm : countUntil, filter, splitter, joiner, canFind, map, filter, move, startsWith;
 import std.range : empty, array, chain;
 import std.file : thisExePath;
 import std.path : dirName, buildPath, setExtension;
 import std.conv : text;
 import std.stdio;
 import std.uni : asLowerCase;
-import std.string : format, lineSplitter, strip;
+import std.string : format, lineSplitter, strip, stripLeft;
 
 int main(string[] args)
 {
@@ -638,6 +638,9 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 		auto stripped = result.output.strip;
 		if (stripped.empty) return;
 		foreach(line; result.output.lineSplitter.filter!(l => !l.empty)) {
+			// Ignore linker message for .exp/.lib file creation
+			if (line.stripLeft.startsWith("Creating library")) continue;
+
 			stderr.writeln("  ", line);
 		}
 	}
