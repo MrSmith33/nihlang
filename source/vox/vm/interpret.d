@@ -11,7 +11,9 @@ import vox.vm;
 // Invariant: when trap happens, VM state should remain as if instruction was not executed
 // Whole destination register should be overwritten
 void vmStep(ref VmState vm) {
-	pragma(inline, true);
+	// version(LDC) because with this much inlines dmd issues a warning
+	// Warning: cannot inline function `vox.vm.interpret.instr_*` for lots of functions
+	version(LDC) pragma(inline, true);
 	VmOpcode op = cast(VmOpcode)vm.code[vm.ip+0];
 
 	final switch(op) with(VmOpcode) {
@@ -82,16 +84,16 @@ void vmStep(ref VmState vm) {
 }
 
 void instr_trap(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	vm.setTrap(VmStatus.ERR_TRAP);
 }
 void instr_jump(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	i32 offset = *cast(i32*)&vm.code[vm.ip+1];
 	vm.ip += offset + 5;
 }
 void instr_branch(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* src = &vm.regs[vm.code[vm.ip+1]];
 
 	i32 offset = *cast(i32*)&vm.code[vm.ip+2];
@@ -104,7 +106,7 @@ void instr_branch(ref VmState vm) {
 	vm.ip += 6;
 }
 void instr_branch_zero(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* src = &vm.regs[vm.code[vm.ip+1]];
 
 	i32 offset = *cast(i32*)&vm.code[vm.ip+2];
@@ -117,7 +119,7 @@ void instr_branch_zero(ref VmState vm) {
 	vm.ip += 6;
 }
 void instr_stack_addr(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	u8 slot_index = vm.code[vm.ip+2];
 	assert(slot_index < vm.numFrameStackSlots);
@@ -125,7 +127,7 @@ void instr_stack_addr(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_stack_alloc(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	SizeAndAlign sizeAlign = *cast(SizeAndAlign*)&vm.code[vm.ip+1];
 	// TODO validation
 	if(vm.numFrameStackSlots == u8.max) panic("Too many stack slots for single stack frame");
@@ -133,7 +135,7 @@ void instr_stack_alloc(ref VmState vm) {
 	vm.ip += 5;
 }
 void instr_call(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	u8  arg0_idx = vm.code[vm.ip+1];
 	u8  num_args = vm.code[vm.ip+2];
 	FuncId calleeId = *cast(FuncId*)&vm.code[vm.ip+3];
@@ -216,7 +218,7 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 	}
 }
 void instr_tail_call(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	u8  arg0_idx = vm.code[vm.ip+1];
 	u8  num_args = vm.code[vm.ip+2];
 	u32 calleeId = *cast(i32*)&vm.code[vm.ip+3];
@@ -304,7 +306,7 @@ void instr_tail_call(ref VmState vm) {
 
 // Also called at the end of native function call
 void instr_ret(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 
 	if (vm.numFrameStackSlots) {
 		VmFunction* callee = &vm.functions[vm.func];
@@ -435,7 +437,7 @@ private void changePointeeInRefs(ref VmState vm, Allocation[] stackAllocs, int d
 }
 
 void instr_mov(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	*dst = *src;
@@ -443,7 +445,7 @@ void instr_mov(ref VmState vm) {
 }
 // u8 op, VmBinCond cmp_op, u8 dst, u8 src0, u8 src1
 void instr_cmp(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmBinCond cond = cast(VmBinCond)vm.code[vm.ip+1];
 	if (cond > VmBinCond.max) return vm.setTrap(VmStatus.ERR_COND_OOB, cond);
 
@@ -497,7 +499,7 @@ void instr_cmp(ref VmState vm) {
 	vm.ip += 5;
 }
 void instr_add_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -507,7 +509,7 @@ void instr_add_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_add_i64_imm8(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	i64 src1 = cast(i8)vm.code[vm.ip+3];
@@ -516,7 +518,7 @@ void instr_add_i64_imm8(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_sub_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -533,7 +535,7 @@ void instr_sub_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_mul_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -542,7 +544,7 @@ void instr_mul_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_div_u64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -551,7 +553,7 @@ void instr_div_u64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_div_s64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -560,7 +562,7 @@ void instr_div_s64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_rem_u64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -569,7 +571,7 @@ void instr_rem_u64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_rem_s64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -578,7 +580,7 @@ void instr_rem_s64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_not_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	dst.as_u64 = ~src.as_u64;
@@ -586,7 +588,7 @@ void instr_not_i64(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_and_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -595,7 +597,7 @@ void instr_and_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_or_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -604,7 +606,7 @@ void instr_or_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_xor_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -613,7 +615,7 @@ void instr_xor_i64(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_shl_i(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -622,7 +624,7 @@ void instr_shl_i(T)(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_shr_u(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -631,7 +633,7 @@ void instr_shr_u(T)(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_shr_s(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -640,7 +642,7 @@ void instr_shr_s(T)(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_rotl_i(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -649,7 +651,7 @@ void instr_rotl_i(T)(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_rotr_i(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	VmReg* src1 = &vm.regs[vm.code[vm.ip+3]];
@@ -658,7 +660,7 @@ void instr_rotr_i(T)(ref VmState vm) {
 	vm.ip += 4;
 }
 void instr_clz_i(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	dst.as_u64 = clz(src.get!T);
@@ -666,7 +668,7 @@ void instr_clz_i(T)(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_ctz_i(T)(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	dst.as_u64 = ctz(src.get!T);
@@ -674,7 +676,7 @@ void instr_ctz_i(T)(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_popcnt_i64(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src = &vm.regs[vm.code[vm.ip+2]];
 	dst.as_u64 = popcnt(src.as_u64);
@@ -682,7 +684,7 @@ void instr_popcnt_i64(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_const_s8(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	i8 imm = vm.code[vm.ip+2];
 	dst.as_s64 = imm;
@@ -690,7 +692,7 @@ void instr_const_s8(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_load(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmOpcode op = cast(VmOpcode)vm.code[vm.ip+0];
 	u32 size = 1 << (op - VmOpcode.load_m8);
 
@@ -741,7 +743,7 @@ void instr_load(ref VmState vm) {
 	vm.ip += 3;
 }
 void instr_store(ref VmState vm) {
-	pragma(inline, true);
+	version(LDC) pragma(inline, true);
 	VmOpcode op = cast(VmOpcode)vm.code[vm.ip+0];
 	u32 size = 1 << (op - VmOpcode.store_m8);
 
