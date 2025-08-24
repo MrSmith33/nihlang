@@ -477,8 +477,11 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 		case unknown: assert(false);
 		case executable:
 			artifacts ~= params.makeArtifactPath(osExeExt[gs.targetOs]);
-			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".exp");
 			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".ilk");
+			// .exp and .lib are auto-created when there is an exported symbol
+			// https://learn.microsoft.com/en-us/cpp/build/reference/implib-name-import-library
+			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".exp");
+			if (gs.targetOs == TargetOs.windows) extraArtifacts ~= params.makeArtifactPath(".lib");
 			break;
 		case staticLibrary:
 			artifacts ~= params.makeArtifactPath(osStaticLibExt[gs.targetOs]);
