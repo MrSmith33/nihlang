@@ -5,8 +5,7 @@
 /// Test attributes
 module vox.tests.infra.attributes;
 
-import vox.lib;
-import vox.tests.infra;
+import vox.lib.types;
 
 @nogc nothrow:
 

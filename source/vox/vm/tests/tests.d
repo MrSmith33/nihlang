@@ -11,13 +11,6 @@ import vox.vm.tests.context;
 
 @nogc nothrow:
 
-i32 runVmTests(ref VoxAllocator allocator) {
-	auto context = VmTestContext(&allocator, stdoutSink);
-	TestSuite suite;
-	collectTests!(vox.vm.tests.tests)(allocator, suite);
-	return runTests(context.toInterface, suite);
-}
-
 // Test ideas:
 // - What if the same register/memory is used multiple times in an instruction
 // - Check that state is not changed on trap

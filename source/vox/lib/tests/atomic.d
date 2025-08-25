@@ -8,12 +8,11 @@ module vox.lib.tests.atomic;
 import vox.lib.types;
 import vox.lib.io;
 import vox.lib.thread;
+import vox.tests.infra;
 
-void runTests() {
-	testWaitNotify();
-}
 
-void testWaitNotify() {
+@Test
+void testWaitNotify(ref SimpleTestContext) {
 	import vox.lib.atomic: atomicFence, atomicStore, notifyOne, wait;
 
 	__gshared u32 g_flag;
@@ -41,5 +40,5 @@ void testWaitNotify() {
 	assert(g_arg == &userData);
 	thread.join;
 	// assert(thread.status == 18);
-	writefln("testWaitNotify success");
+	//writefln("testWaitNotify success");
 }

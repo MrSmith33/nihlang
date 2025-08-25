@@ -11,19 +11,39 @@ import vox.lib.types;
 pragma(mangle, "vox_main")
 i32 vox_main(string[] args)
 {
-	import vox.lib.thread : threads_supported;
-	static if (threads_supported) {
-		import vox.lib.tests.atomic;
-		vox.lib.tests.atomic.runTests();
-	}
+	import vox.tests.infra;
 
 	VoxAllocator allocator;
+	TestSuite suite;
 
-	import vox.vm.tests.tests;
-	runVmTests(allocator);
+	// Contexts need to be live during runTests call
+	auto context0 = SimpleTestContext(&allocator, stdoutSink);
+	import vox.vm.tests.context;
+	auto context1 = VmTestContext(&allocator, stdoutSink);
+	import vox.tests.context;
+	auto context2 = VoxTestContext(&allocator, stdoutSink);
 
-	import vox.tests.tests;
-	runVoxTests(allocator);
+	import vox.lib.thread : threads_supported;
+	static if (threads_supported) {{
+		import vox.lib.tests.atomic;
+		auto contextIndex = suite.registerContext(allocator, context0.toInterface);
+		collectTestDefinitions!(vox.lib.tests.atomic)(allocator, suite, contextIndex);
+	}}
+
+	{
+		import vox.vm.tests.tests;
+		auto contextIndex = suite.registerContext(allocator, context1.toInterface);
+		collectTestDefinitions!(vox.vm.tests.tests)(allocator, suite, contextIndex);
+	}
+
+	{
+		import vox.tests.tests;
+		auto contextIndex = suite.registerContext(allocator, context2.toInterface);
+		collectTestDefinitions!(vox.tests.tests)(allocator, suite, contextIndex);
+	}
+
+	instantiateTests(allocator, suite);
+	runTests(suite);
 
 	// import vox.lib.bitcopy_test;
 	// test_copyBitRange;

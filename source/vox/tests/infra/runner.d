@@ -12,7 +12,7 @@ import vox.tests.tests;
 
 @nogc nothrow:
 
-i32 runTests(ITestContext context, ref TestSuite suite) {
+i32 runTests(ref TestSuite suite) {
 	u32 numTests;
 	if (suite.filter.enabled) {
 		foreach(ref test; suite.tests) {
@@ -24,19 +24,20 @@ i32 runTests(ITestContext context, ref TestSuite suite) {
 		writefln("Selected %s of %s tests to run", numTests, suite.tests.length);
 	} else {
 		numTests = cast(u32)suite.tests.length;
-		writefln("Running %s Vox tests", suite.tests.length);
+		writefln("Running %s tests", suite.tests.length);
 	}
 
 	// Warmup (first run does all the allocations and memory faults)
-	if (suite.filter.disabled && suite.tests.length) {
-		context.runTest(suite.tests[0]);
-		context.runTest(suite.tests[0]);
-		context.runTest(suite.tests[0]);
-	}
+	//if (suite.filter.disabled && suite.tests.length) {
+	//	context.runTest(suite.tests[0]);
+	//	context.runTest(suite.tests[0]);
+	//	context.runTest(suite.tests[0]);
+	//}
 	// End warmup
 
 	MonoTime start = currTime;
 	foreach(ref test; suite.tests) {
+		auto context = suite.contexts[test.contextIndex];
 		context.runTest(test);
 	}
 	MonoTime end = currTime;

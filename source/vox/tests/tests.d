@@ -9,9 +9,7 @@ import vox.tests.context;
 
 @nogc nothrow:
 
-i32 runVoxTests(ref VoxAllocator allocator) {
-	auto context = VoxTestContext(&allocator, stdoutSink);
-	TestSuite suite;
-	collectTests!(vox.tests.tests)(allocator, suite);
-	return runTests(context.toInterface, suite);
+@Test
+void test_empty(ref VoxTestContext c) {
+
 }

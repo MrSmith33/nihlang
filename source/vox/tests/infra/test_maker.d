@@ -11,30 +11,27 @@ import vox.tests.infra;
 
 @nogc nothrow:
 
-void collectTests(alias M)(ref VoxAllocator allocator, ref TestSuite suite) {
+void collectTestDefinitions(alias M)(ref VoxAllocator allocator, ref TestSuite suite, u8 contextId) {
 	foreach(m; __traits(allMembers, M))
 	{
 		alias member = __traits(getMember, M, m);
 		foreach (attr; __traits(getAttributes, member)) {
 			static if (is(attr == Test)) {
 				suite.definitions.put(allocator, TestDefinition.init);
-				gatherTestDefinition!member(allocator, suite.definitions.back);
+				gatherTestDefinition!member(allocator, suite.definitions.back, contextId);
 				break;
 			}
 		}
 	}
-	foreach(i, ref d; suite.definitions) {
-		d.index = cast(u32)i;
-		makeTest(allocator, suite, d);
-	}
 }
 
 // This must be as small as possible, otherwise compile times are to big
-void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefinition def) {
+void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefinition def, u8 contextId) {
 	def.name = __traits(identifier, test);
 	def.file = __traits(getLocation, test)[0];
 	def.line = __traits(getLocation, test)[1];
 	def.test_handler = cast(TestHandler)&test;
+	def.contextIndex = contextId;
 	foreach (attr; __traits(getAttributes, test)) {
 		static if (is(attr == TestPtrSize32)) {
 			def.attrPtrSize32 = true;
@@ -46,12 +43,27 @@ void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefini
 			def.ignore = true;
 		} else static if (is(typeof(attr) == TestParam)) {
 			static __gshared u32[] attr_values = attr.values;
-			def.parameters.put(allocator, TestDefinition.Param(attr.id, attr_values));
+			def.parameters.put(allocator, TestParam(attr.id, attr_values));
+		} else static if (is(typeof(attr) == string)) {
+			def.source = attr;
 		}
 	}
 }
 
-void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
+void instantiateTests(ref VoxAllocator allocator, ref TestSuite suite) {
+	foreach(i, ref d; suite.definitions) {
+		d.index = cast(u32)i;
+		instantiateTest(allocator, suite, d);
+	}
+}
+
+static struct MakerParam {
+	u8 id;
+	Array!u32 values;
+	u32 currentIndex;
+}
+
+void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
 	if (def.ignore) return;
 
 	if (def.onlyThis) {
@@ -65,36 +77,32 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 		suite.filter.enabled = true;
 	}
 
+	ITestContext context = suite.contexts[def.contextIndex];
+
 	u32 numPermutations = 1;
 
-	static struct Param {
-		u8 id;
-		Array!u32 values;
-		u32 currentIndex;
-	}
-
-	Array!Param parameters;
+	Array!MakerParam parameters;
 	scope(exit) parameters.free(allocator);
 
+	context.addTestInstanceParams(allocator, def, parameters);
+
+	// Calculate permutations for implicit parameters added by addTestInstanceParams
+	foreach(ref p; parameters) {
+		if (p.values.length > 0) {
+			numPermutations *= p.values.length;
+		}
+	}
+
+	// Calculate permutations for parameters added by the definition
 	foreach(ref p; def.parameters) {
 		// skip empty parameters
 		if (p.values.length > 0) {
 			numPermutations *= p.values.length;
 			Array!u32 values;
 			values.put(allocator, p.values);
-			parameters.put(allocator, Param(p.id, values));
+			parameters.put(allocator, MakerParam(p.id, values));
 		}
 	}
-
-	// Add ptr sizes
-	Array!u32 ptr_size_values;
-	if (def.attrPtrSize32 != def.attrPtrSize64) {
-		ptr_size_values.put(allocator, def.attrPtrSize32 ? PtrSize._32 : PtrSize._64);
-	} else {
-		ptr_size_values.put(allocator, PtrSize._32, PtrSize._64);
-		numPermutations *= 2;
-	}
-	parameters.put(allocator, Param(TestParamId.ptr_size, ptr_size_values));
 
 	//writefln("parameters.length %s numPermutations %s", parameters.length, numPermutations);
 	//foreach(i, ref param; parameters) {
@@ -119,6 +127,7 @@ void makeTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition de
 			index : suite.tests.length,
 			test_handler : def.test_handler,
 			parameters : testParameters,
+			contextIndex : def.contextIndex,
 		};
 		suite.tests.put(allocator, t);
 

@@ -36,6 +36,21 @@ struct VmTestContext {
 		sink = _sink;
 	}
 
+	void addTestInstanceParams(
+		ref VoxAllocator allocator,
+		TestDefinition def,
+		ref Array!MakerParam parameters)
+	{
+		// Add ptr sizes
+		Array!u32 ptr_size_values;
+		if (def.attrPtrSize32 != def.attrPtrSize64) {
+			ptr_size_values.put(allocator, def.attrPtrSize32 ? PtrSize._32 : PtrSize._64);
+		} else {
+			ptr_size_values.put(allocator, PtrSize._32, PtrSize._64);
+		}
+		parameters.put(allocator, MakerParam(TestParamId.ptr_size, ptr_size_values));
+	}
+
 	void runTest(ref TestInstance test) {
 		prepareForTest(test);
 		//writef("-- test");

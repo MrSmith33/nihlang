@@ -12,10 +12,24 @@ import vox.tests.infra;
 @nogc nothrow:
 
 struct TestSuite {
+	@nogc nothrow:
+	Array!ITestContext contexts;
 	Array!TestDefinition definitions;
 	// test permutations
 	Array!TestInstance tests;
 	TestFilter filter;
+
+	u8 registerContext(ref VoxAllocator allocator, ITestContext context) {
+		foreach(i, c; contexts) {
+			if (c == context) {
+				return cast(u8)i;
+			}
+		}
+		auto contextIndex = cast(u8)contexts.length;
+		assert(contextIndex == contexts.length, "Out of context space");
+		contexts.put(allocator, context);
+		return contextIndex;
+	}
 }
 
 alias TestHandler = @nogc nothrow void function(void*);
@@ -23,18 +37,28 @@ alias TestHandler = @nogc nothrow void function(void*);
 struct TestDefinition {
 	@nogc nothrow:
 	string name;
+	// File where the test is located
 	string file;
+	// When test has @"" attribute
+	string source;
+	// Line in a file where the test is located
 	u32 line;
+	// Index into TestSuite.definitions
 	u32 index;
-	static struct Param {
-		u8 id;
-		u32[] values;
-	}
+	// @TestPtrSize32
 	bool attrPtrSize32;
+	// @TestPtrSize64
 	bool attrPtrSize64;
+	// @TestOnly
 	bool onlyThis;
+	// @TestIgnore
 	bool ignore;
-	Array!Param parameters;
+	// Index into TestSuite.contexts
+	u8 contextIndex;
+
+	// @TestParam attributes attached to a test
+	Array!TestParam parameters;
+	// Actual test code, called by a test runner for each test instance
 	TestHandler test_handler;
 }
 
@@ -50,6 +74,8 @@ struct TestInstance {
 	u32 permutation;
 	// Index into TestSuite.tests
 	u32 index;
+	// Index into TestSuite.contexts
+	u8 contextIndex;
 
 	PtrSize ptrSize() {
 		return cast(PtrSize)getParam(TestParamId.ptr_size);
