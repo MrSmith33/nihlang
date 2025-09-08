@@ -42,6 +42,12 @@ i32 vox_main(string[] args)
 		collectTestDefinitions!(vox.tests.tests)(allocator, suite, contextIndex);
 	}
 
+	{
+		import vox.fe.lexer.test;
+		auto contextIndex = suite.registerContext(allocator, context0.toInterface);
+		collectTestDefinitions!(vox.fe.lexer.test)(allocator, suite, contextIndex);
+	}
+
 	instantiateTests(allocator, suite);
 	runTests(suite);
 
