@@ -41,17 +41,60 @@ void writeFile(const(char)[] filename, const(u8)[] data) {
 	                         &numWritten,
 	                         null);
 
+	CloseHandle(file);
+
 	if (!success) {
-		CloseHandle(file);
 		panic("Cannot write to file \"%s\".", filename);
 	} else {
 		if (numWritten != data.length) {
-			CloseHandle(file);
 			panic("Number of bytes to write (%s) != bytes written (%s) to file \"%s\".", data.length, numWritten, filename);
 		}
 	}
+}
+
+import vox.lib.mem.allocator;
+u8[] readFile(ref VoxAllocator allocator, const(char)[] filename) {
+	import vox.lib.error;
+	HANDLE file;
+	file = CreateFileA(filename.ptr,           // name of the file
+	                   GENERIC_READ,           // open for reading
+	                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share everything
+	                   null,                   // default security
+	                   OPEN_EXISTING,          // open existing file
+	                   FILE_ATTRIBUTE_NORMAL,  // normal file
+	                   null);                  // no attr. template
+
+	if (file == INVALID_HANDLE_VALUE) {
+		panic("Cannot open file \"%s\" for read.", filename);
+	}
+
+	i64 size;
+	if (!GetFileSizeEx(file, &size)) {
+		u32 errCode = GetLastError();
+		panic("GetFileSizeEx failed: filename \"%s\", error %s", filename, errCode);
+	}
+
+	import vox.lib.math : nextPOT;
+	i64 memSize = nextPOT(size);
+	auto buf = allocator.allocBlock(memSize);
+
+	enforce(size <= u32.max, "Cannot read more than 4 GiB. File name \"%s\", file size: %s", filename, size);
+
+	u32 numBytesRead;
+	bool success = ReadFile(file, cast(u8*)buf.ptr, cast(u32)size, &numBytesRead, null);
 
 	CloseHandle(file);
+
+	if (!success) {
+		u32 errCode = GetLastError();
+		panic("ReadFile failed: filename \"%s\", error %s", filename, errCode);
+	} else {
+		if (numBytesRead != size) {
+			panic("Number of bytes to read (%s) != bytes read (%s) from file \"%s\".", size, numBytesRead, filename);
+		}
+	}
+
+	return buf[0..size];
 }
 
 
@@ -93,6 +136,10 @@ bool ReadFile(
 	u32*        lpNumberOfBytesRead,
 	OVERLAPPED* lpOverlapped
 );
+bool GetFileSizeEx(
+	HANDLE      hFile,
+	i64*        lpFileSize
+);
 enum HANDLE INVALID_HANDLE_VALUE = cast(HANDLE)-1;
 enum u32 STD_INPUT_HANDLE  = 0xFFFFFFF6;
 enum u32 STD_OUTPUT_HANDLE = 0xFFFFFFF5;
@@ -113,7 +160,13 @@ enum u32 FILE_ATTRIBUTE_TEMPORARY = 0x00000100;
 enum u32 FILE_ATTRIBUTE_OFFLINE   = 0x00001000;
 enum u32 FILE_ATTRIBUTE_ENCRYPTED = 0x00004000;
 
+enum u32 FILE_SHARE_READ       = 0x00000001;
+enum u32 FILE_SHARE_WRITE      = 0x00000002;
+enum u32 FILE_SHARE_DELETE     = 0x00000004;
+
 enum u32 GENERIC_WRITE         = 0x40000000;
+enum u32 GENERIC_READ          = 0x80000000;
+
 void* VirtualAlloc(void* lpAddress, usz dwSize, u32 flAllocationType, u32 flProtect);
 bool VirtualFree(void* lpAddress, usz dwSize, u32 dwFreeType);
 bool VirtualProtect(void* lpAddress, usz dwSize, u32 flNewProtect, u32* lpflOldProtect);
