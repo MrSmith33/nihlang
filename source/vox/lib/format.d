@@ -37,7 +37,7 @@ void formatValue(T)(scope SinkDelegate sink, const auto ref T val, FormatSpec sp
 	selectFormatter!T(sink, val, spec);
 }
 
-private void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) @nogc nothrow {
+private void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) {
 	u32 start = cursor;
 	while (true) {
 		if (cursor >= fmt.length){
@@ -65,7 +65,7 @@ private void writeLiteral(scope SinkDelegate sink, string fmt, ref u32 cursor) @
 		sink(fmt[start .. cursor]);
 }
 
-private FormatSpec consumeSpec(u32 argIndex, string fmt, ref u32 cursor) @nogc nothrow {
+private FormatSpec consumeSpec(u32 argIndex, string fmt, ref u32 cursor) {
 	FormatSpec spec;
 
 	if (cursor >= fmt.length) {
@@ -173,6 +173,30 @@ template selectFormatter(T) {
 	}
 	else {
 		static assert(false, "selectFormatter: " ~ T.stringof);
+	}
+}
+
+struct EscapedString {
+	@nogc nothrow:
+	const(char)[] data;
+	void toString(scope SinkDelegate sink, FormatSpec spec) const @nogc nothrow {
+		u32 start;
+		u32 end;
+		foreach (i, char c; data) {
+			if (c < 32 || c > 126) {
+				if (end > start) {
+					sink(data[start..end]);
+				}
+				formattedWrite(sink, "\\x%X", cast(u8)c);
+				start = cast(u32)i+1;
+				end = cast(u32)i+1;
+			} else {
+				end = cast(u32)i+1;
+			}
+		}
+		if (end > start) {
+			sink(data[start..end]);
+		}
 	}
 }
 
@@ -587,7 +611,7 @@ enum FormatSpecFlags : ubyte {
 immutable(char[21]) metrixPrefixesAscii = "qryzafpnum kMGTPEZYRQ";
 immutable(char[11]) binaryPrefixes = " KMGTPEZYRQ";
 
-void testFormatting() @nogc nothrow {
+void testFormatting() {
 	char[512] buf = void;
 	u32 cursor;
 	void testSink(scope const(char)[] str) @nogc nothrow {
