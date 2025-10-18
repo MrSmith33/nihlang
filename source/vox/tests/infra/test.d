@@ -17,7 +17,17 @@ struct TestSuite {
 	Array!TestDefinition definitions;
 	// test permutations
 	Array!TestInstance tests;
-	TestFilter filter;
+	u32 numOnlyInstances;
+
+	bool isFilterEnabled() => numOnlyInstances != 0;
+
+	u32 numTestsToRun() {
+		if (isFilterEnabled) {
+			return numOnlyInstances;
+		} else {
+			return tests.length;
+		}
+	}
 
 	u8 registerContext(ref VoxAllocator allocator, ITestContext context) {
 		foreach(i, c; contexts) {
@@ -76,6 +86,8 @@ struct TestInstance {
 	u32 index;
 	// Index into TestSuite.contexts
 	u8 contextIndex;
+	// @TestOnly
+	bool onlyThis;
 
 	PtrSize ptrSize() {
 		return cast(PtrSize)getParam(TestParamId.ptr_size);
@@ -92,16 +104,4 @@ struct TestInstance {
 		u8 id;
 		u32 value;
 	}
-}
-
-struct TestFilter {
-	@nogc nothrow:
-
-	bool enabled = false;
-	bool disabled() => !enabled;
-	bool shouldRun(ref TestInstance test) {
-		return definition == test.definition;
-	}
-
-	u32 definition;
 }

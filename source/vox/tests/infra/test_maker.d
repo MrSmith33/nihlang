@@ -66,17 +66,6 @@ static struct MakerParam {
 void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
 	if (def.ignore) return;
 
-	if (def.onlyThis) {
-		if (suite.filter.enabled) {
-			auto otherDef = suite.definitions[suite.filter.definition];
-			panic("TestOnly attribute found in multiple places:\n  %s at %s:%s\n  %s at %s:%s\n",
-				otherDef.name, otherDef.file, otherDef.line,
-				def.name, def.file, def.line);
-		}
-		suite.filter.definition = def.index;
-		suite.filter.enabled = true;
-	}
-
 	ITestContext context = suite.contexts[def.contextIndex];
 
 	u32 numPermutations = 1;
@@ -128,8 +117,14 @@ void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefini
 			test_handler : def.test_handler,
 			parameters : testParameters,
 			contextIndex : def.contextIndex,
+			onlyThis : def.onlyThis,
 		};
 		suite.tests.put(allocator, t);
+
+		// How many filtered tests should run
+		if (def.onlyThis) {
+			++suite.numOnlyInstances;
+		}
 
 		// increment
 		foreach(ref param; parameters) {
