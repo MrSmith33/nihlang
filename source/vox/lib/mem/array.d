@@ -78,12 +78,22 @@ struct Array(T)
 		return this[_length-howMany.._length];
 	}
 
-	void put(ref VoxAllocator allocator, T[] items...)
+	void put(ref VoxAllocator allocator, const(T)[] items...)
 	{
 		if (_length + items.length > _capacity) extend(allocator, cast(uint)items.length);
 
 		_length += items.length;
-		this[_length-items.length..$][] = items;
+		this[_length-items.length..$][] = cast(T[])items;
+	}
+
+	static if (is(T == ubyte))
+	{
+		void putAsBytes(V)(ref VoxAllocator allocator, auto ref V value)
+			if (!is(immutable(V) == immutable(I)[], I))
+		{
+			ubyte[] ptr = voidPut(allocator, V.sizeof);
+			ptr[] = *cast(ubyte[V.sizeof]*)&value;
+		}
 	}
 
 	void putFront(ref VoxAllocator allocator, T item)
