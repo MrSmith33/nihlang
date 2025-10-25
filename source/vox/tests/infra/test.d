@@ -16,7 +16,7 @@ struct TestSuite {
 	Array!ITestContext contexts;
 	Array!TestDefinition definitions;
 	// test permutations
-	Array!TestInstance tests;
+	Array!TestInstance instances;
 	u32 numOnlyInstances;
 
 	bool isFilterEnabled() => numOnlyInstances != 0;
@@ -25,7 +25,7 @@ struct TestSuite {
 		if (isFilterEnabled) {
 			return numOnlyInstances;
 		} else {
-			return tests.length;
+			return instances.length;
 		}
 	}
 
@@ -82,7 +82,7 @@ struct TestInstance {
 	u32 definition;
 	// index of permutation within this test 0..n
 	u32 permutation;
-	// Index into TestSuite.tests
+	// Index into TestSuite.instances
 	u32 index;
 	// Index into TestSuite.contexts
 	u8 contextIndex;

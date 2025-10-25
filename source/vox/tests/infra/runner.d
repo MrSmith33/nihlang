@@ -14,13 +14,13 @@ import vox.tests.tests;
 
 i32 runTests(ref TestSuite suite) {
 	if (suite.isFilterEnabled) {
-		writefln("Selected %s of %s tests to run", suite.numTestsToRun, suite.tests.length);
+		writefln("Selected %s of %s tests to run", suite.numTestsToRun, suite.instances.length);
 	} else {
 		writefln("Running all %s tests", suite.numTestsToRun);
 	}
 
 	MonoTime start = currTime;
-	foreach(ref test; suite.tests) {
+	foreach(ref test; suite.instances) {
 		if (!suite.isFilterEnabled || test.onlyThis) {
 			auto context = suite.contexts[test.contextIndex];
 			context.runTest(test);

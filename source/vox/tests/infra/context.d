@@ -59,9 +59,13 @@ struct SimpleTestContext {
 
 	@nogc nothrow:
 
+	SinkDelegate sink;
 	TestInstance test;
+	VoxAllocator* allocator;
 
 	this(VoxAllocator* allocator, SinkDelegate _sink) {
+		this.allocator = allocator;
+		sink = _sink;
 	}
 
 	void runTest(ref TestInstance _test) {

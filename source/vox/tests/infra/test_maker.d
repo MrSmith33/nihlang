@@ -113,15 +113,15 @@ void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefini
 			name : def.name,
 			definition : def.index,
 			permutation : numPermutations - 1,
-			index : suite.tests.length,
+			index : suite.instances.length,
 			test_handler : def.test_handler,
 			parameters : testParameters,
 			contextIndex : def.contextIndex,
 			onlyThis : def.onlyThis,
 		};
-		suite.tests.put(allocator, t);
+		suite.instances.put(allocator, t);
 
-		// How many filtered tests should run
+		// How many filtered instances should run
 		if (def.onlyThis) {
 			++suite.numOnlyInstances;
 		}
