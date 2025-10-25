@@ -389,6 +389,7 @@ private void pre_drop_stack_range(ref VmState vm, DroppedStackSlots dropped) {
 		// Restore references from stackAllocs to stackAllocs
 		changeLocalPointeeInRefs(vm, stackAllocs, 1, fromSlot, toSlot);
 
+		// This may be a false positive if allocations pointing to the stack are garbage
 		return vm.setTrap(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM, i);
 	}
 

@@ -65,6 +65,7 @@ struct Allocation {
 	SizeAndAlign sizeAlign;
 	// How many pointers to this allocation exist in other allocations
 	// Pointers in registers do not increment the numInRefs
+	// Only used to report escaped stack pointers
 	u32 numInRefs;
 
 	static if (OUT_REFS_PER_ALLOCATION) {
