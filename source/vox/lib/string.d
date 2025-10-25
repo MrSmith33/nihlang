@@ -8,9 +8,9 @@ import vox.lib;
 @nogc nothrow:
 
 
-const(char)[] fromStringz(const(char)* cString) {
+inout(char)[] fromStringz(inout(char)* cString) {
 	if (cString == null) return null;
-	const(char)* cursor = cString;
+	inout(char)* cursor = cString;
 	while(*cursor) ++cursor;
 	usize length = cast(usize)(cursor - cString);
 	return cString[0..length];
@@ -37,4 +37,17 @@ u32 encode_utf8(ref char[4] buf, dchar c) {
 		return 4;
 	}
 	panic("Invalid code point");
+}
+
+usz parseInt(string str) {
+	u32 cursor = 0;
+	usz res;
+	while ('0' <= str[cursor] && str[cursor] <= '9') {
+		if (cursor >= str.length) break;
+
+		res = res * 10 + (str[cursor] - '0');
+
+		++cursor;
+	}
+	return res;
 }
