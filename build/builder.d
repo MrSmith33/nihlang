@@ -631,29 +631,38 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 
 	MonoTime startTime = currTime;
 	import std.process : execute, Config;
-	auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
-	MonoTime endTime = currTime;
+	try {
+		auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
+		MonoTime endTime = currTime;
 
-	void printCalleeOutput() {
-		auto stripped = result.output.strip;
-		if (stripped.empty) return;
-		foreach(line; result.output.lineSplitter.filter!(l => !l.empty)) {
-			// Ignore linker message for .exp/.lib file creation
-			if (line.stripLeft.startsWith("Creating library")) continue;
+		void printCalleeOutput() {
+			auto stripped = result.output.strip;
+			if (stripped.empty) return;
+			foreach(line; result.output.lineSplitter.filter!(l => !l.empty)) {
+				// Ignore linker message for .exp/.lib file creation
+				if (line.stripLeft.startsWith("Creating library")) continue;
 
-			stderr.writeln("  ", line);
+				stderr.writeln("  ", line);
+			}
 		}
-	}
 
-	if (result.status == 0) {
-		if (job.printOutput) printCalleeOutput;
-	} else {
+		if (result.status == 0) {
+			if (job.printOutput) printCalleeOutput;
+		} else {
+			if (!gs.printCommands) printCommand; // print command on error if we didn't print it yet
+			printCalleeOutput; // always print on error
+			stderr.writeln("Command exited with ", result.status);
+		}
+
+		return JobResult(job, result.status, result.output.strip, endTime - startTime);
+	} catch(Exception e) {
+		MonoTime endTime = currTime;
+
 		if (!gs.printCommands) printCommand; // print command on error if we didn't print it yet
-		printCalleeOutput; // always print on error
-		stderr.writeln("Command exited with ", result.status);
-	}
+		stderr.writeln(e.msg);
 
-	return JobResult(job, result.status, result.output.strip, endTime - startTime);
+		return JobResult(job, 1, null, currTime - startTime);
+	}
 }
 
 void deleteArtifacts(in GlobalSettings gs, in string[] artifacts) {
