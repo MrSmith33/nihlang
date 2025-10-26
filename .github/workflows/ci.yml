@@ -124,6 +124,8 @@ jobs:
           #  target: arm64-macos
           - runner: windows-latest
             target: x64-windows
+          - runner: windows-11-arm
+            target: arm64-windows
           - runner: ubuntu-latest
             target: wasm32-wasi
           - runner: ubuntu-latest
