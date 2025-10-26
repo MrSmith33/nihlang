@@ -229,6 +229,7 @@ struct GlobalSettings
 	bool prettyPrint;
 	bool printCallees;
 	bool verboseCallees;
+	bool verbose;
 	bool printTotalTime;
 	bool timeTrace;
 
@@ -244,6 +245,7 @@ struct GlobalSettings
 
 	// settings parser
 	void setTarget(string option, string target) {
+
 		foreach(component; target.asLowerCase.text.splitter('-')) {
 			auto aliasIndex = countUntil(targetAliases[].map!(a => a.from), component);
 			if (aliasIndex >= 0) {
@@ -310,6 +312,7 @@ void printOptions() {
 	stderr.writeln("   --print-commands   Print commands that are being run");
 	stderr.writeln("   --pretty           Enable pretty printing of the commands");
 	stderr.writeln("   --print-callees    Print output of callee programs");
+	stderr.writeln("   --verbose          Verbose printing of a build process");
 	stderr.writeln("   --verbose-callees  Passes verbose flag to called programs");
 	stderr.writeln("   --print-total-time Print time of all run commands");
 	stderr.writeln("   --fuzzer           Enable fuzzing");
@@ -362,6 +365,7 @@ GlobalSettings parseSettings(string[] args, const(Config)[] configs) {
 			"pretty", "", &settings.prettyPrint,
 			"print-callees", "", &settings.printCallees,
 			"verbose-callees", "", &settings.verboseCallees,
+			"verbose", "", &settings.verbose,
 			"print-total-time", "", &settings.printTotalTime,
 			"no-deps", "", &settings.nodeps,
 			"fuzzer", "", &settings.fuzzer,
@@ -455,6 +459,7 @@ struct CompileParams {
 struct Job {
 	CompileParams params;
 	string[] args;
+	string[string] envVars;
 	string workDir;
 	// When executable is produced it will be a first artifact
 	string[] artifacts;
@@ -465,6 +470,95 @@ struct Job {
 	bool cleanBeforeRun;
 	// Always print the output of the command
 	bool printOutput;
+}
+
+bool isSomeWindowsTarget(in GlobalSettings gs) {
+	if (gs.targetOs != TargetOs.windows) return false;
+	if (gs.targetArch == TargetArch.arm64) return true;
+	if (gs.targetArch == TargetArch.x64) return true;
+	return false;
+}
+
+bool addWindowsLibs(in GlobalSettings gs, ref string[string] envVars) {
+	import std.file;
+	import std.path : baseName;
+
+	if (hostOs != TargetOs.windows) return true;
+	if (!isSomeWindowsTarget(gs)) return true;
+	// Only needed when cross-compiling
+	if (!gs.isCrossCompiling) return true;
+
+	import std.process : execute, Config;
+	auto result = execute(["vswhere", "-latest", "-property", "resolvedInstallationPath"], null, Config.none, size_t.max);
+
+	if (result.status != 0) {
+		stderr.writeln("vswhere exited with ", result.status);
+		stderr.writeln("Cannot find Windows SDK and Visual Studio");
+		return false;
+	}
+
+	// LDC will skip environment setup if it detects VSINSTALLDIR and VSCMD_ARG_TGT_ARCH
+	auto vsPath = result.output.strip;
+	envVars["VSINSTALLDIR"] = vsPath;
+	envVars["VSCMD_ARG_TGT_ARCH"] = archName[gs.targetArch];
+
+	auto sdkPath = `C:\Program Files (x86)\Windows Kits\10\Lib`;
+	if (!exists(sdkPath)) {
+		stderr.writefln("Cannot find Windows SDK at %s", sdkPath);
+		return false;
+	}
+
+	string maxSdkPath;
+	foreach(DirEntry e; dirEntries(sdkPath, SpanMode.shallow)) {
+		if (gs.verbose) stderr.writefln("- SDK %s", e.name);
+		// Filter out Windows Driver Kit (wdf)
+		if (!e.name.baseName.startsWith("10.")) continue;
+		if (maxSdkPath is null || e.name > maxSdkPath) {
+			maxSdkPath = e.name;
+		}
+	}
+	if (maxSdkPath is null) {
+		stderr.writefln("Cannot find SDK at %s", sdkPath);
+		return false;
+	}
+
+	auto vsToolsPath = buildPath(vsPath, `VC\Tools\MSVC`);
+	string maxVSPath;
+	foreach(DirEntry e; dirEntries(vsToolsPath, SpanMode.shallow)) {
+		if (gs.verbose) stderr.writefln("- VS %s", e.name);
+		if (maxVSPath is null || e.name > maxVSPath) {
+			maxVSPath = e.name;
+		}
+	}
+	if (maxVSPath is null) {
+		stderr.writefln("Cannot find Visual Studio at %s", vsToolsPath);
+		return false;
+	}
+
+	auto umLibsPath = buildPath(maxSdkPath, "um", archName[gs.targetArch]);
+	auto ucrtLibsPath = buildPath(maxSdkPath, "ucrt", archName[gs.targetArch]);
+	auto vsLibsPath = buildPath(maxVSPath, "lib", archName[gs.targetArch]);
+
+	auto umTestPath = buildPath(umLibsPath, "kernel32.lib");
+	auto ucrtTestPath = buildPath(ucrtLibsPath, "libucrt.lib");
+	auto vsTestPath = buildPath(vsLibsPath, "libcmt.lib");
+
+	if (!exists(umTestPath)) {
+		stderr.writefln("Cannot find kernel32.lib in %s", umLibsPath);
+		return false;
+	}
+	if (!exists(ucrtTestPath)) {
+		stderr.writefln("Cannot find libucrt.lib in %s", ucrtLibsPath);
+		return false;
+	}
+	if (!exists(vsTestPath)) {
+		stderr.writefln("Cannot find libcmt.lib in %s", vsLibsPath);
+		return false;
+	}
+
+	import std.array : join;
+	envVars["LIB"] = join([umLibsPath, ucrtLibsPath, vsLibsPath], ";");
+	return true;
 }
 
 Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
@@ -499,7 +593,12 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 	extraArtifacts ~= params.makeArtifactPath(osObjExt[gs.targetOs]);
 
 	Flags flags = selectFlags(gs, params);
-	string[] flagsStrings = flagsToStrings(gs, cast(size_t)flags, params);
+
+	string[string] envVars;
+	string[] flagsStrings;
+	string[] linkerFlags;
+	addWindowsLibs(gs, envVars);
+	flagsToStrings(gs, cast(size_t)flags, params, flagsStrings);
 
 	flagsStrings ~= gs.makeTargetTripleFlag;
 
@@ -532,6 +631,7 @@ Job makeCompileJob(in GlobalSettings gs, in CompileParams params) {
 		artifacts : artifacts,
 		extraArtifacts : extraArtifacts,
 		printOutput : gs.printCallees,
+		envVars : envVars,
 	};
 	return job;
 }
@@ -619,10 +719,16 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	}
 
 	void printCommand() {
-		if (gs.prettyPrint)
+		if (gs.prettyPrint) {
 			stderr.writefln("> %-(%s\n| %)", job.args);
-		else
-			stderr.writefln("> %-(%s %)", job.args);
+			foreach(key, val; job.envVars)
+				stderr.writefln("| $%s = %s", key, val);
+		} else {
+			stderr.writef("> %-(%s %)", job.args);
+			foreach(key, val; job.envVars)
+				stderr.writef(" $%s=%s", key, val);
+			stderr.writeln;
+		}
 	}
 
 	if (gs.printCommands) printCommand;
@@ -632,7 +738,7 @@ JobResult runJob(in GlobalSettings gs, in Job job) {
 	MonoTime startTime = currTime;
 	import std.process : execute, Config;
 	try {
-		auto result = execute(job.args, null, Config.none, size_t.max, job.workDir);
+		auto result = execute(job.args, job.envVars, Config.none, size_t.max, job.workDir);
 		MonoTime endTime = currTime;
 
 		void printCalleeOutput() {
@@ -800,10 +906,14 @@ Flags selectFlags(in GlobalSettings g, in CompileParams params)
 	return flags;
 }
 
-string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams params) {
+void flagsToStrings(
+	in GlobalSettings gs,
+	in size_t bits,
+	in CompileParams params,
+	ref string[] flags)
+{
 	import core.bitop : bsf;
 
-	string[] flags;
 	string[] versions;
 	string[] linkerFlags;
 
@@ -1030,8 +1140,6 @@ string[] flagsToStrings(in GlobalSettings gs, in size_t bits, in CompileParams p
 		if (params.compiler == Compiler.dmd) flags ~= text("-version=", ver);
 		if (params.compiler == Compiler.ldc) flags ~= text("-d-version=", ver);
 	}
-
-	return flags;
 }
 
 enum TargetType : ubyte {

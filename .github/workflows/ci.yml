@@ -9,7 +9,7 @@ on:
   release: # test + build + release
     types: [ published ]
 env:
-  DC: ldc-1.41.0-beta1
+  DC: ldc-1.41.0
 
 defaults:
   run:
@@ -20,7 +20,7 @@ jobs:
     name: Build vanilla D
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-15-intel, windows-latest]
+        os: [ubuntu-latest, macos-15-intel, windows-latest, windows-11-arm]
         build: [debug-fast, release-fast]
     runs-on: ${{ matrix.os }}
     steps:
@@ -48,6 +48,8 @@ jobs:
           #  target: arm64-macos
           - runner: windows-latest
             target: x64-windows
+          - runner: windows-11-arm
+            target: arm64-windows
         v:
           - build: debug-fast,release-fast
             config: nih-cli,nih-static,nih-shared,vbe-static,vbe-shared
