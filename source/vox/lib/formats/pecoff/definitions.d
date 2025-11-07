@@ -5,6 +5,8 @@ module vox.lib.formats.pecoff.definitions;
 
 import vox.lib;
 
+@nogc nothrow:
+
 struct DosHeader {
 	@nogc nothrow:
 	// Magic number
@@ -49,7 +51,7 @@ struct DosHeader {
 
 	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
-		sink.put(allocator, cast(u8[64])this);
+		sink.putAsBytes(allocator, this);
 		return offset;
 	}
 
@@ -75,7 +77,7 @@ struct DosHeader {
 		formattedWrite(sink, "  File address of new exe header: %s\n", e_lfanew);
 	}
 
-	usz fileSize() => DosHeader.sizeof;
+	usz fileSize() const => DosHeader.sizeof;
 }
 static assert(DosHeader.sizeof == 64);
 
@@ -90,7 +92,7 @@ static assert(DosHeader.sizeof == 64);
 /// MS-DOS stub. This file offset is placed at location 0x3c during linking.
 struct DosStub {
 	@nogc nothrow:
-	u8[] data;
+	const(u8)[] data = dosStubBytes[];
 
 	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
@@ -98,10 +100,16 @@ struct DosStub {
 		return offset;
 	}
 
-	usz fileSize() => data.length;
+	void toString(scope SinkDelegate sink, FormatSpec spec) const {
+		foreach(b; data)
+			formattedWrite(sink, "%02X", b);
+		formattedWrite(sink, "\n");
+	}
+
+	usz fileSize() const => data.length;
 }
 
-u8[136] dosStubBytes = cast(u8[])x"
+immutable u8[136] dosStubBytes = cast(u8[])x"
 	0E1FBA0E00B409CD21B8014CCD21546869732070726F6772616D2063616E6E6F7420
 	62652072756E20696E20444F53206D6F64652E0D0D0A2400000000000000A9187F5E
 	ED79110DED79110DED79110DA601100CEA79110DED79100DF179110DED79110DEC79
@@ -121,7 +129,7 @@ struct PeSignature {
 		formattedWrite(sink, "  %s\n", signature.EscapedString);
 	}
 
-	usz fileSize() => PeSignature.sizeof;
+	usz fileSize() const => PeSignature.sizeof;
 }
 static assert(PeSignature.sizeof == 4);
 
@@ -136,6 +144,7 @@ enum MachineType : u16 {
 }
 
 struct MachineTypePrinter {
+	@nogc nothrow:
 	MachineType type;
 	void toString(scope SinkDelegate sink, FormatSpec spec) const @nogc nothrow {
 		switch (type) with(MachineType) {
@@ -286,12 +295,11 @@ struct CoffFileHeader {
 		}
 	}
 
-	usz fileSize() => CoffFileHeader.sizeof;
+	usz fileSize() const => CoffFileHeader.sizeof;
 }
 static assert(CoffFileHeader.sizeof == 20);
 
-struct ImageDataDirectory
-{
+struct ImageDataDirectory {
 	u32 VirtualAddress;
 	u32 Size;
 }
@@ -323,8 +331,7 @@ enum DEFAULT_FILE_ALIGNMENT = 512;
 /// The optional header itself has three major parts
 ///
 /// struct defines PE32+
-struct OptionalHeader
-{
+struct OptionalHeader {
 	@nogc nothrow:
 
 	/// The unsigned integer that identifies the
@@ -616,12 +623,11 @@ struct OptionalHeader
 		formattedWrite(sink, "  _reserved: %s\n", _reserved);
 	}
 
-	usz fileSize() => OptionalHeader.sizeof;
+	usz fileSize() const => OptionalHeader.sizeof;
 }
 static assert(OptionalHeader.sizeof == 240);
 
-enum SectionFlags : u32
-{
+enum SectionFlags : u32 {
 	/// The section contains executable code.
 	SCN_CNT_CODE = 0x00000020,
 	/// The section contains initialized data.
@@ -686,8 +692,8 @@ enum SectionFlags : u32
 	SCN_MEM_WRITE = 0x80000000,
 }
 
-struct SectionHeader
-{
+struct SectionHeader {
+	@nogc nothrow:
 	/// An 8-byte, null-padded UTF-8 encoded string. If
 	/// the string is exactly 8 characters long, there is no
 	/// terminating null. For longer names, this field
@@ -852,8 +858,7 @@ string fromFixedString(const(char)[] fixedStr) {
 	return null;
 }
 
-enum SymbolSectionNumber : i16
-{
+enum SymbolSectionNumber : i16 {
 	/// The symbol record is not yet assigned a section. A
 	/// value of zero indicates that a reference to an external
 	/// symbol is defined elsewhere. A value of non-zero is a
@@ -872,8 +877,7 @@ enum SymbolSectionNumber : i16
 	DEBUG = -2,
 }
 
-enum CoffSymClass : u8
-{
+enum CoffSymClass : u8 {
 	END_OF_FUNCTION = 0xFF,
 	NULL = 0,
 	AUTOMATIC = 1,
@@ -904,6 +908,7 @@ enum CoffSymClass : u8
 }
 
 struct PeSymbolName {
+	@nogc nothrow:
 	union
 	{
 		char[8] ShortName;
@@ -932,8 +937,8 @@ struct PeSymbolName {
 /// The symbol table is an array of records, each 18 bytes long. Each record is either a
 /// standard or auxiliary symbol-table record. A standard record defines a symbol or
 /// name and has the following format.
-struct SymbolTableEntry
-{
+struct SymbolTableEntry {
+	@nogc nothrow:
 	align(1):
 	/// The name of the symbol, represented by a union
 	/// of three structures. An array of 8 bytes is used if
