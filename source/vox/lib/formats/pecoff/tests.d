@@ -12,9 +12,15 @@ import vox.lib.formats.pecoff.executable;
 
 @Test
 void test_pecoff_write_parse(ref SimpleTestContext c) {
-	CoffExecutable exe;
-	Array!u8 exeBytes;
-	exe.write(*c.allocator, exeBytes);
-	exe.parse(exeBytes[]);
-	//formattedWrite(c.sink, "%s", exe);
+	CoffExecutable exe1;
+	Array!u8 exe1Bytes;
+	exe1.write(*c.allocator, exe1Bytes);
+
+	CoffExecutable exe2;
+	exe2.parse(exe1Bytes[]);
+
+	// Check that writing and parsing pecoff executable yields the same data
+	assert(exe1 == exe2, "write/parse pair have diverged");
+	//formattedWrite(c.sink, "%s", exe1);
+	//formattedWrite(c.sink, "%s", exe2);
 }
