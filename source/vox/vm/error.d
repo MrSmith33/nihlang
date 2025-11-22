@@ -150,11 +150,11 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 
 			i64 offset = src.as_s64;
 
-			sink.formattedWrite("Reading outside of the allocation\n  allocation: %s\n  allocation size: %s bytes\n  read size: %s bytes\n  read offset: %s bytes",
-				src.pointer,
-				alloc.sizeAlign.size,
-				size,
-				offset);
+			sink("Reading outside of the allocation\n");
+			sink.formattedWrite("  Allocation: %s\n", src.pointer);
+			sink.formattedWrite("  Allocation size: %s bytes\n", alloc.sizeAlign.size);
+			sink.formattedWrite("  Read size: %s bytes\n", size);
+			sink.formattedWrite("  Read offset: %s bytes", offset);
 			break;
 
 		case ERR_WRITE_OOB:

@@ -514,7 +514,7 @@ void instr_add_i64_imm8(ref VmState vm) {
 	VmReg* dst  = &vm.regs[vm.code[vm.ip+1]];
 	VmReg* src0 = &vm.regs[vm.code[vm.ip+2]];
 	i64 src1 = cast(i8)vm.code[vm.ip+3];
-	dst.as_u64 = src0.as_s64 + src1;
+	dst.as_u64 = src0.as_u64 + src1;
 	dst.pointer = src0.pointer;
 	vm.ip += 4;
 }
@@ -715,8 +715,8 @@ void instr_load(ref VmState vm) {
 		return vm.setTrap(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 	}
 
-	if (offset < 0) return vm.setTrap(VmStatus.ERR_READ_OOB);
-	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_READ_OOB);
+	// Signed check to avoid overflow
+	if (offset < 0 || (offset + size > alloc.sizeAlign.size)) return vm.setTrap(VmStatus.ERR_READ_OOB);
 
 	static if (SANITIZE_UNINITIALIZED_MEM) {
 		size_t numInitedBytes = mem.countInitBits(alloc.offset + cast(u32)offset, size);
@@ -764,8 +764,8 @@ void instr_store(ref VmState vm) {
 	}
 
 	i64 offset = dst.as_s64;
-	if (offset < 0) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
-	if (offset + size > alloc.sizeAlign.size) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
+	// Signed check to avoid overflow
+	if (offset < 0 || (offset + size > alloc.sizeAlign.size)) return vm.setTrap(VmStatus.ERR_WRITE_OOB);
 
 	// allocation size is never bigger than u32.max, so it is safe to cast valid offset to u32
 	// Note: this part should execute before bytes are written, because we need original data in trap handler

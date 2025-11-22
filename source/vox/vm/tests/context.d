@@ -79,9 +79,9 @@ struct VmTestContext {
 	private void printState() {
 		sink("  ---\n  ");
 		if (vm.ip < vm.functions[vm.func].code.length) {
-			sink("  ---\n  ");
 			u32 ipCopy = vm.ip;
 			disasmOne(sink, vm.functions[vm.func].code[], ipCopy);
+			sink("\n  ---\n  ");
 		}
 		vmFormatError(vm, sink);
 		sink("\n  ---\n");
@@ -115,7 +115,7 @@ struct VmTestContext {
 	void expectStatus(VmStatus expected, string file = __FILE__, int line = __LINE__) {
 		if (vm.status == expected) return;
 
-		sink.formattedWrite("Unexpected VM status\n  Expected: %s\n", VmStatus_names[expected]);
+		sink.formattedWrite("Unexpected VM status\n  Expected: %s\n  Got: %s\n", VmStatus_names[expected], VmStatus_names[vm.status]);
 		printState();
 		panic(line, file, 1, "Unexpected VM status");
 	}
