@@ -2005,6 +2005,42 @@ void test_call_2(ref VmTestContext c) {
 	c.expectNumExecutedInstructions(6);
 }
 
+@Test
+void test_call_3(ref VmTestContext c) {
+	// External function calls VM function by pointer
+
+	// u64 extern(u64 function(u64) func) {
+	//     return func(42);
+	// }
+	static extern(C) void externFunc(ref VmState vm, void* userData) {
+		auto funcPtr = vm.regs[0].pointer;
+		assert(funcPtr.isDefined);
+		vm.call(funcPtr, VmReg(42));
+	}
+	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
+
+	// u64 a(u64 num) {
+	//     return num * 2;
+	// }
+	CodeBuilder a = CodeBuilder(c.vm.allocator);
+	a.emit_const_s8(1, 2);
+	a.emit_mul_i64(0, 0, 1);
+	a.emit_ret();
+	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, a);
+
+	// u64 b() {
+	//     return extern(&a);
+	// }
+	CodeBuilder b = CodeBuilder(c.vm.allocator);
+	b.emit_func_addr(0, funcA.index);
+	b.emit_call(0, 1, extFuncId.index);
+	b.emit_ret();
+
+	AllocId funcB = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	VmReg[] res = c.call(funcB);
+	c.expectResult(VmReg(84));
+}
+
 
 @Test
 void test_tail_call_0(ref VmTestContext c) {

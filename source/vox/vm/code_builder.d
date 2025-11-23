@@ -50,6 +50,11 @@ struct CodeBuilder {
 		U32(sizeAlign.payload);
 	}
 
+	void emit_func_addr(u8 dst, u32 funcIndex) {
+		U8(VmOpcode.func_addr, dst);
+		U32(funcIndex);
+	}
+
 	void emit_call(u8 arg0_idx, u8 num_args, u32 funcIndex) {
 		U8(VmOpcode.call, arg0_idx, num_args);
 		U32(funcIndex);

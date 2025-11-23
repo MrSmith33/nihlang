@@ -23,6 +23,7 @@ void vmStep(ref VmState vm) {
 		case branch_zero: return instr_branch_zero(vm);
 		case stack_addr: return instr_stack_addr(vm);
 		case stack_alloc: return instr_stack_alloc(vm);
+		case func_addr: return instr_func_addr(vm);
 		case call: return instr_call(vm);
 		case tail_call: return instr_tail_call(vm);
 		case ret: return instr_ret(vm);
@@ -133,6 +134,13 @@ void instr_stack_alloc(ref VmState vm) {
 	if(vm.numFrameStackSlots == u8.max) panic("Too many stack slots for single stack frame");
 	vm.pushStackAlloc(sizeAlign);
 	vm.ip += 5;
+}
+void instr_func_addr(ref VmState vm) {
+	version(LDC) pragma(inline, true);
+	VmReg* dst = &vm.regs[vm.code[vm.ip+1]];
+	FuncId calleeId = *cast(FuncId*)&vm.code[vm.ip+2];
+	*dst = VmReg(AllocId(calleeId, MemoryKind.func_id));
+	vm.ip += 6;
 }
 void instr_call(ref VmState vm) {
 	version(LDC) pragma(inline, true);

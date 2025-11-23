@@ -56,6 +56,13 @@ void disasmOne(scope SinkDelegate sink, u8[] code, ref u32 ip, u32 offset = 0) {
 			sink.formattedWrite("%04X stack_alloc %s\n", addr, sizeAlign);
 			break;
 
+		case func_addr:
+			u8 dst = code[ip++];
+			i32 func_id = *cast(i32*)&code[ip];
+			ip += 4;
+			sink.formattedWrite("%04X func_addr r%s f%s", addr, dst, func_id);
+			break;
+
 		case call:
 			u8 arg0_idx = code[ip++];
 			u8 num_args = code[ip++];
