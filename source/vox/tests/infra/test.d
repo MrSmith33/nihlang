@@ -88,6 +88,8 @@ struct TestInstance {
 	u8 contextIndex;
 	// @TestOnly
 	bool onlyThis;
+	// When test has @"" attribute
+	string source;
 
 	PtrSize ptrSize() {
 		return cast(PtrSize)getParam(TestParamId.ptr_size);

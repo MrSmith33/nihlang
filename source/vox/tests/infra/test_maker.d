@@ -118,6 +118,7 @@ void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefini
 			parameters : testParameters,
 			contextIndex : def.contextIndex,
 			onlyThis : def.onlyThis,
+			source : def.source,
 		};
 		suite.instances.put(allocator, t);
 
