@@ -402,3 +402,8 @@ struct BitsSetRangeReverse(T) {
 		return 0;
 	}
 }
+
+bool startsWith(const(char)[] what, const(char)[] withWhat) {
+	if (withWhat.length > what.length) return false;
+	return what[0..withWhat.length] == withWhat;
+}
