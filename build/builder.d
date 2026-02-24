@@ -698,6 +698,7 @@ Job makeRunWasmWasiJob(in GlobalSettings gs, JobResult compileRes) {
 	args ~= "wasmtime";
 	// enable threads
 	args ~= ["--wasi", "threads=y"];
+	args ~= ["--wasm", "shared-memory=y"];
 	args ~= compileRes.job.artifacts[0];
 	string workDir = compileRes.job.params.artifactDir;
 	Job job = { args : args, workDir : workDir, printOutput : true };
