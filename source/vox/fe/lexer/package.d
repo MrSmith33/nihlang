@@ -12,7 +12,7 @@ struct Lexer
 {
 	@nogc nothrow:
 
-	const(char)[] input;
+	const(char)* input;
 	uint position;
 	uint line;
 	uint column;

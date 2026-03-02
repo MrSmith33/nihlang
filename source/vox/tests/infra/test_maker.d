@@ -73,7 +73,7 @@ void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefini
 	Array!MakerParam parameters;
 	scope(exit) parameters.free(allocator);
 
-	context.addTestInstanceParams(allocator, def, parameters);
+	context.addTestInstanceParams(def, parameters);
 
 	// Calculate permutations for implicit parameters added by addTestInstanceParams
 	foreach(ref p; parameters) {

@@ -14,8 +14,16 @@ struct ITestContext {
 	@nogc nothrow:
 
 	void* instance;
+	@nogc nothrow void function() initPtr;
 	@nogc nothrow void function(ref TestInstance) runTestPtr;
-	@nogc nothrow void function(ref VoxAllocator, TestDefinition, ref Array!MakerParam) addTestInstanceParamsPtr;
+	@nogc nothrow void function(TestDefinition, ref Array!MakerParam) addTestInstanceParamsPtr;
+
+	void init() {
+		@nogc nothrow void delegate() fun;
+		fun.ptr = instance;
+		fun.funcptr = initPtr;
+		fun();
+	}
 
 	void runTest(ref TestInstance test) {
 		@nogc nothrow void delegate(ref TestInstance) fun;
@@ -25,13 +33,12 @@ struct ITestContext {
 	}
 
 	void addTestInstanceParams(
-		ref VoxAllocator allocator,
 		TestDefinition def,
 		ref Array!MakerParam parameters) {
-		@nogc nothrow void delegate(ref VoxAllocator, TestDefinition, ref Array!MakerParam) fun;
+		@nogc nothrow void delegate(TestDefinition, ref Array!MakerParam) fun;
 		fun.ptr = instance;
 		fun.funcptr = addTestInstanceParamsPtr;
-		fun(allocator, def, parameters);
+		fun(def, parameters);
 	}
 }
 
@@ -41,14 +48,16 @@ mixin template TestContextUtils() {
 	ITestContext toInterface() {
 		ITestContext res = {
 			instance : &this,
+			initPtr : (&this.init).funcptr,
 			runTestPtr : (&this.runTest).funcptr,
 			addTestInstanceParamsPtr : (&this.addTestInstanceParams).funcptr,
 		};
 		return res;
 	}
 
+	void init() {}
+
 	void addTestInstanceParams(
-		ref VoxAllocator allocator,
 		TestDefinition def,
 		ref Array!MakerParam parameters) {}
 }

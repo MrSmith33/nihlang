@@ -19,6 +19,10 @@ i32 runTests(ref TestSuite suite) {
 		writefln("Running all %s tests", suite.numTestsToRun);
 	}
 
+	foreach(ref context; suite.contexts) {
+		context.init();
+	}
+
 	MonoTime start = currTime;
 	foreach(ref test; suite.instances) {
 		if (!suite.isFilterEnabled || test.onlyThis) {

@@ -13,7 +13,7 @@ void test_lexer(ref SimpleTestContext c) {
 	void test(string source, string expectedMatch, TokenType expectedToken,
 		string file = __FILE__, int line = __LINE__)
 	{
-		auto lexer = Lexer(source);
+		auto lexer = Lexer(source.ptr);
 		auto tok = lexer.nextToken;
 		auto match = tok.getTokenString(source);
 
