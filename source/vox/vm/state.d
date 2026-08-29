@@ -20,11 +20,12 @@ struct VmState {
 	u64 errData;
 	u64 budget = u64.max;
 
-	VoxAllocator* allocator;
+	Allocator* allocator;
 	Memory[3] memories;
 
 	Array!VmFunction functions;
-	Array!VmFrame callerFrames; // current function doesn't have a frame
+	// current function doesn't have a frame
+	Array!VmFrame callerFrames;
 	Array!VmReg registers;
 
 	u32 numCalls;
@@ -485,21 +486,21 @@ struct VmState {
 struct VmFunction {
 	@nogc nothrow:
 
-	VmFuncKind kind;
-	u8 numResults;
-	u8 numRegParams;
-	u8 numStackParams;
-	Array!SizeAndAlign stackSlotSizes;
+	VmFuncKind kind;   // bytecode or external
+	u8 numResults;     // how many results are in the function
+	u8 numRegParams;   // how many parameters are passed via registers
+	u8 numStackParams; // how many parameters are passed via stack slots
+	Array!SizeAndAlign stackSlotSizes; // stack slot sizes in the function
 
 	union {
-		Array!u8 code;
+		Array!u8 code; // code of bytecode function
 		struct {
-			VmExternalFn external;
-			void* externalUserData;
+			VmExternalFn external;  // pointer to external function
+			void* externalUserData; // user data for external function
 		}
 	}
 
-	void free(ref VoxAllocator allocator) {
+	void free(ref Allocator allocator) {
 		final switch (kind) {
 			case VmFuncKind.bytecode:
 				code.free(allocator);

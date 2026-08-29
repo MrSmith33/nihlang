@@ -6,24 +6,25 @@ module vox.tests.context;
 
 import vox.lib;
 import vox.tests.infra;
+import vox.source;
 
 struct VoxTestContext {
 	mixin TestContextUtils;
 
 	@nogc nothrow:
 
-	VoxAllocator* allocator;
+	Allocator* allocator;
 	SinkDelegate sink;
 	TestInstance test;
 	Driver driver;
 
-	this(VoxAllocator* allocator, SinkDelegate _sink) {
+	this(Allocator* allocator, SinkDelegate _sink) {
 		this.allocator = allocator;
 		sink = _sink;
 	}
 
 	void init() {
-		driver.init(*allocator);
+		assert(!driver.init(*allocator).isError);
 	}
 
 	void runTest(ref TestInstance _test) {
@@ -63,11 +64,19 @@ struct Driver {
 	@nogc nothrow:
 	Buffers bufs;
 
-	void init(ref VoxAllocator allocator) {
+	Result!void init(ref Allocator allocator) {
 		enum _64KiB = 65_536;
 		enum _1MiB = 1024*1024;
-		bufs.sources.setBuffer(allocator.allocBlock(_1MiB));
-		bufs.files.setBuffer(allocator.allocBlock(_64KiB));
+
+		auto sourceMem = allocator.allocBlock(_1MiB);
+		if (sourceMem.isError) return Result!void.makeError(1);
+		bufs.sources.setBuffer(sourceMem.data);
+
+		auto filesMem = allocator.allocBlock(_64KiB);
+		if (filesMem.isError) return Result!void.makeError(1);
+		bufs.files.setBuffer(filesMem.data);
+
+		return Result!void();
 	}
 
 	void startCompilation() {
@@ -106,7 +115,7 @@ struct Driver {
 			while(true) {
 				auto tok = lexer.nextToken;
 				//writefln("  %s", cast(uint)tok.tok);
-				if (tok.tok == TokenType.eoi) break;
+				if (tok.type == TokenType.eoi) break;
 			}
 		}
 	}

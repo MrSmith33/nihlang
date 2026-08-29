@@ -11,14 +11,14 @@ struct Array(T)
 	@nogc nothrow:
 	import vox.lib.math : isPowerOfTwo, nextPOT, max;
 	import vox.lib.format : SinkDelegate, FormatSpec, formattedWrite;
-	import vox.lib.error : enforce;
+	import vox.lib.error : Result, enforce;
 	import vox.lib.memory : memmove;
-	import vox.lib.mem.allocator : VoxAllocator;
+	import vox.lib.mem.allocator : Allocator;
 
 	// Can be 0
 	enum uint NUM_INLINE_BYTES = size_t.sizeof;
 	enum uint NUM_INLINE_ITEMS = NUM_INLINE_BYTES / T.sizeof;
-	enum uint MIN_EXTERNAL_BYTES = max(VoxAllocator.MIN_BLOCK_BYTES, nextPOT((size_t.sizeof / T.sizeof + 1) * T.sizeof));
+	enum uint MIN_EXTERNAL_BYTES = max(Allocator.MIN_BLOCK_BYTES, nextPOT((size_t.sizeof / T.sizeof + 1) * T.sizeof));
 
 	private uint _length;
 	private uint _capacity = NUM_INLINE_ITEMS;
@@ -40,8 +40,7 @@ struct Array(T)
 	ref T back() { return this[$-1]; }
 	void clear() { _length = 0; }
 
-	ref inout(T) opIndex(size_t index) inout
-	{
+	ref inout(T) opIndex(size_t index) inout {
 		enforce(index < _capacity, "opIndex(%s), capacity %s", index, _capacity);
 		static if (NUM_INLINE_ITEMS > 0) {
 			if (_capacity == NUM_INLINE_ITEMS) return inlineItems[index];
@@ -50,86 +49,93 @@ struct Array(T)
 		return externalArray[index];
 	}
 
-	Array!T dup(ref VoxAllocator allocator)
-	{
+	Result!(Array!T) dup(ref Allocator allocator) {
 		Array!T copy = this;
 
 		static if (NUM_INLINE_ITEMS > 0) {
-			if (_capacity == NUM_INLINE_ITEMS) return copy;
+			if (_capacity == NUM_INLINE_ITEMS) return typeof(return)(copy);
 		}
 
 		size_t byteCapacity = nextPOT(_capacity * T.sizeof);
 
 		// When we have empty array with NUM_INLINE_ITEMS == 0 and no allocated external array
-		if (byteCapacity == 0) return copy;
+		if (byteCapacity == 0) return typeof(return)(copy);
 
 		ubyte[] block = (cast(ubyte*)externalArray)[0..byteCapacity];
 
-		ubyte[] newBlock = allocator.allocBlock(block.length);
-		newBlock[] = block;
-		copy.externalArray = cast(T*)newBlock.ptr;
-		return copy;
+		auto newBlock = allocator.allocBlock(block.length);
+		if (newBlock.isError) return typeof(return).makeError(1);
+		newBlock.data[] = block;
+		copy.externalArray = cast(T*)newBlock.data.ptr;
+		return typeof(return)(copy);
 	}
 
-	T[] voidPut(ref VoxAllocator allocator, uint howMany)
-	{
-		if (_length + howMany > _capacity) extend(allocator, howMany);
+	Result!(T[]) voidPut(ref Allocator allocator, uint howMany) {
+		if (_length + howMany > _capacity) {
+			if (extend(allocator, howMany).isError)
+				return Result!(T[]).makeError(1);
+		}
 		_length += howMany;
-		return this[_length-howMany.._length];
+		return this[_length-howMany.._length].Result!(T[]);
 	}
 
-	void put(ref VoxAllocator allocator, const(T)[] items...)
-	{
-		if (_length + items.length > _capacity) extend(allocator, cast(uint)items.length);
+	Result!void put(ref Allocator allocator, const(T)[] items...) {
+		if (_length + items.length > _capacity) {
+			if (extend(allocator, cast(uint)items.length).isError)
+				return Result!void.makeError(1);
+		}
 
 		_length += items.length;
 		this[_length-items.length..$][] = cast(T[])items;
+		return Result!void();
 	}
 
 	static if (is(T == ubyte))
 	{
-		void putAsBytes(V)(ref VoxAllocator allocator, auto ref V value)
+		Result!void putAsBytes(V)(ref Allocator allocator, auto ref V value)
 			if (!is(immutable(V) == immutable(I)[], I))
 		{
-			ubyte[] ptr = voidPut(allocator, V.sizeof);
-			ptr[] = *cast(ubyte[V.sizeof]*)&value;
+			auto ptr = voidPut(allocator, V.sizeof);
+			if (ptr.isError) return typeof(return).makeError(1);
+			ptr.data[] = *cast(ubyte[V.sizeof]*)&value;
+			return typeof(return)();
 		}
 	}
 
-	void putFront(ref VoxAllocator allocator, T item)
-	{
-		putAt(allocator, 0, item);
+	Result!void putFront(ref Allocator allocator, T item) {
+		return putAt(allocator, 0, item);
 	}
 
 	// shifts items to the right
-	void putAt(ref VoxAllocator allocator, size_t at, T[] items...)
-	{
-		replaceAt(allocator, at, 0, items);
+	Result!void putAt(ref Allocator allocator, size_t at, T[] items...) {
+		return replaceAt(allocator, at, 0, items);
 	}
 
-	void replaceAt(ref VoxAllocator allocator, size_t at, size_t numItemsToRemove, T[] itemsToInsert)
-	{
+	Result!void replaceAt(ref Allocator allocator, size_t at, size_t numItemsToRemove, T[] itemsToInsert) {
 		assert(at + numItemsToRemove <= _length);
 
 		size_t numItemsToInsert = itemsToInsert.length;
 
-		replaceAtVoid(allocator, at, numItemsToRemove, numItemsToInsert);
+		if (replaceAtVoid(allocator, at, numItemsToRemove, numItemsToInsert).isError) {
+			return Result!void.makeError(1);
+		}
 		this[at..at+numItemsToInsert][] = itemsToInsert;
+		return Result!void();
 	}
 
-	void replaceAtVoid(ref VoxAllocator allocator, size_t at, size_t numItemsToRemove, size_t numItemsToInsert)
-	{
+	Result!void replaceAtVoid(ref Allocator allocator, size_t at, size_t numItemsToRemove, size_t numItemsToInsert) {
 		assert(at + numItemsToRemove <= _length);
 
-		if (numItemsToInsert == numItemsToRemove)
-		{
+		if (numItemsToInsert == numItemsToRemove) {
 			// no resize or moves needed
-		}
-		else
-		{
+		} else {
 			ptrdiff_t delta = numItemsToInsert - numItemsToRemove;
 
-			if (_length + delta > _capacity) extend(allocator, cast(uint)delta);
+			if (_length + delta > _capacity) {
+				if (extend(allocator, cast(uint)delta).isError) {
+					return Result!void.makeError(1);
+				}
+			}
 
 			scope(exit) _length += delta;
 
@@ -143,92 +149,98 @@ struct Array(T)
 
 			memmove(ptr + delta, ptr, numItemsToMove * T.sizeof);
 		}
+		return Result!void();
 	}
 
-	void unput(size_t numItems)
-	{
+	void unput(size_t numItems) {
 		_length = cast(uint)(_length - numItems);
 	}
 
-	void reserve(ref VoxAllocator allocator, uint howMany)
-	{
-		if (_length + howMany > _capacity) extend(allocator, howMany);
+	Result!void reserve(ref Allocator allocator, uint howMany) {
+		if (_length + howMany > _capacity) {
+			return extend(allocator, howMany);
+		}
+		return Result!void();
 	}
 
 	// returns memory to allocator and zeroes the length
-	void free(ref VoxAllocator allocator) {
+	Result!void free(ref Allocator allocator) {
 		scope(exit) {
 			externalArray = null;
 			_length = 0;
 			_capacity = NUM_INLINE_ITEMS;
 		}
 		static if (NUM_INLINE_ITEMS > 0) {
-			if (_capacity == NUM_INLINE_ITEMS) return; // no-op
+			if (_capacity == NUM_INLINE_ITEMS) return Result!void(); // no-op
 		}
 
 		size_t byteCapacity = nextPOT(_capacity * T.sizeof);
 		ubyte[] oldBlock = (cast(ubyte*)externalArray)[0..byteCapacity];
-		allocator.freeBlock(oldBlock);
+		return allocator.freeBlock(oldBlock);
 	}
 
 	// extend the storage
-	private void extend(ref VoxAllocator allocator, uint items)
+	private Result!void extend(ref Allocator allocator, uint items)
 	{
 		uint byteCapacityNeeded = cast(uint)nextPOT((_length + items) * T.sizeof);
 		if (_capacity == NUM_INLINE_ITEMS) {
-			ubyte[] newBlock = allocator.allocBlock(max(byteCapacityNeeded, MIN_EXTERNAL_BYTES));
+			auto newBlock = allocator.allocBlock(max(byteCapacityNeeded, MIN_EXTERNAL_BYTES));
+			if (newBlock.isError) {
+				return Result!void.makeError(1);
+			}
 			static if (NUM_INLINE_ITEMS > 0) {
 				ubyte[] oldBlock = (cast(ubyte*)inlineItems.ptr)[0..NUM_INLINE_BYTES];
-				newBlock[0..oldBlock.length] = oldBlock;
+				newBlock.data[0..oldBlock.length] = oldBlock;
 			}
-			externalArray = cast(T*)newBlock.ptr;
-			_capacity = cast(uint)(newBlock.length / T.sizeof);
-			return;
+			externalArray = cast(T*)newBlock.data.ptr;
+			_capacity = cast(uint)(newBlock.data.length / T.sizeof);
+			return Result!void();
 		}
 
 		size_t byteCapacity = nextPOT(_capacity * T.sizeof);
 		ubyte[] block = (cast(ubyte*)externalArray)[0..byteCapacity];
-		resizeSmallArray(allocator, block, byteCapacityNeeded);
+		if (resizeSmallArray(allocator, block, byteCapacityNeeded).isError)
+			return Result!void.makeError(1);
 		externalArray = cast(T*)block.ptr;
 		_capacity = cast(uint)(block.length / T.sizeof);
+		return Result!void();
 	}
 
 	// Doubles the size of block
-	private void resizeSmallArray(ref VoxAllocator allocator, ref ubyte[] oldBlock, size_t newLength) {
+	private Result!void resizeSmallArray(ref Allocator allocator, ref ubyte[] oldBlock, size_t newLength) {
 		assert(isPowerOfTwo(oldBlock.length));
-		assert(oldBlock.length >= VoxAllocator.MIN_BLOCK_BYTES);
-		assert(newLength >= VoxAllocator.MIN_BLOCK_BYTES, "too small");
+		assert(oldBlock.length >= Allocator.MIN_BLOCK_BYTES);
+		assert(newLength >= Allocator.MIN_BLOCK_BYTES, "too small");
 
-		ubyte[] newBlock = allocator.allocBlock(newLength);
-		newBlock[0..oldBlock.length] = oldBlock;
+		auto newBlock = allocator.allocBlock(newLength);
+		if (newBlock.isError) {
+			return Result!void.makeError(1);
+		}
+		newBlock.data[0..oldBlock.length] = oldBlock;
 		allocator.freeBlock(oldBlock);
-		oldBlock = newBlock;
+		oldBlock = newBlock.data;
+		return Result!void();
 	}
 
-	inout(T)[] opSlice() inout
-	{
+	inout(T)[] opSlice() inout {
 		static if (NUM_INLINE_ITEMS > 0) {
 			if (_capacity == NUM_INLINE_ITEMS) return inlineItems.ptr[0.._length];
 		}
 		return externalArray[0.._length];
 	}
 
-	inout(T)[] opSlice(size_t from, size_t to) inout
-	{
+	inout(T)[] opSlice(size_t from, size_t to) inout {
 		return this[][from..to];
 	}
 
-	void removeInPlace(size_t at)
-	{
-		if (at+1 != _length)
-		{
+	void removeInPlace(size_t at) {
+		if (at+1 != _length) {
 			this[at] = this[_length-1];
 		}
 		--_length;
 	}
 
-	void removeByShift(size_t at, size_t numToRemove = 1)
-	{
+	void removeByShift(size_t at, size_t numToRemove = 1) {
 		size_t to = at;
 		size_t from = at + numToRemove;
 		while(from < _length)

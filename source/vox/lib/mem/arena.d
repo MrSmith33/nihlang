@@ -48,7 +48,7 @@ struct Arena(T)
 	}
 	void clear() { length = 0; }
 
-	T[] put(T[] items ...) {
+	T[] put(const(T)[] items ...) {
 		size_t initialLength = length;
 		version(Windows) {
 			if (capacity - length < items.length) makeSpace(items.length);

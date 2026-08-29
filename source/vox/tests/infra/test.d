@@ -29,7 +29,7 @@ struct TestSuite {
 		}
 	}
 
-	u8 registerContext(ref VoxAllocator allocator, ITestContext context) {
+	u8 registerContext(ref Allocator allocator, ITestContext context) {
 		foreach(i, c; contexts) {
 			if (c == context) {
 				return cast(u8)i;

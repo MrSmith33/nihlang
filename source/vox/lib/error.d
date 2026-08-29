@@ -5,6 +5,19 @@ module vox.lib.error;
 
 @nogc nothrow:
 
+struct Result(T) {
+	static if (!is(T == void)) {
+		T data;
+	}
+	uint isError;
+
+	static typeof(this) makeError(uint error) {
+		typeof(this) res;
+		res.isError = error;
+		return res;
+	}
+}
+
 noreturn panic(Args...)(string fmt, Args args, string file = __FILE__, int line = __LINE__) {
 	panic(line, file, 0, fmt, args);
 }

@@ -17,11 +17,11 @@ void test_lexer(ref SimpleTestContext c) {
 		auto tok = lexer.nextToken;
 		auto match = tok.getTokenString(source);
 
-		if (match == expectedMatch && tok.tok == expectedToken) return;
+		if (match == expectedMatch && tok.type == expectedToken) return;
 
 		writefln("Lexer test failed %s", line);
 		writefln("  Expected:\n    token: %s\n    match: %s\n  Got: \n    token: %s\n    match: %s",
-			expectedToken, expectedMatch, tok.tok, match);
+			expectedToken, expectedMatch, tok.type, match);
 		panic(line, file, 0, "Unexpected token");
 	}
 

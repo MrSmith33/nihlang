@@ -22,7 +22,7 @@ struct CoffExecutable {
 	usz coffFileHeaderOffset;
 	usz optionalHeaderOffset;
 
-	void write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	void write(ref Allocator allocator, ref Array!u8 sink) {
 		dosHeader.write(allocator, sink);
 		dosStubOffset = dosStub.write(allocator, sink);
 		peSignatureOffset = peSignature.write(allocator, sink);

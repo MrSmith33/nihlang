@@ -70,9 +70,9 @@ struct SimpleTestContext {
 
 	SinkDelegate sink;
 	TestInstance test;
-	VoxAllocator* allocator;
+	Allocator* allocator;
 
-	this(VoxAllocator* allocator, SinkDelegate _sink) {
+	this(Allocator* allocator, SinkDelegate _sink) {
 		this.allocator = allocator;
 		sink = _sink;
 	}

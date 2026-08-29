@@ -139,6 +139,8 @@ jobs:
         with:
           compiler: ${{ env.DC }}
       - uses: jcbhmr/setup-wasmtime@v2
+        with:
+          wasmtime-version: ~46.0.0
         if: ${{ matrix.os.target == 'wasm32-wasi' }}
       - if: ${{ matrix.os.target == 'arm64-linux' }}
         run: |

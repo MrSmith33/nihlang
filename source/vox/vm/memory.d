@@ -152,19 +152,22 @@ struct Memory {
 		HashMap!(u32, AllocId, u32.max) outRefs;
 	}
 
-	void reserve(ref VoxAllocator allocator, u32 size) {
+	Result!void reserve(ref Allocator allocator, u32 size) {
 		memory.voidPut(allocator, size);
 		// By default no pointers are in memory
-		u8[] data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
-		data1[] = 0;
+		auto data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
+		if (data1.isError) return Result!void.makeError(1);
+		data1.data[] = 0;
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
-			u8[] data2 = initBitmap.voidPut(allocator, divCeil(size, Allocation.ALLOCATION_GRANULARITY));
-			data2[] = 0;
+			auto data2 = initBitmap.voidPut(allocator, divCeil(size, Allocation.ALLOCATION_GRANULARITY));
+			if (data2.isError) return Result!void.makeError(1);
+			data2.data[] = 0;
 		}
+		return Result!void();
 	}
 
-	void clear(ref VoxAllocator allocator) {
+	void clear(ref Allocator allocator) {
 		static if (OUT_REFS_PER_ALLOCATION) {
 			foreach(ref alloc; allocations) {
 				alloc.outRefs.free(allocator);
@@ -188,7 +191,7 @@ struct Memory {
 		bytesUsed = 0;
 	}
 
-	AllocId allocate(ref VoxAllocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
+	AllocId allocate(ref Allocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		assert(offset % Allocation.ALLOCATION_GRANULARITY == 0);
@@ -211,7 +214,7 @@ struct Memory {
 	// only for stack allocations
 	// assumes all allocations to be in sequential order in memory
 	// Doesn't clear outRefs or pointer bitmap
-	void popAllocations(ref VoxAllocator allocator, u32 howMany) {
+	void popAllocations(u32 howMany) {
 		assert(allocations.length >= howMany);
 		allocations.unput(howMany);
 
@@ -229,11 +232,11 @@ struct Memory {
 		}
 	}
 
-	void popAndShiftAllocations(ref VoxAllocator allocator, u32 from, u32 to) {
+	void popAndShiftAllocations(ref Allocator allocator, u32 from, u32 to) {
 		assert(to <= allocations.length);
 		assert(from <= to);
 		if (from == to) return;
-		if (to == allocations.length) return popAllocations(allocator, to - from);
+		if (to == allocations.length) return popAllocations(to - from);
 
 		const u32 fromByte = allocations[from].offset;
 		const u32 toByte   = allocations[to - 1].offset + allocations[to - 1].alignedSize;
@@ -354,7 +357,7 @@ struct Memory {
 
 // Doesn't delete the heap allocations
 void moveMemToStatic(
-	ref VoxAllocator allocator,
+	ref Allocator allocator,
 	ref Memory static_mem,
 	ref Memory heap_mem,
 	AllocId root,
@@ -363,7 +366,7 @@ void moveMemToStatic(
 	assert(root.kind == MemoryKind.static_mem, "Root must be in static memory");
 
 	static void visit(
-		ref VoxAllocator allocator,
+		ref Allocator allocator,
 		ref Memory static_mem,
 		ref Memory heap_mem,
 		AllocId node,

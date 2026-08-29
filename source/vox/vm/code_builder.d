@@ -13,7 +13,7 @@ import vox.vm.memory;
 struct CodeBuilder {
 	@nogc nothrow:
 
-	VoxAllocator* allocator;
+	Allocator* allocator;
 	Array!u8 code;
 	Array!SizeAndAlign stack;
 

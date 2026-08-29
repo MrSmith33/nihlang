@@ -49,7 +49,7 @@ struct DosHeader {
 	// Offset to the 'PE\0\0' signature relative to the beginning of the file
 	u32 e_lfanew = DosHeader.sizeof + dosStubBytes.length;
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.putAsBytes(allocator, this);
 		return offset;
@@ -94,7 +94,7 @@ struct DosStub {
 	@nogc nothrow:
 	const(u8)[] data = dosStubBytes[];
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.put(allocator, data);
 		return offset;
@@ -119,7 +119,7 @@ struct PeSignature {
 	@nogc nothrow:
 	char[4] signature = "PE\0\0";
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.putAsBytes(allocator, this);
 		return offset;
@@ -260,7 +260,7 @@ struct CoffFileHeader {
 	/// See CoffFlags.
 	u16 Characteristics;
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.putAsBytes(allocator, this);
 		return offset;
@@ -569,7 +569,7 @@ struct OptionalHeader {
 
 	u64 _reserved; /// Reserved, must be zero
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.putAsBytes(allocator, this);
 		return offset;
@@ -775,7 +775,7 @@ struct SectionHeader {
 		return nameFromSlashName(Name, stringTable);
 	}
 
-	u32 write(ref VoxAllocator allocator, ref Array!u8 sink) {
+	u32 write(ref Allocator allocator, ref Array!u8 sink) {
 		auto offset = sink.length;
 		sink.putAsBytes(allocator, this);
 		return offset;

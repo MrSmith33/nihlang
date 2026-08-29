@@ -73,12 +73,6 @@ void simpleNamedStackTrace(u32 bottomFramesToSkip = 0, u32 topFramesToSkip = 0) 
 	}
 }
 
-
-struct Result(T) {
-	bool success;
-	T value;
-}
-
 struct Demangler
 {
 	const(char)[] name;
@@ -108,21 +102,21 @@ struct Demangler
 				if (name[cursor] < '0' || name[cursor] > '9') break;
 				++cursor;
 			}
-			if (cursor - start == 0) return Result!u32(false);
-			return Result!u32(true, decodeNumber(name[start..cursor]));
+			if (cursor - start == 0) return Result!u32.makeError(1);
+			return Result!u32(decodeNumber(name[start..cursor]));
 		}
 
 		if (name[cursor] < '0' || name[cursor] > '9') goto plain;
 
 		while(true) {
-			Result!u32 num = parseNum(cursor, name);
-			if (!num.success || cursor+num.value >= end) {
+			auto num = parseNum(cursor, name);
+			if (num.isError || cursor+num.data >= end) {
 				if (idIndex == 0) goto plain;
 				return;
 			}
 			if (idIndex > 0) sink(".");
-			sink(name[cursor..cursor+num.value]);
-			cursor += num.value;
+			sink(name[cursor..cursor+num.data]);
+			cursor += num.data;
 			++idIndex;
 		}
 		return;

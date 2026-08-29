@@ -27,6 +27,9 @@
 //   __wasm_init_memory performs thread-safe static memory init.
 //   `start` function is called by every thread before running entry point
 //
+//   --wasi threads=y now causes `Error: the `-Sthreads` flag is no longer supported` since wasmtime 47.0.0
+//   https://github.com/bytecodealliance/rfcs/blob/main/accepted/wasmtime-remove-wasi-threads.md
+//
 // source ~/dlang/ldc-1.32.0/activate
 module builder;
 

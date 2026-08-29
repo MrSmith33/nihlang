@@ -7,6 +7,56 @@ import vox.lib;
 
 @nogc nothrow:
 
+alias AllocBlockFn = @nogc nothrow Result!(ubyte[]) function(size_t size);
+alias AllocBlockDg = @nogc nothrow Result!(ubyte[]) delegate(size_t size);
+alias FreeBlockFn = @nogc nothrow Result!void function(ubyte[] block);
+alias FreeBlockDg = @nogc nothrow Result!void delegate(ubyte[] block);
+
+// Common header for all allocators
+// Makes allocator implicitly convert to Allocator
+mixin template AllocatorBase() {
+	import vox.lib.mem.allocator : AllocBlockFn, FreeBlockFn, Allocator;
+	AllocBlockFn allocBlockPtr = &allocBlock;
+	FreeBlockFn freeBlockPtr = &freeBlock;
+
+	alias toInterface this;
+
+	ref Allocator toInterface() {
+		return *cast(Allocator*)(&this);
+    }
+}
+
+// Interface for all allocators
+// This is a virtual type and should not be instantiated directly
+struct Allocator {
+	@nogc nothrow:
+
+	@disable this(); // disable default initialization
+    @disable this(ref Allocator); // disable copy constructor
+    @disable this(Allocator); // disable move constructor
+
+	AllocBlockFn allocBlockPtr;
+	FreeBlockFn freeBlockPtr;
+
+	// Not sure where to put this
+	// hardcoded for now for all allocators
+	enum MIN_BLOCK_BYTES = 16;
+
+	Result!(ubyte[]) allocBlock(size_t size) {
+		AllocBlockDg fun;
+		fun.ptr = &this;
+		fun.funcptr = allocBlockPtr;
+		return fun(size);
+	}
+
+	Result!void freeBlock(ubyte[] block) {
+		FreeBlockDg fun;
+		fun.ptr = &this;
+		fun.funcptr = freeBlockPtr;
+		return fun(block);
+	}
+}
+
 enum PAGE_SIZE = 4096;
 enum ALLOC_GRANULARITY = 65_536;
 
@@ -118,32 +168,35 @@ struct VoxAllocator
 	@nogc nothrow:
 	import vox.lib : isPowerOfTwo, bsr;
 
+	mixin AllocatorBase!();
+
 	// arenas for buffers from 16 to 65536 bytes
 	enum NUM_ARENAS = 13;
-	enum MIN_BLOCK_BYTES = 16;
 	enum MAX_BLOCK_BYTES = 65_536;
 
 	private BlockAllocator[NUM_ARENAS] sizeAllocators;
 
-	ubyte[] allocBlock(size_t size) {
+	Result!(ubyte[]) allocBlock(size_t size) {
 		assert(isPowerOfTwo(size));
-		assert(size >= MIN_BLOCK_BYTES);
+		assert(size >= Allocator.MIN_BLOCK_BYTES);
 		if (size > MAX_BLOCK_BYTES) {
-			return os_allocate(alignValue(size, ALLOC_GRANULARITY));
+			return os_allocate(alignValue(size, ALLOC_GRANULARITY)).Result!(ubyte[]);
 		}
 		uint index = sizeToIndex(size);
-		return sizeAllocators[index].alloc(size);
+		return sizeAllocators[index].alloc(size).Result!(ubyte[]);
 	}
 
-	void freeBlock(ubyte[] block) {
-		if (block.ptr is null) return;
+	Result!void freeBlock(ubyte[] block) {
+		if (block.ptr is null) return Result!void();
 		assert(isPowerOfTwo(block.length));
-		assert(block.length >= MIN_BLOCK_BYTES);
+		assert(block.length >= Allocator.MIN_BLOCK_BYTES);
 		if (block.length > MAX_BLOCK_BYTES) {
-			return os_deallocate(block);
+			os_deallocate(block);
+			return Result!void();
 		}
 		uint index = sizeToIndex(block.length);
 		sizeAllocators[index].free(block);
+		return Result!void();
 	}
 
 	private uint sizeToIndex(size_t size) {

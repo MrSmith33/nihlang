@@ -4,8 +4,8 @@
 module vox.fe.lexer;
 
 import vox.lib;
-import vox.fe.lexer.token;
-import vox.fe.lexer.token_type;
+public import vox.fe.lexer.token;
+public import vox.fe.lexer.token_type;
 import vox.fe.lexer.tables;
 
 struct Lexer
@@ -13,8 +13,11 @@ struct Lexer
 	@nogc nothrow:
 
 	const(char)* input;
+	// Offset into input
 	uint position;
+	// Zero-based
 	uint line;
+	// Zero-based
 	uint column;
 
 	Token nextToken() {

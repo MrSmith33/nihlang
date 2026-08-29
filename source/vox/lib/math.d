@@ -154,3 +154,18 @@ u64 hash_u64(u64 x) {
 	x ^= x >> 33;
 	return x;
 }
+
+// https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function
+uint fnv1a_32(const(ubyte)[] data) {
+	enum uint fnvPrime       = 0x01000193;
+	enum uint fnvOffsetBasis = 0x811c9dc5;
+
+	uint _hash = fnvOffsetBasis;
+
+	foreach (immutable ubyte i; data) {
+		_hash ^= i;
+		_hash *= fnvPrime;
+	}
+
+	return _hash;
+}

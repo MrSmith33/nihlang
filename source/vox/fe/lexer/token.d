@@ -5,6 +5,7 @@ module vox.fe.lexer.token;
 
 import vox.lib.format;
 import vox.fe.lexer.token_type;
+import vox.source;
 
 struct Token {
 	@nogc nothrow:
@@ -13,13 +14,20 @@ struct Token {
 	uint end;
 	uint line;
 	uint col;
-	TokenType tok;
+	TokenType type;
+
+	Location location() {
+		return Location(Position(start), Position(end));
+	}
+
+	Position startPos() => Position(start);
+	Position endPos() => Position(end);
 
 	const(char)[] getTokenString(const(char)[] input) pure const {
 		return input[start..end];
 	}
 
 	void toString(scope SinkDelegate sink) const {
-		sink.formattedWrite("line %s col %s start %s end %s len %s %s", line+1, col+1, start, end, end-start, tok);
+		sink.formattedWrite("line %s col %s start %s end %s len %s %s", line+1, col+1, start, end, end-start, type);
 	}
 }

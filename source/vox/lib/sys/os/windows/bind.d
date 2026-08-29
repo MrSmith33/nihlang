@@ -53,7 +53,8 @@ void writeFile(const(char)[] filename, const(u8)[] data) {
 }
 
 import vox.lib.mem.allocator;
-u8[] readFile(ref VoxAllocator allocator, const(char)[] filename) {
+import vox.lib.error : Result;
+Result!(u8[]) readFile(ref Allocator allocator, const(char)[] filename) {
 	import vox.lib.error;
 	HANDLE file;
 	file = CreateFileA(filename.ptr,           // name of the file
@@ -77,11 +78,14 @@ u8[] readFile(ref VoxAllocator allocator, const(char)[] filename) {
 	import vox.lib.math : nextPOT;
 	i64 memSize = nextPOT(size);
 	auto buf = allocator.allocBlock(memSize);
+	if (buf.isError) {
+		return Result!(u8[]).makeError(1);
+	}
 
 	enforce(size <= u32.max, "Cannot read more than 4 GiB. File name \"%s\", file size: %s", filename, size);
 
 	u32 numBytesRead;
-	bool success = ReadFile(file, cast(u8*)buf.ptr, cast(u32)size, &numBytesRead, null);
+	bool success = ReadFile(file, cast(u8*)buf.data.ptr, cast(u32)size, &numBytesRead, null);
 
 	CloseHandle(file);
 
@@ -94,7 +98,7 @@ u8[] readFile(ref VoxAllocator allocator, const(char)[] filename) {
 		}
 	}
 
-	return buf[0..size];
+	return buf.data[0..size].Result!(u8[]);
 }
 
 

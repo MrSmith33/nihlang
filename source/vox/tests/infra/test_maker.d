@@ -11,7 +11,7 @@ import vox.tests.infra;
 
 @nogc nothrow:
 
-void collectTestDefinitions(alias M)(ref VoxAllocator allocator, ref TestSuite suite, u8 contextId) {
+void collectTestDefinitions(alias M)(ref Allocator allocator, ref TestSuite suite, u8 contextId) {
 	foreach(m; __traits(allMembers, M))
 	{
 		alias member = __traits(getMember, M, m);
@@ -26,7 +26,7 @@ void collectTestDefinitions(alias M)(ref VoxAllocator allocator, ref TestSuite s
 }
 
 // This must be as small as possible, otherwise compile times are to big
-void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefinition def, u8 contextId) {
+void gatherTestDefinition(alias test)(ref Allocator allocator, ref TestDefinition def, u8 contextId) {
 	def.name = __traits(identifier, test);
 	def.file = __traits(getLocation, test)[0];
 	def.line = __traits(getLocation, test)[1];
@@ -50,7 +50,7 @@ void gatherTestDefinition(alias test)(ref VoxAllocator allocator, ref TestDefini
 	}
 }
 
-void instantiateTests(ref VoxAllocator allocator, ref TestSuite suite) {
+void instantiateTests(ref Allocator allocator, ref TestSuite suite) {
 	foreach(i, ref d; suite.definitions) {
 		d.index = cast(u32)i;
 		instantiateTest(allocator, suite, d);
@@ -63,7 +63,7 @@ static struct MakerParam {
 	u32 currentIndex;
 }
 
-void instantiateTest(ref VoxAllocator allocator, ref TestSuite suite, TestDefinition def) {
+void instantiateTest(ref Allocator allocator, ref TestSuite suite, TestDefinition def) {
 	if (def.ignore) return;
 
 	ITestContext context = suite.contexts[def.contextIndex];

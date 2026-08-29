@@ -13,7 +13,8 @@ i32 vox_main(string[] args)
 {
 	import vox.tests.infra;
 
-	VoxAllocator allocator;
+	VoxAllocator voxAllocator;
+	ref allocator = voxAllocator.toInterface();
 	TestSuite suite;
 
 	// Contexts need to be live during runTests call

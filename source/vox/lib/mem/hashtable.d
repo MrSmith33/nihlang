@@ -16,7 +16,7 @@ struct KeyBucket(Key, Key emptyKey)
 {
 	@nogc nothrow:
 
-	static assert(isPowerOfTwo(Key.sizeof), Key.stringof ~ "is not POT");
+	static assert(isPowerOfTwo(Key.sizeof), Key.stringof ~ " is not POT");
 	Key key = emptyKey;
 
 	bool empty() const { return key == emptyKey; }
@@ -53,11 +53,11 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 	}
 
 	/// Returns false if no value was deleted, true otherwise
-	bool remove(ref VoxAllocator allocator, Key key) {
+	bool remove(ref Allocator allocator, Key key) {
 		Value existingValue;
 		return remove(allocator, key, existingValue);
 	}
-	bool remove(ref VoxAllocator allocator, Key key, out Value existingValue) {
+	bool remove(ref Allocator allocator, Key key, out Value existingValue) {
 		if (_length == 0) return false;
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t searched_dib = 0;
@@ -92,7 +92,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 			return int32_hash(key);
 		} else static if (Key.sizeof == 8 && is(typeof(cast(size_t)key))) {
 			return cast(size_t)key;
-		} else return hashOf(key);
+		} else return key.toHash();
 	}
 
 	private size_t findIndex(Key key) inout
@@ -112,16 +112,16 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		}
 	}
 
-	void free(ref VoxAllocator allocator) {
+	void free(ref Allocator allocator) {
 		static if (SINGLE_ALLOC) {
-			size_t size = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * _capacity);
+			size_t size = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * _capacity);
 			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..size]);
 			//values = null; // not needed, because values ptr is derived from keys
 		} else {
-			size_t keySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * _capacity);
+			size_t keySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * _capacity);
 			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..keySize]);
 			static if (store_values) {
-				size_t valSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * _capacity);
+				size_t valSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * _capacity);
 				allocator.freeBlock((cast(ubyte*)values)[0..valSize]);
 			}
 			values = null;
@@ -136,7 +136,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		_length = 0;
 	}
 
-	private void extend(ref VoxAllocator allocator)
+	private Result!void extend(ref Allocator allocator)
 	{
 		uint newCapacity = _capacity ? _capacity * 2 : MIN_CAPACITY;
 		auto oldKeyBuckets = keyBuckets;
@@ -148,18 +148,21 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		auto oldCapacity = _capacity;
 
 		static if (SINGLE_ALLOC) {
-			size_t newSize = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * newCapacity);
-			ubyte[] newBlock = allocator.allocBlock(newSize);
-			keyBuckets = cast(KeyBucketT*)(newBlock.ptr);
+			size_t newSize = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * newCapacity);
+			auto newBlock = allocator.allocBlock(newSize);
+			if (newBlock.isError) return Result!void.makeError(1);
+			keyBuckets = cast(KeyBucketT*)(newBlock.data.ptr);
 			// values is based on keyBuckets ptr
 		} else {
-			size_t newKeySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * newCapacity);
-			ubyte[] newKeysBlock = allocator.allocBlock(newKeySize);
-			keyBuckets = cast(KeyBucketT*)(newKeysBlock.ptr);
+			size_t newKeySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * newCapacity);
+			auto newKeysBlock = allocator.allocBlock(newKeySize);
+			if (newKeysBlock.isError) return Result!void.makeError(1);
+			keyBuckets = cast(KeyBucketT*)(newKeysBlock.data.ptr);
 			static if (store_values) {
-				size_t newValSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * newCapacity);
-				ubyte[] newValuesBlock = allocator.allocBlock(newValSize);
-				values = cast(Value*)newValuesBlock.ptr;
+				size_t newValSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * newCapacity);
+				auto newValuesBlock = allocator.allocBlock(newValSize);
+				if (newValuesBlock.isError) return Result!void.makeError(1);
+				values = cast(Value*)newValuesBlock.data.ptr;
 			}
 		}
 
@@ -176,17 +179,18 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 			}
 
 			static if (SINGLE_ALLOC) {
-				size_t oldSize = max(VoxAllocator.MIN_BLOCK_BYTES, Bucket_size * oldCapacity);
+				size_t oldSize = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * oldCapacity);
 				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldSize]);
 			} else {
-				size_t oldKeySize = max(VoxAllocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * oldCapacity);
+				size_t oldKeySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * oldCapacity);
 				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldKeySize]);
 				static if (store_values) {
-					size_t oldValSize = max(VoxAllocator.MIN_BLOCK_BYTES, Value.sizeof * oldCapacity);
+					size_t oldValSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * oldCapacity);
 					allocator.freeBlock((cast(ubyte*)oldValues)[0..oldValSize]);
 				}
 			}
 		}
+		return Result!void();
 	}
 }
 
@@ -213,29 +217,32 @@ mixin template HashMapImpl()
 	alias KeyT = Key;
 	alias ValueT = Value;
 
-	Value* put(ref VoxAllocator allocator, Key key, Value value) {
+	Result!(Value*) put(ref Allocator allocator, Key key, Value value) {
 		Value oldValue;
 		return put(allocator, key, value, oldValue);
 	}
 
 	// Length will increase if we inserted new key, otherwise oldValue contains old value
-	Value* put(ref VoxAllocator allocator, Key key, Value value, out Value oldValue)
+	Result!(Value*) put(ref Allocator allocator, Key key, Value value, out Value oldValue)
 	{
 		assert(KeyBucketT.isValidKey(key), "Invalid key");
-		if (_length == maxLength) extend(allocator);
+		if (_length == maxLength) {
+			auto res = extend(allocator);
+			if (res.isError) return Result!(Value*).makeError(res.isError);
+		}
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;
 		while (true) {
 			if (keyBuckets[index].key == key) { // same key
 				oldValue = values[index];
 				values[index] = value;
-				return &values[index];
+				return Result!(Value*)(&values[index]);
 			}
 			if (keyBuckets[index].empty) { // bucket is empty
 				++_length;
 				keyBuckets[index].assignKey(key);
 				values[index] = value;
-				return &values[index];
+				return Result!(Value*)(&values[index]);
 			}
 			size_t current_initial_bucket = getHash(keyBuckets[index].key) & (_capacity - 1); // % capacity
 			ptrdiff_t current_dib = index - current_initial_bucket;
@@ -251,14 +258,17 @@ mixin template HashMapImpl()
 		}
 	}
 
-	Value* getOrCreate(ref VoxAllocator allocator, Key key, out bool wasCreated, Value default_value = Value.init)
+	Result!(Value*) getOrCreate(ref Allocator allocator, Key key, out bool wasCreated, Value default_value = Value.init)
 	{
 		if (_length == 0) {
 			wasCreated = true;
 			return put(allocator, key, default_value);
 		}
 
-		if (_length == maxLength) extend(allocator);
+		if (_length == maxLength) {
+			auto res = extend(allocator);
+			if (res.isError) return Result!(Value*).makeError(res.isError);
+		}
 		auto index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;
 		Value value;
@@ -269,11 +279,11 @@ mixin template HashMapImpl()
 				keyBuckets[index].assignKey(key);
 				values[index] = default_value;
 				wasCreated = true;
-				return &values[index];
+				return Result!(Value*)(&values[index]);
 			}
 
 			// found existing item
-			if (keyBuckets[index].key == key) return &values[index];
+			if (keyBuckets[index].key == key) return Result!(Value*)(&values[index]);
 
 			size_t current_initial_bucket = getHash(keyBuckets[index].key) & (_capacity - 1); // % capacity
 			ptrdiff_t current_dib = index - current_initial_bucket;
@@ -301,7 +311,7 @@ mixin template HashMapImpl()
 				++_length;
 				keyBuckets[index].assignKey(key);
 				values[index] = value;
-				return &values[index];
+				return Result!(Value*)(&values[index]);
 			}
 			size_t current_initial_bucket = getHash(keyBuckets[index].key) & (_capacity - 1); // % capacity
 			ptrdiff_t current_dib = index - current_initial_bucket;

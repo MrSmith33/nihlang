@@ -328,7 +328,7 @@ void instr_ret(ref VmState vm) {
 		if (vm.status != VmStatus.RUNNING) return;
 
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
-		mem.popAllocations(*vm.allocator, vm.numFrameStackSlots);
+		mem.popAllocations(vm.numFrameStackSlots);
 		vm.frameFirstStackSlot -= vm.numFrameStackSlots;
 	}
 
