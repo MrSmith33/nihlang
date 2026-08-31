@@ -9,7 +9,12 @@ struct Position {
 	uint offset;
 }
 
-struct Location {
+// A slice of a source code
+struct Span {
+	@nogc nothrow:
+
 	Position start;
 	Position end;
+
+	size_t length() inout => end.offset - start.offset;
 }

@@ -7,6 +7,7 @@ import vox.lib;
 public import vox.fe.lexer.token;
 public import vox.fe.lexer.token_type;
 import vox.fe.lexer.tables;
+import vox.source;
 
 struct Lexer
 {
@@ -84,6 +85,11 @@ struct Lexer
 		line = curLine;
 		column = curColumn;
 
-		return Token(startPos, curPosition, startLine, startCol, cast(TokenType)(state & 0b0111_1111));
+		return Token(
+			Span(
+				Position(startPos),
+				Position(curPosition)),
+			startLine, startCol,
+			cast(TokenType)(state & 0b0111_1111));
 	}
 }

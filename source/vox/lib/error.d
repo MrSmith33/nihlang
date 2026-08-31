@@ -11,6 +11,15 @@ struct Result(T) {
 	}
 	uint isError;
 
+	static if (!is(T == void))
+	this(T value) {
+		data = value;
+	}
+
+	this(V)(Result!V err) {
+		isError = err.isError;
+	}
+
 	static typeof(this) makeError(uint error) {
 		typeof(this) res;
 		res.isError = error;

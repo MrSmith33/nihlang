@@ -18,7 +18,6 @@ import vox.tests.context;
 	i32 data = 2;
 }
 void test_sandbox(ref VoxTestContext c) {
-	c.driver.addHar("test.har", c.test.source.asciiStripLeft);
 	c.driver.compile();
 
 	//auto sym = c.getGlobalPtr!i32("test1.data");

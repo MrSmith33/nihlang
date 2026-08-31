@@ -10,24 +10,17 @@ import vox.source;
 struct Token {
 	@nogc nothrow:
 
-	uint start;
-	uint end;
+	Span span;
 	uint line;
 	uint col;
 	TokenType type;
 
-	Location location() {
-		return Location(Position(start), Position(end));
-	}
-
-	Position startPos() => Position(start);
-	Position endPos() => Position(end);
-
 	const(char)[] getTokenString(const(char)[] input) pure const {
-		return input[start..end];
+		return input[span.start.offset..span.end.offset];
 	}
 
 	void toString(scope SinkDelegate sink) const {
-		sink.formattedWrite("line %s col %s start %s end %s len %s %s", line+1, col+1, start, end, end-start, type);
+		sink.formattedWrite("line %s col %s start %s end %s len %s %s",
+			line+1, col+1, span.start.offset, span.end.offset, span.length, type);
 	}
 }

@@ -31,6 +31,7 @@ struct Arena(T)
 	ref T opIndex(size_t at) { return bufPtr[at]; }
 	ref T back() { return bufPtr[length-1]; }
 	inout(T[]) data() inout { return bufPtr[0..length]; }
+	size_t opDollar() const { return length; }
 	bool empty() { return length == 0; }
 	T* nextPtr() { return bufPtr + length; }
 	bool contains(void* ptr) { return cast(void*)bufPtr <= ptr && cast(T*)ptr < cast(void*)(bufPtr + length); }
@@ -89,7 +90,9 @@ struct Arena(T)
 
 	static if (is(T == ubyte))
 	{
-		void put(V)(auto ref V value) if (!isDynamicArray!V) {
+		void put(V)(auto ref V value)
+			if (!is(immutable(V) == immutable(I)[], I))
+		{
 			ubyte[] ptr = voidPut(V.sizeof);
 			ptr[] = *cast(ubyte[V.sizeof]*)&value;
 		}
@@ -101,6 +104,16 @@ struct Arena(T)
 		void padUntilAligned(size_t alignment) {
 			pad(paddingSize(length, alignment));
 		}
+	}
+
+	inout(T)[] opSlice() inout {
+		return bufPtr[0..length];
+	}
+
+	inout(T)[] opSlice(size_t from, size_t to) inout {
+		assert(from < length);
+		assert(to <= length);
+		return bufPtr[from..to];
 	}
 
 	version(Windows)
