@@ -136,13 +136,25 @@ u64 bitmask(u64 n) {
 }
 
 // [16 21f0aaad 15 d35a2d97 15] https://github.com/skeeto/hash-prospector
+// [16 21f0aaad 15 735a2d97 15] https://github.com/skeeto/hash-prospector/issues/19#issuecomment-1120105785
+// [16 21f0aaad 15 f35a2d97 15] https://github.com/skeeto/hash-prospector/issues/19#issuecomment-3747708182
 u32 int32_hash(u32 x) {
-    x ^= x >> 16;
-    x *= 0x21f0aaad;
-    x ^= x >> 15;
-    x *= 0xd35a2d97;
-    x ^= x >> 15;
-    return x;
+	x ^= x >> 16;
+	x *= 0x21f0aaad;
+	x ^= x >> 15;
+	x *= 0xf35a2d97;
+	x ^= x >> 15;
+	return x;
+}
+
+// Reverse of int32_hash
+u32 int32_hash_r(u32 x) {
+	x ^= x >> 15 ^ x >> 30;
+	x *= 2534613543;
+	x ^= x >> 15 ^ x >> 30;
+	x *= 859588901;
+	x ^= x >> 16;
+	return x;
 }
 
 // murmurhash3 64-bit finalizer
