@@ -35,6 +35,12 @@ struct Driver {
 		if (filesMem.isError) return Result!void.fromError(filesMem);
 		context.bufs.files.setBuffer(filesMem.data);
 
+		auto arrayMem = allocator.allocBlock(_1MiB);
+		if (arrayMem.isError) return Result!void.fromError(arrayMem);
+		auto bigArrayMem = allocator.allocBlock(_1MiB);
+		if (bigArrayMem.isError) return Result!void.fromError(bigArrayMem);
+		context.bufs.arrayArena.setBuffers(arrayMem.data, bigArrayMem.data);
+
 		auto stringsMem = allocator.allocBlock(_64KiB);
 		if (stringsMem.isError) return Result!void.fromError(stringsMem);
 		context.bufs.strings.setBuffer(stringsMem.data);
@@ -127,12 +133,14 @@ struct VoxContext {
 	@nogc nothrow:
 	Buffers bufs;
 
-	Result!T makeError(T, Args...)(Span span, string fmt, Args args) {
+	Result!T makeError(T, Args...)(Span loc, string fmt, Args args) {
 		auto startLen = bufs.strings.length;
 		formattedWrite(&putStr, fmt, args);
 		auto endLen = bufs.strings.length;
 		auto msg = cast(string)bufs.strings[startLen..endLen];
-		auto index = appendError!Diagnostic(msg);
+		Array!Annotation annotations;
+		annotations.put(bufs.arrayArena, Annotation("here", loc));
+		auto index = appendError!Diagnostic(msg, annotations);
 		return Result!T.fromError(index); // TODO: return index of error object
 	}
 

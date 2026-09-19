@@ -41,7 +41,10 @@ struct VoxTestContext {
 
 	DiagnosticChecker compileFail(string file = __FILE__, int line = __LINE__) {
 		auto res = driver.compile();
-		if (res.isError) return DiagnosticChecker(&this, res.isError);
+		if (res.isError) {
+			ref diag = driver.context.getError!Diagnostic(res.isError);
+			return DiagnosticChecker(&this, &diag);
+		}
 		panic(line, file, 1, "Compilation was expected to fail, but succeeded");
 	}
 
@@ -54,17 +57,65 @@ struct VoxTestContext {
 struct DiagnosticChecker {
 	@nogc nothrow:
 
+	// Last command
+	enum State {
+		init,
+		diag,
+		anno,
+	}
+
 	VoxTestContext* context;
-	u32 errorIndex;
+	Diagnostic* diag;
+	State state;
+	u32 selectedAnnotation;
 
 	DiagnosticChecker expectDiagnostic(string msg = null, string file = __FILE__, int line = __LINE__) {
-		ref diag = context.driver.context.getError!Diagnostic(errorIndex);
+		if (state != State.init) {
+			panic(line, file, 0, "expectDiagnostic must be the first call in a chain");
+		}
+		if (msg is null) return DiagnosticChecker(context, diag, State.diag);
+		if (msg == diag.msg) return DiagnosticChecker(context, diag, State.diag);
 
-		if (msg is null) return this;
-		if (msg == diag.msg) return this;
+		panic(line, file, 0, "Unexpected error message:\n  Expected: %s\n  Got: %s\n", msg, diag.msg);
 
-		context.sink.formattedWrite("Unexpected error message:\n  Expected: %s\n  Got: %s\n", msg, diag.msg);
+		return this;
+	}
 
+	DiagnosticChecker withAnnotation(string msg = null, string file = __FILE__, int line = __LINE__) {
+		if (state != State.diag && state != State.anno) {
+			panic(line, file, 0, "expectDiagnostic must be the first call in a chain");
+		}
+
+		if (msg is null && diag.annotations.length == 1) {
+			// Select annotation zero
+			return DiagnosticChecker(context, diag, State.anno, 0);
+		}
+
+		if (msg is null) {
+			panic(line, file, 0, "Diagnostic has multiple annotations, but message was not specified in a call to withAnnotation");
+		}
+
+		foreach(i, ref a; diag.annotations) {
+			if (a.msg == msg) {
+				return DiagnosticChecker(context, diag, State.anno, cast(u32)i);
+			}
+		}
+
+		panic(line, file, 0, "Cannot find annotation with message: %s\n", msg);
+	}
+
+	DiagnosticChecker pointingAt(string at, string file = __FILE__, int line = __LINE__) {
+		if (state != State.anno) {
+			panic(line, file, 0, "pointingAt must be called immediately after withAnnotation");
+		}
+
+		auto data = context.driver.context.bufs.sources.data;
+		auto loc = diag.annotations[selectedAnnotation].location;
+		auto slice = data[loc.start.offset..loc.end.offset];
+
+		if (at == slice) return this;
+
+		context.sink.formattedWrite("Annotation is pointing at the wrong location:\n  Expected: %s\n  Got: %s\n", at, slice);
 		return this;
 	}
 }

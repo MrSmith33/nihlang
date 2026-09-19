@@ -15,5 +15,7 @@ import vox.tests.context;
 	;
 }
 void test_decl(ref VoxTestContext c) {
-	c.compileFail.expectDiagnostic("Expected declaration, got ;");
+	c.compileFail
+		.expectDiagnostic("Expected declaration, got ;")
+		.withAnnotation("here").pointingAt(";");
 }
