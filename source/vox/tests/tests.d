@@ -14,8 +14,17 @@ import vox.tests.context;
 --- test1.vx
 	;
 }
-void test_decl(ref VoxTestContext c) {
+void test1(ref VoxTestContext c) {
 	c.compileFail
 		.expectDiagnostic("Expected declaration, got ;")
 		.withAnnotation("here").pointingAt(";");
+}
+
+@Test
+@q{
+--- test2.vx
+	i32 data;
+}
+void test2(ref VoxTestContext c) {
+	c.compile();
 }

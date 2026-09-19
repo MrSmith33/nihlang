@@ -23,6 +23,13 @@ struct Parser {
 		while (tok.type == TokenType.comment);
 	}
 
+	string getTokenString() {
+		if (tok.type == TokenType.eoi)
+			return "end of file";
+		else
+			return cast(string)tok.getTokenString(context.bufs.sources.data);
+	}
+
 	Result!void parseModule(ref FileInfo file) {
 		lexer.input = context.bufs.sources.bufPtr;
 		lexer.position = file.offset;
@@ -32,12 +39,13 @@ struct Parser {
 
 		//return Result!void();
 
-		//if (tok.type == TokenType.semicolon) {
+		if (tok.type == TokenType.semicolon) {
 			return context.makeError!void(tok.span,
 				"Expected %s, got %s",
 				"declaration",
-				cast(string)tok.getTokenString(context.bufs.sources.data));
-		//}
+				getTokenString());
+		}
+		//return Result!void();
 		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
 		//return expectIdentifier().Result!void;
 		//while (tok.type != TokenType.eoi) {
@@ -50,20 +58,16 @@ struct Parser {
 		//	//writefln("  %s", cast(uint)tok.tok);
 		//	if (tok.tok == TokenType.eoi) break;
 		//}
+		AstNodes items;
+		return parse_declaration(items);
 	}
 
 	Result!void expect(TokenType type, string what, string afterWhat = null) {
 		if (tok.type != type) {
-			const(char)[] tokenString;
-			if (tok.type == TokenType.eoi)
-				tokenString = "end of file";
-			else
-				tokenString = tok.getTokenString(context.bufs.sources.data);
-
 			if (afterWhat)
-				return context.makeError!void(tok.span, "Expected %s after %s, got %s", what, afterWhat, cast(string)tokenString);
+				return context.makeError!void(tok.span, "Expected %s after %s, got %s", what, afterWhat, getTokenString());
 			else
-				return context.makeError!void(tok.span, "Expected %s, got %s", what, cast(string)tokenString);
+				return context.makeError!void(tok.span, "Expected %s, got %s", what, getTokenString());
 		}
 		return Result!void();
 	}
@@ -92,27 +96,29 @@ struct Parser {
 		return Result!Name(id);
 	}
 
-	void parse_declaration() {
-
-	}
-
-	/*void parse_declaration(ref AstNodes items) // <declaration> ::= <func_declaration> / <var_declaration> / <struct_declaration>
-	{
-		version(print_parse) auto s1 = scop("parse_declaration %s", loc);
-
-		switch(tok.type) with(TokenType)
-		{
-			kw_i32:
+	Result!void parse_declaration(ref AstNodes items) { // <declaration> ::= <var_declaration>
+		switch(tok.type) with(TokenType) {
+			case kw_i32: {
 				nextToken; // skip i32
- 				// <func_declaration> / <var_declaration>
- 				break;
+
+ 				auto res1 = expectIdentifier("i32");
+ 				if (res1.isError) {
+					return Result!void(res1);
+				}
+				auto id = res1.data;
+
+ 				auto res2 = expectAndConsume(TokenType.semicolon, ";", "identifier");
+				if (res2.isError) {
+					return Result!void(res2);
+				}
+
+ 				return Result!void();
+ 			}
 
  			default:
- 				// Error
-				return;
+ 				return context.makeError!void(tok.span, "TODO: %s", getTokenString());
 		}
-		assert(false);
-	}*/
+	}
 }
 
 struct AstNode {

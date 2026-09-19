@@ -39,6 +39,14 @@ struct VoxTestContext {
 	// Testing API
 	// -----------
 
+	void compile(string file = __FILE__, int line = __LINE__) {
+		auto res = driver.compile();
+		if (res.isError) {
+			ref diag = driver.context.getError!Diagnostic(res.isError);
+			panic(line, file, 1, "Compilation failed, but expected to succeeded");
+		}
+	}
+
 	DiagnosticChecker compileFail(string file = __FILE__, int line = __LINE__) {
 		auto res = driver.compile();
 		if (res.isError) {

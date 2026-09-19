@@ -41,6 +41,13 @@ struct Driver {
 		if (bigArrayMem.isError) return Result!void.fromError(bigArrayMem);
 		context.bufs.arrayArena.setBuffers(arrayMem.data, bigArrayMem.data);
 
+		auto nameStr = allocator.allocBlock(_64KiB);
+		if (nameStr.isError) return Result!void.fromError(nameStr);
+		auto nameEntries = allocator.allocBlock(_64KiB);
+		if (nameEntries.isError) return Result!void.fromError(nameEntries);
+		context.bufs.nameMap.stringDataBuffer.setBuffer(nameStr.data);
+		context.bufs.nameMap.entries.setBuffer(nameEntries.data);
+
 		auto stringsMem = allocator.allocBlock(_64KiB);
 		if (stringsMem.isError) return Result!void.fromError(stringsMem);
 		context.bufs.strings.setBuffer(stringsMem.data);
