@@ -20,9 +20,15 @@ struct Result(T) {
 		isError = err.isError;
 	}
 
-	static typeof(this) makeError(uint error) {
+	static typeof(this) fromError(uint error) {
 		typeof(this) res;
 		res.isError = error;
+		return res;
+	}
+
+	static typeof(this) fromError(V)(Result!V err) {
+		typeof(this) res;
+		res.isError = err.isError;
 		return res;
 	}
 }

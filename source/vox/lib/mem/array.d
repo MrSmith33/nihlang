@@ -64,7 +64,7 @@ struct Array(T)
 		ubyte[] block = (cast(ubyte*)externalArray)[0..byteCapacity];
 
 		auto newBlock = allocator.allocBlock(block.length);
-		if (newBlock.isError) return typeof(return).makeError(1);
+		if (newBlock.isError) return typeof(return).fromError(newBlock);
 		newBlock.data[] = block;
 		copy.externalArray = cast(T*)newBlock.data.ptr;
 		return typeof(return)(copy);
@@ -72,8 +72,8 @@ struct Array(T)
 
 	Result!(T[]) voidPut(ref Allocator allocator, uint howMany) {
 		if (_length + howMany > _capacity) {
-			if (extend(allocator, howMany).isError)
-				return Result!(T[]).makeError(1);
+			auto res = extend(allocator, howMany);
+			if (res.isError) return Result!(T[]).fromError(res);
 		}
 		_length += howMany;
 		return this[_length-howMany.._length].Result!(T[]);
@@ -81,8 +81,8 @@ struct Array(T)
 
 	Result!void put(ref Allocator allocator, const(T)[] items...) {
 		if (_length + items.length > _capacity) {
-			if (extend(allocator, cast(uint)items.length).isError)
-				return Result!void.makeError(1);
+			auto res = extend(allocator, cast(uint)items.length);
+			if (res.isError) return Result!void.fromError(res);
 		}
 
 		_length += items.length;
@@ -96,7 +96,7 @@ struct Array(T)
 			if (!is(immutable(V) == immutable(I)[], I))
 		{
 			auto ptr = voidPut(allocator, V.sizeof);
-			if (ptr.isError) return typeof(return).makeError(1);
+			if (ptr.isError) return Result!void.fromError(ptr);
 			ptr.data[] = *cast(ubyte[V.sizeof]*)&value;
 			return typeof(return)();
 		}
@@ -116,8 +116,9 @@ struct Array(T)
 
 		size_t numItemsToInsert = itemsToInsert.length;
 
-		if (replaceAtVoid(allocator, at, numItemsToRemove, numItemsToInsert).isError) {
-			return Result!void.makeError(1);
+		auto res = replaceAtVoid(allocator, at, numItemsToRemove, numItemsToInsert);
+		if (res.isError) {
+			return Result!void.fromError(res);
 		}
 		this[at..at+numItemsToInsert][] = itemsToInsert;
 		return Result!void();
@@ -132,8 +133,9 @@ struct Array(T)
 			ptrdiff_t delta = numItemsToInsert - numItemsToRemove;
 
 			if (_length + delta > _capacity) {
-				if (extend(allocator, cast(uint)delta).isError) {
-					return Result!void.makeError(1);
+				auto res = extend(allocator, cast(uint)delta);
+				if (res.isError) {
+					return Result!void.fromError(res);
 				}
 			}
 
@@ -186,7 +188,7 @@ struct Array(T)
 		if (_capacity == NUM_INLINE_ITEMS) {
 			auto newBlock = allocator.allocBlock(max(byteCapacityNeeded, MIN_EXTERNAL_BYTES));
 			if (newBlock.isError) {
-				return Result!void.makeError(1);
+				return Result!void.fromError(newBlock);
 			}
 			static if (NUM_INLINE_ITEMS > 0) {
 				ubyte[] oldBlock = (cast(ubyte*)inlineItems.ptr)[0..NUM_INLINE_BYTES];
@@ -199,8 +201,8 @@ struct Array(T)
 
 		size_t byteCapacity = nextPOT(_capacity * T.sizeof);
 		ubyte[] block = (cast(ubyte*)externalArray)[0..byteCapacity];
-		if (resizeSmallArray(allocator, block, byteCapacityNeeded).isError)
-			return Result!void.makeError(1);
+		auto res = resizeSmallArray(allocator, block, byteCapacityNeeded);
+		if (res.isError) return Result!void.fromError(res);
 		externalArray = cast(T*)block.ptr;
 		_capacity = cast(uint)(block.length / T.sizeof);
 		return Result!void();
@@ -214,7 +216,7 @@ struct Array(T)
 
 		auto newBlock = allocator.allocBlock(newLength);
 		if (newBlock.isError) {
-			return Result!void.makeError(1);
+			return Result!void.fromError(newBlock);
 		}
 		newBlock.data[0..oldBlock.length] = oldBlock;
 		allocator.freeBlock(oldBlock);

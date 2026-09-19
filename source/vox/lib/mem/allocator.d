@@ -39,7 +39,7 @@ struct Allocator {
 	FreeBlockFn freeBlockPtr;
 
 	// Not sure where to put this
-	// hardcoded for now for all allocators
+	// Hardcoded for now for all allocators
 	enum MIN_BLOCK_BYTES = 16;
 
 	Result!(ubyte[]) allocBlock(size_t size) {

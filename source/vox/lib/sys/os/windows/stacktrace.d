@@ -102,7 +102,7 @@ struct Demangler
 				if (name[cursor] < '0' || name[cursor] > '9') break;
 				++cursor;
 			}
-			if (cursor - start == 0) return Result!u32.makeError(1);
+			if (cursor - start == 0) return Result!u32.fromError(1);
 			return Result!u32(decodeNumber(name[start..cursor]));
 		}
 

@@ -69,7 +69,7 @@ struct ArrayArena {
 		size_t blockSize = max(nextPOT(length * T.sizeof), MIN_BLOCK_BYTES);
 		auto newBlock = allocBlock(blockSize);
 		if (newBlock.isError) {
-			return Result!(T[]).makeError(1);
+			return Result!(T[]).fromError(newBlock);
 		}
 		return (cast(T*)newBlock.ptr)[0..length].Result!(T[]);
 	}
@@ -85,7 +85,7 @@ struct ArrayArena {
 		assert(isPowerOfTwo(size));
 		assert(size >= MIN_BLOCK_BYTES);
 		if (size > MAX_BLOCK_BYTES) {
-			return Result!(ubyte[]).makeError(1);
+			return Result!(ubyte[]).fromError(1);
 		}
 		uint index = sizeToIndex(size);
 		ubyte[] block = freeLists[index].get(size);
@@ -103,7 +103,7 @@ struct ArrayArena {
 		assert(isPowerOfTwo(block.length));
 		assert(block.length >= MIN_BLOCK_BYTES);
 		if (block.length > MAX_BLOCK_BYTES) {
-			return Result!void.makeError(1);
+			return Result!void.fromError(1);
 		}
 		uint index = sizeToIndex(block.length);
 		freeLists[index].put(block);

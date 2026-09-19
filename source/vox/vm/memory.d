@@ -156,12 +156,12 @@ struct Memory {
 		memory.voidPut(allocator, size);
 		// By default no pointers are in memory
 		auto data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
-		if (data1.isError) return Result!void.makeError(1);
+		if (data1.isError) return Result!void.fromError(data1);
 		data1.data[] = 0;
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
 			auto data2 = initBitmap.voidPut(allocator, divCeil(size, Allocation.ALLOCATION_GRANULARITY));
-			if (data2.isError) return Result!void.makeError(1);
+			if (data2.isError) return Result!void.fromError(data2);
 			data2.data[] = 0;
 		}
 		return Result!void();

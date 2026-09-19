@@ -28,19 +28,19 @@ struct Driver {
 		enum _1MiB = 1024*1024;
 
 		auto sourceMem = allocator.allocBlock(_1MiB);
-		if (sourceMem.isError) return Result!void.makeError(1);
+		if (sourceMem.isError) return Result!void.fromError(sourceMem);
 		context.bufs.sources.setBuffer(sourceMem.data);
 
 		auto filesMem = allocator.allocBlock(_64KiB);
-		if (filesMem.isError) return Result!void.makeError(1);
+		if (filesMem.isError) return Result!void.fromError(filesMem);
 		context.bufs.files.setBuffer(filesMem.data);
 
 		auto stringsMem = allocator.allocBlock(_64KiB);
-		if (stringsMem.isError) return Result!void.makeError(1);
+		if (stringsMem.isError) return Result!void.fromError(stringsMem);
 		context.bufs.strings.setBuffer(stringsMem.data);
 
 		auto errorsMem = allocator.allocBlock(_64KiB);
-		if (errorsMem.isError) return Result!void.makeError(1);
+		if (errorsMem.isError) return Result!void.fromError(errorsMem);
 		context.bufs.errors.setBuffer(errorsMem.data);
 
 		return Result!void();
@@ -72,15 +72,17 @@ struct Driver {
 		parseHar(harData, &onError, &onFile);
 	}
 
-	void compile() {
+	Result!void compile() {
 		foreach(ref file; context.bufs.files.data) {
 			import vox.fe.lexer;
 			import vox.fe.lexer.token_type;
 			import vox.fe.parser;
 
 			Parser parser = Parser(&context);
-			parser.parseModule(file);
+			auto res = parser.parseModule(file);
+			if (res.isError) return res;
 		}
+		return Result!void();
 	}
 }
 
@@ -104,12 +106,14 @@ struct Buffers {
 
 		// 0 position is reserved for null position
 		sources.put(0);
+		// 0 position is reserved for no error
+		errors.put(0, 0, 0, 0);
 	}
 }
 
 struct Diagnostic {
 	string msg;
-	Annotation[] annotations;
+	Array!Annotation annotations;
 	// TODO: stack trace
 }
 
@@ -125,13 +129,30 @@ struct VoxContext {
 
 	Result!T makeError(T, Args...)(Span span, string fmt, Args args) {
 		auto startLen = bufs.strings.length;
-		formattedWrite(&putString, fmt, args);
+		formattedWrite(&putStr, fmt, args);
 		auto endLen = bufs.strings.length;
-		//writeln(cast(string)bufs.strings[startLen..endLen]);
-		return Result!T.makeError(1); // TODO: return index of error object
+		auto msg = cast(string)bufs.strings[startLen..endLen];
+		auto index = appendError!Diagnostic(msg);
+		return Result!T.fromError(index); // TODO: return index of error object
 	}
 
-	void putString(scope const(char)[] str) {
+	u32 appendError(T, Args...)(Args args) {
+		uint resIndex = bufs.errors.uintLength;
+		T* obj = cast(T*)bufs.errors.nextPtr;
+		enum size_t numAllocatedSlots = divCeil(T.sizeof, uint.sizeof);
+		bufs.errors.voidPut(numAllocatedSlots);
+		*obj = T(args);
+		return resIndex / uint.sizeof;
+	}
+
+	ref T getError(T)(u32 index) {
+		auto ptr = bufs.errors.bufPtr + (index * uint.sizeof);
+		return *cast(T*)ptr;
+	}
+
+	// WASM doesn't like when we cast cast(SinkDelegate)&bufs.strings.put
+	// wasm trap: indirect call type mismatch
+	void putStr(scope const(char)[] str) {
 		bufs.strings.put(str);
 	}
 }

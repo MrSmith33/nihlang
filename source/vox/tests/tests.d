@@ -10,16 +10,10 @@ import vox.tests.context;
 @nogc nothrow:
 
 @Test
-//@TestOnly
 @q{
 --- test1.vx
-	i32 data = 42;
---- test2.vx
-	i32 data = 2;
+	;
 }
-void test_sandbox(ref VoxTestContext c) {
-	c.driver.compile();
-
-	//auto sym = c.getGlobalPtr!i32("test1.data");
-	//assert(*sym == 42);
+void test_decl(ref VoxTestContext c) {
+	c.compileFail.expectDiagnostic("Expected declaration, got ;");
 }

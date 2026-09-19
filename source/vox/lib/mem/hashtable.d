@@ -150,18 +150,18 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		static if (SINGLE_ALLOC) {
 			size_t newSize = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * newCapacity);
 			auto newBlock = allocator.allocBlock(newSize);
-			if (newBlock.isError) return Result!void.makeError(1);
+			if (newBlock.isError) return Result!void.fromError(newBlock);
 			keyBuckets = cast(KeyBucketT*)(newBlock.data.ptr);
 			// values is based on keyBuckets ptr
 		} else {
 			size_t newKeySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * newCapacity);
 			auto newKeysBlock = allocator.allocBlock(newKeySize);
-			if (newKeysBlock.isError) return Result!void.makeError(1);
+			if (newKeysBlock.isError) return Result!void.fromError(newKeysBlock);
 			keyBuckets = cast(KeyBucketT*)(newKeysBlock.data.ptr);
 			static if (store_values) {
 				size_t newValSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * newCapacity);
 				auto newValuesBlock = allocator.allocBlock(newValSize);
-				if (newValuesBlock.isError) return Result!void.makeError(1);
+				if (newValuesBlock.isError) return Result!void.fromError(newValuesBlock);
 				values = cast(Value*)newValuesBlock.data.ptr;
 			}
 		}
@@ -228,7 +228,7 @@ mixin template HashMapImpl()
 		assert(KeyBucketT.isValidKey(key), "Invalid key");
 		if (_length == maxLength) {
 			auto res = extend(allocator);
-			if (res.isError) return Result!(Value*).makeError(res.isError);
+			if (res.isError) return Result!(Value*).fromError(res);
 		}
 		size_t index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;
@@ -267,7 +267,7 @@ mixin template HashMapImpl()
 
 		if (_length == maxLength) {
 			auto res = extend(allocator);
-			if (res.isError) return Result!(Value*).makeError(res.isError);
+			if (res.isError) return Result!(Value*).fromError(res);
 		}
 		auto index = getHash(key) & (_capacity - 1); // % capacity
 		size_t inserted_dib = 0;

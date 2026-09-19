@@ -23,15 +23,23 @@ struct Parser {
 		while (tok.type == TokenType.comment);
 	}
 
-	void parseModule(ref FileInfo file) {
+	Result!void parseModule(ref FileInfo file) {
 		lexer.input = context.bufs.sources.bufPtr;
 		lexer.position = file.offset;
 		lexer.line = 0;
 		lexer.column = 0;
 		nextToken;
 
+		//return Result!void();
+
+		//if (tok.type == TokenType.semicolon) {
+			return context.makeError!void(tok.span,
+				"Expected %s, got %s",
+				"declaration",
+				cast(string)tok.getTokenString(context.bufs.sources.data));
+		//}
 		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
-		expectIdentifier();
+		//return expectIdentifier().Result!void;
 		//while (tok.type != TokenType.eoi) {
 		//	if (tok.type == TokenType.eoi) break;
 		//	parse_declaration();
@@ -46,7 +54,12 @@ struct Parser {
 
 	Result!void expect(TokenType type, string what, string afterWhat = null) {
 		if (tok.type != type) {
-			const(char)[] tokenString = tok.getTokenString(context.bufs.sources.data);
+			const(char)[] tokenString;
+			if (tok.type == TokenType.eoi)
+				tokenString = "end of file";
+			else
+				tokenString = tok.getTokenString(context.bufs.sources.data);
+
 			if (afterWhat)
 				return context.makeError!void(tok.span, "Expected %s after %s, got %s", what, afterWhat, cast(string)tokenString);
 			else

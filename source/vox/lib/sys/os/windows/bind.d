@@ -79,7 +79,7 @@ Result!(u8[]) readFile(ref Allocator allocator, const(char)[] filename) {
 	i64 memSize = nextPOT(size);
 	auto buf = allocator.allocBlock(memSize);
 	if (buf.isError) {
-		return Result!(u8[]).makeError(1);
+		return Result!(u8[]).fromError(buf);
 	}
 
 	enforce(size <= u32.max, "Cannot read more than 4 GiB. File name \"%s\", file size: %s", filename, size);
