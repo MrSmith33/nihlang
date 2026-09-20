@@ -59,7 +59,7 @@ struct Parser {
 		//	if (tok.tok == TokenType.eoi) break;
 		//}
 		AstNodes items;
-		return parse_declaration(items);
+		return parse_declarations(items, TokenType.eoi);
 	}
 
 	Result!void expect(TokenType type, string what, string afterWhat = null) {
@@ -94,6 +94,15 @@ struct Parser {
 		}
 		Name id = makeIdentifier(tok);
 		return Result!Name(id);
+	}
+
+	Result!void parse_declarations(ref AstNodes declarations, TokenType until) { // <declaration>*
+		while (tok.type != until) {
+			if (tok.type == TokenType.eoi) break;
+			auto res = parse_declaration(declarations);
+			if (res.isError) return res;
+		}
+		return Result!void();
 	}
 
 	Result!void parse_declaration(ref AstNodes items) { // <declaration> ::= <var_declaration>

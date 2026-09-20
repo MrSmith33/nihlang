@@ -23,8 +23,26 @@ void test1(ref VoxTestContext c) {
 @Test
 @q{
 --- test2.vx
-	i32 data;
 }
 void test2(ref VoxTestContext c) {
+	c.compile();
+}
+
+@Test
+@q{
+--- test3.vx
+	i32 data;
+}
+void test3(ref VoxTestContext c) {
+	c.compile();
+}
+
+@Test
+@q{
+--- test4.vx
+	i32 data1;
+	i32 data2;
+}
+void test4(ref VoxTestContext c) {
 	c.compile();
 }
