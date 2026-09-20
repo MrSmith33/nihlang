@@ -23,11 +23,14 @@ struct Parser {
 		while (tok.type == TokenType.comment);
 	}
 
+	string getSpanString(Span location) {
+		return location.getString(context.bufs.sources.data);
+	}
 	string getTokenString() {
 		if (tok.type == TokenType.eoi)
 			return "end of file";
 		else
-			return cast(string)tok.getTokenString(context.bufs.sources.data);
+			return getSpanString(tok.location);
 	}
 
 	Result!void parseModule(ref FileInfo file) {
@@ -40,7 +43,7 @@ struct Parser {
 		//return Result!void();
 
 		if (tok.type == TokenType.semicolon) {
-			return context.makeError!void(tok.span,
+			return context.makeError!void(tok.location,
 				"Expected %s, got %s",
 				"declaration",
 				getTokenString());
@@ -62,17 +65,17 @@ struct Parser {
 		return parse_declarations(items, TokenType.eoi);
 	}
 
-	Result!void expect(TokenType type, string what, string afterWhat = null) {
+	Result!void expect(TokenType type, string what, Span afterWhat = Span.init) {
 		if (tok.type != type) {
-			if (afterWhat)
-				return context.makeError!void(tok.span, "Expected %s after %s, got %s", what, afterWhat, getTokenString());
+			if (afterWhat.isDefined)
+				return context.makeError!void(tok.location, "Expected %s after %s, got %s", what, getSpanString(afterWhat), getTokenString());
 			else
-				return context.makeError!void(tok.span, "Expected %s, got %s", what, getTokenString());
+				return context.makeError!void(tok.location, "Expected %s, got %s", what, getTokenString());
 		}
 		return Result!void();
 	}
 
-	Result!void expectAndConsume(TokenType type, string what, string afterWhat = null) {
+	Result!void expectAndConsume(TokenType type, string what, Span afterWhat = Span.init) {
 		auto res = expect(type, what, afterWhat);
 		if (res.isError) {
 			return res;
@@ -86,9 +89,8 @@ struct Parser {
 		return context.bufs.nameMap.getOrReg(context.bufs.arrayArena, str);
 	}
 
-	Result!Name expectIdentifier(string after = null) {
-		Span span = tok.span;
-		auto res = expectAndConsume(TokenType.id, "identifier", after);
+	Result!Name expectIdentifier(Span afterWhat = Span.init) {
+		auto res = expectAndConsume(TokenType.id, "identifier", afterWhat);
 		if (res.isError) {
 			return Result!Name(res);
 		}
@@ -107,25 +109,36 @@ struct Parser {
 
 	Result!void parse_declaration(ref AstNodes items) { // <declaration> ::= <var_declaration>
 		switch(tok.type) with(TokenType) {
-			case kw_i32: {
-				nextToken; // skip i32
-
- 				auto res1 = expectIdentifier("i32");
+ 			default:
+ 				auto typeLoc = tok.location;
+ 				auto res1 = expr(); // type
  				if (res1.isError) {
 					return Result!void(res1);
 				}
-				auto id = res1.data;
 
- 				auto res2 = expectAndConsume(TokenType.semicolon, ";", "identifier");
-				if (res2.isError) {
+ 				auto idLoc = tok.location;
+				auto res2 = expectIdentifier(typeLoc);
+ 				if (res2.isError) {
 					return Result!void(res2);
+				}
+				auto id = res2.data;
+
+ 				auto res3 = expectAndConsume(TokenType.semicolon, ";", idLoc);
+				if (res3.isError) {
+					return Result!void(res3);
 				}
 
  				return Result!void();
- 			}
+		}
+	}
 
- 			default:
- 				return context.makeError!void(tok.span, "TODO: %s", getTokenString());
+	Result!AstIndex expr() {
+		switch(tok.type) with(TokenType) {
+			case kw_i32:
+				nextToken; // skip i32
+				return Result!AstIndex();
+			default:
+ 				return context.makeError!AstIndex(tok.location, "TODO: %s", getTokenString());
 		}
 	}
 }
@@ -133,6 +146,8 @@ struct Parser {
 struct AstNode {
 	uint data;
 }
+
+alias AstIndex = u32;
 
 alias AstNodes = Array!AstNode;
 

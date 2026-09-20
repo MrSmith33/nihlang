@@ -17,4 +17,6 @@ struct Span {
 	Position end;
 
 	size_t length() inout => end.offset - start.offset;
+	bool isDefined() inout => start.offset == 0;
+	string getString(const(char)[] source) const => cast(string)source[start.offset..end.offset];
 }

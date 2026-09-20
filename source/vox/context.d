@@ -5,7 +5,7 @@
 module vox.context;
 
 import vox.lib;
-import vox.source;
+import vox.fe.source;
 
 // 0 One global context for all compilations
 //   Hosts all worker and all builds

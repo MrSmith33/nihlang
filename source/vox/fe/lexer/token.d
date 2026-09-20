@@ -10,17 +10,17 @@ import vox.source;
 struct Token {
 	@nogc nothrow:
 
-	Span span;
+	Span location;
 	uint line;
 	uint col;
 	TokenType type;
 
 	const(char)[] getTokenString(const(char)[] input) pure const {
-		return input[span.start.offset..span.end.offset];
+		return input[location.start.offset..location.end.offset];
 	}
 
 	void toString(scope SinkDelegate sink) const {
 		sink.formattedWrite("line %s col %s start %s end %s len %s %s",
-			line+1, col+1, span.start.offset, span.end.offset, span.length, type);
+			line+1, col+1, location.start.offset, location.end.offset, location.length, type);
 	}
 }
