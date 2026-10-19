@@ -5,6 +5,7 @@ module vox.source.identifier;
 
 import vox.lib;
 import vox.lib.mem.arena : Arena;
+import vox.fe.source.location : Position;
 
 struct Name {
 	@nogc nothrow:
@@ -16,6 +17,11 @@ struct Name {
 	bool isUndefined() => index == 0;
 
 	size_t toHash() => int32_hash(index);
+}
+
+struct NameWithPos {
+	Name name;
+	Position position;
 }
 
 struct NameMap {

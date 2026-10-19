@@ -56,6 +56,10 @@ struct Driver {
 		if (errorsMem.isError) return Result!void.fromError(errorsMem);
 		context.bufs.errors.setBuffer(errorsMem.data);
 
+		auto astMem = allocator.allocBlock(_64KiB);
+		if (astMem.isError) return Result!void.fromError(astMem);
+		context.bufs.ast.setBuffer(astMem.data);
+
 		return Result!void();
 	}
 
@@ -107,7 +111,8 @@ struct Buffers {
 	ArrayArena arrayArena;
 	NameMap nameMap;
 	Arena!char strings;
-	Arena!u8 errors;
+	Arena!u32 errors;
+	Arena!u32 ast;
 
 	void clear() {
 		sources.clear;
@@ -116,11 +121,14 @@ struct Buffers {
 		//nameMap
 		strings.clear;
 		errors.clear;
+		ast.clear;
 
 		// 0 position is reserved for null position
 		sources.put(0);
 		// 0 position is reserved for no error
 		errors.put(0, 0, 0, 0);
+		// 0 position is reserved for null position
+		ast.put(0);
 	}
 }
 
@@ -140,6 +148,16 @@ struct VoxContext {
 	@nogc nothrow:
 	Buffers bufs;
 
+	Span getTokenSpan(Position start) {
+		import vox.fe.lexer : Lexer;
+		Lexer lexer;
+		lexer.input = bufs.sources.bufPtr;
+		lexer.position = start.offset;
+		lexer.line = 0;
+		lexer.column = 0;
+		return lexer.nextToken().location;
+	}
+
 	Result!T makeError(T, Args...)(Span loc, string fmt, Args args) {
 		auto startLen = bufs.strings.length;
 		formattedWrite(&putStr, fmt, args);
@@ -148,7 +166,7 @@ struct VoxContext {
 		Array!Annotation annotations;
 		annotations.put(bufs.arrayArena, Annotation("here", loc));
 		auto index = appendError!Diagnostic(msg, annotations);
-		return Result!T.fromError(index); // TODO: return index of error object
+		return Result!T.fromError(index);
 	}
 
 	u32 appendError(T, Args...)(Args args) {
@@ -157,12 +175,26 @@ struct VoxContext {
 		enum size_t numAllocatedSlots = divCeil(T.sizeof, uint.sizeof);
 		bufs.errors.voidPut(numAllocatedSlots);
 		*obj = T(args);
-		return resIndex / uint.sizeof;
+		return resIndex;
 	}
 
 	ref T getError(T)(u32 index) {
-		auto ptr = bufs.errors.bufPtr + (index * uint.sizeof);
-		return *cast(T*)ptr;
+		return *cast(T*)(&bufs.errors.bufPtr[index]);
+	}
+
+	AstIndex appendAst(T, Args...)(Args args) {
+		uint resIndex = bufs.ast.uintLength;
+		T* obj = cast(T*)bufs.ast.nextPtr;
+		enum size_t numAllocatedSlots = divCeil(T.sizeof, uint.sizeof);
+		bufs.ast.voidPut(numAllocatedSlots);
+		*obj = T(args);
+		return AstIndex(resIndex);
+	}
+
+	T* getAst(T)(AstIndex index) {
+		if (!index) return null;
+		T* result = cast(T*)(&bufs.ast.bufPtr[index.storageIndex * uint.sizeof]);
+		return result;
 	}
 
 	// WASM doesn't like when we cast cast(SinkDelegate)&bufs.strings.put
@@ -170,6 +202,22 @@ struct VoxContext {
 	void putStr(scope const(char)[] str) {
 		bufs.strings.put(str);
 	}
+}
+
+struct AstNode {
+	uint data;
+}
+
+alias AstIndex = u32;
+
+alias AstNodes = Array!AstIndex;
+
+struct ModuleDecl {
+	AstNodes declarations;
+}
+
+struct VariableDecl {
+	NameWithPos identifier;
 }
 
 // Single build/compilation, single VoxContext

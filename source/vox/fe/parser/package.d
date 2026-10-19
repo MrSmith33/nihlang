@@ -34,6 +34,8 @@ struct Parser {
 	}
 
 	Result!void parseModule(ref FileInfo file) {
+		ModuleDecl modDecl;
+
 		lexer.input = context.bufs.sources.bufPtr;
 		lexer.position = file.offset;
 		lexer.line = 0;
@@ -61,8 +63,7 @@ struct Parser {
 		//	//writefln("  %s", cast(uint)tok.tok);
 		//	if (tok.tok == TokenType.eoi) break;
 		//}
-		AstNodes items;
-		return parse_declarations(items, TokenType.eoi);
+		return parse_declarations(modDecl.declarations, TokenType.eoi);
 	}
 
 	Result!void expect(TokenType type, string what, Span afterWhat = Span.init) {
@@ -128,6 +129,9 @@ struct Parser {
 					return Result!void(res3);
 				}
 
+				auto varDecl = context.appendAst!VariableDecl();
+				items.put(context.bufs.arrayArena, varDecl);
+
  				return Result!void();
 		}
 	}
@@ -141,16 +145,4 @@ struct Parser {
  				return context.makeError!AstIndex(tok.location, "TODO: %s", getTokenString());
 		}
 	}
-}
-
-struct AstNode {
-	uint data;
-}
-
-alias AstIndex = u32;
-
-alias AstNodes = Array!AstNode;
-
-struct ModuleDeclNode {
-
 }
