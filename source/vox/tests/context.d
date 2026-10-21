@@ -32,7 +32,7 @@ struct VoxTestContext {
 
 	void runTest(ref TestInstance _test) {
 		test = _test;
-		driver.startCompilation();
+		driver.startCompilation().unwrap();
 		driver.addHar("test.har", test.source.asciiStripLeft);
 		test.test_handler(&this);
 	}

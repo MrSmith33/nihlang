@@ -60,13 +60,14 @@ struct Driver {
 		if (astMem.isError) return Result!void.fromError(astMem);
 		context.bufs.ast.setBuffer(astMem.data);
 
-		context.initialize();
+		auto initRes = context.initialize();
+		if (initRes.isError) return Result!void.fromError(initRes);
 
 		return Result!void();
 	}
 
-	void startCompilation() {
-		context.bufs.startCompilation();
+	Result!void startCompilation() {
+		return context.bufs.startCompilation();
 	}
 
 	void addHar(string harFilename, const(char)[] harData) {
@@ -122,7 +123,7 @@ struct Buffers {
 
 	// Runs for each compilation
 	// TODO: Incompatible with multiple compilations at once
-	void startCompilation() {
+	Result!void startCompilation() {
 		sources.clear;
 		files.clear;
 
@@ -136,12 +137,15 @@ struct Buffers {
 		nameMap.map = typeof(nameMap.map).init;
 		nameMap.fqnMap = typeof(nameMap.fqnMap).init;
 
-		nameMap.regCommonNames(arrayArena);
+		auto res = nameMap.regCommonNames(arrayArena);
+		if (res.isError) return Result!void.fromError(res);
 
 		// 0 position is reserved for null position
 		sources.put(0);
 		// 0 position is reserved for no error
 		errors.put(0);
+
+		return Result!void();
 	}
 }
 
@@ -162,9 +166,10 @@ struct VoxContext {
 	Buffers bufs;
 
 	// Runs ones when context is created
-	void initialize() {
+	Result!void initialize() {
 		// populates nameMap with common identifiers like this, length, ptr, min, max, sizeof...
-		bufs.nameMap.regCommonNames(bufs.arrayArena);
+		auto res = bufs.nameMap.regCommonNames(bufs.arrayArena);
+		if (res.isError) return Result!void.fromError(res);
 
 		// 0 position is reserved for null position
 		bufs.ast.put(0);
@@ -174,6 +179,7 @@ struct VoxContext {
 
 		bufs.initializedAstBufSize = bufs.ast.length;
 
+		return Result!void();
 	}
 
 	string getString(Name name) {
@@ -200,7 +206,9 @@ struct VoxContext {
 		auto endLen = bufs.strings.length;
 		auto msg = cast(string)bufs.strings[startLen..endLen];
 		Array!Annotation annotations;
-		annotations.put(bufs.arrayArena, Annotation("here", loc));
+		auto res = annotations.put(bufs.arrayArena, Annotation("here", loc));
+		if (res.isError) return Result!T.fromError(res);
+
 		auto index = appendError!Diagnostic(msg, annotations);
 		return Result!T.fromError(index);
 	}

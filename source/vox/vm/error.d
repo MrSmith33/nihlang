@@ -39,6 +39,8 @@ enum VmStatus : u8 {
 
 	ERR_ESCAPED_PTR_TO_STACK_IN_REG,
 	ERR_ESCAPED_PTR_TO_STACK_IN_MEM,
+
+	ERR_STACK_OVERFLOW,
 }
 
 immutable VmStatus_names = staticArray([__traits(allMembers, VmStatus)]);
@@ -285,6 +287,10 @@ void vmFormatError(ref VmState vm, scope SinkDelegate sink) {
 			sink.formattedWrite(
 				"Address of stack slot %s escapes through memory",
 				slotId);
+			break;
+
+		case ERR_STACK_OVERFLOW:
+			sink.formattedWrite("Stack overflow");
 			break;
 	}
 }

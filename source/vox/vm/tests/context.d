@@ -31,7 +31,7 @@ struct VmTestContext {
 
 		// Set to 32 bit during reserve, so that pointer bitmaps cover both 32 and 64 bits
 		vm.ptrSize = PtrSize._32;
-		vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
+		vm.reserveMemory(static_bytes, heap_bytes, stack_bytes).unwrap();
 
 		sink = _sink;
 	}
@@ -43,11 +43,11 @@ struct VmTestContext {
 		// Add ptr sizes
 		Array!u32 ptr_size_values;
 		if (def.attrPtrSize32 != def.attrPtrSize64) {
-			ptr_size_values.put(*vm.allocator, def.attrPtrSize32 ? PtrSize._32 : PtrSize._64);
+			ptr_size_values.put(*vm.allocator, def.attrPtrSize32 ? PtrSize._32 : PtrSize._64).unwrap();
 		} else {
-			ptr_size_values.put(*vm.allocator, PtrSize._32, PtrSize._64);
+			ptr_size_values.put(*vm.allocator, PtrSize._32, PtrSize._64).unwrap();
 		}
-		parameters.put(*vm.allocator, MakerParam(TestParamId.ptr_size, ptr_size_values));
+		parameters.put(*vm.allocator, MakerParam(TestParamId.ptr_size, ptr_size_values)).unwrap();
 	}
 
 	void runTest(ref TestInstance test) {
@@ -71,7 +71,7 @@ struct VmTestContext {
 		vm.memories[MemoryKind.static_mem].ptrSize = test.ptrSize;
 		vm.memories[MemoryKind.heap_mem].ptrSize   = test.ptrSize;
 		vm.memories[MemoryKind.stack_mem].ptrSize  = test.ptrSize;
-		vm.resetMem;
+		vm.resetMem.unwrap();
 		vm.resetState;
 	}
 
@@ -138,10 +138,56 @@ struct VmTestContext {
 		panic(line, file, 1, "Unexpected number of executed instructions");
 	}
 
+	AllocId addFunction() {
+		return vm.addFunction().unwrap();
+	}
+
+	AllocId addFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		Array!u8 code)
+	{
+		return vm.addFunction(numResults, numRegParams, numStackParams, code).unwrap();
+	}
+
+	AllocId addFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		ref CodeBuilder builder)
+	{
+		return vm.addFunction(numResults, numRegParams, numStackParams, builder).unwrap();
+	}
+
+	AllocId addExternalFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		VmExternalFn fn,
+		void* userData = null)
+	{
+		return vm.addExternalFunction(numResults, numRegParams, fn, userData).unwrap();
+	}
+
+	AllocId addExternalFunction(
+		NumResults numResults,
+		NumRegParams numRegParams,
+		NumStackParams numStackParams,
+		Array!SizeAndAlign stack,
+		VmExternalFn fn,
+		void* userData = null)
+	{
+		return vm.addExternalFunction(numResults, numRegParams, numStackParams, stack, fn, userData).unwrap();
+	}
+
+	AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
+		return vm.pushStackAlloc(sizeAlign, perm).unwrap();
+	}
+
 	AllocId memAlloc(MemoryKind kind, SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
 		final switch(kind) with(MemoryKind) {
-			case stack_mem: return vm.pushStackAlloc(sizeAlign, perm);
-			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, perm);
+			case stack_mem: return vm.pushStackAlloc(sizeAlign, perm).unwrap();
+			case heap_mem, static_mem: return vm.memories[kind].allocate(*vm.allocator, sizeAlign, perm).unwrap;
 			case func_id: assert(false, "Cannot allocate function id");
 		}
 	}
@@ -174,7 +220,7 @@ struct VmTestContext {
 
 	void memWritePtr(Memory* mem, Allocation* alloc, u32 offset, AllocId ptrVal) {
 		if (ptrVal.isDefined) {
-			vm.pointerPut(mem, alloc, offset, ptrVal);
+			vm.pointerPut(mem, alloc, offset, ptrVal).unwrap();
 		} else {
 			vm.pointerRemove(mem, alloc, offset);
 		}

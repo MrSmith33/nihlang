@@ -49,7 +49,7 @@ struct VmState {
 		return cast(u8)(memories[MemoryKind.stack_mem].allocations.length - frameFirstStackSlot);
 	}
 
-	void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
+	Result!void reserveMemory(u32 static_bytes, u32 heap_bytes, u32 stack_bytes) {
 		memories[MemoryKind.static_mem].kind = MemoryKind.static_mem;
 		memories[MemoryKind.heap_mem].kind   = MemoryKind.heap_mem;
 		memories[MemoryKind.stack_mem].kind  = MemoryKind.stack_mem;
@@ -58,14 +58,21 @@ struct VmState {
 		memories[MemoryKind.heap_mem].ptrSize   = ptrSize;
 		memories[MemoryKind.stack_mem].ptrSize  = ptrSize;
 
-		memories[MemoryKind.static_mem].reserve(*allocator, static_bytes);
-		memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes);
-		memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes);
+		auto res1 = memories[MemoryKind.static_mem].reserve(*allocator, static_bytes);
+		if (res1.isError) return res1;
+		auto res2 = memories[MemoryKind.heap_mem].reserve(*allocator, heap_bytes);
+		if (res2.isError) return res2;
+		auto res3 = memories[MemoryKind.stack_mem].reserve(*allocator, stack_bytes);
+		if (res3.isError) return res3;
+
 		// skip one allocation for null pointer
-		memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+		auto res4 = memories[MemoryKind.heap_mem].allocations.voidPut(*allocator, 1);
+		if (res4.isError) return Result!void.fromError(res4);
+
+		return Result!void();
 	}
 
-	void resetMem() {
+	Result!void resetMem() {
 		foreach(ref func; functions)
 			func.free(*allocator);
 		functions.clear;
@@ -74,13 +81,17 @@ struct VmState {
 		foreach(ref mem; memories) {
 			mem.clear(*allocator);
 		}
+
 		// null allocation
-		memories[MemoryKind.heap_mem].allocations.put(*allocator, Allocation());
+		auto res = memories[MemoryKind.heap_mem].allocations.put(*allocator, Allocation());
+		if (res.isError) return Result!void.fromError(res);
 		// native caller function
 		VmFunction f = {
 			kind : VmFuncKind.external,
 		};
-		functions.put(*allocator, f);
+		auto res2 = functions.put(*allocator, f);
+		if (res2.isError) return Result!void.fromError(res2);
+		return Result!void();
 	}
 
 	void resetState() {
@@ -122,37 +133,40 @@ struct VmState {
 		return kind != MemoryKind.func_id;
 	}
 
-	AllocId addFunction() {
+	Result!AllocId addFunction() {
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction());
-		return AllocId(index, MemoryKind.func_id);
+		auto res = functions.put(*allocator, VmFunction());
+		if (res.isError) return Result!AllocId.fromError(res);
+		return AllocId(index, MemoryKind.func_id).Result!AllocId;;
 	}
 
-	AllocId addFunction(
+	Result!AllocId addFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
 		NumStackParams numStackParams,
 		Array!u8 code)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction());
+		auto res = functions.put(*allocator, VmFunction());
+		if (res.isError) return Result!AllocId.fromError(res);
 		auto id = AllocId(index, MemoryKind.func_id);
 		auto builder = CodeBuilder(allocator, code);
 		setFunction(id, numResults, numRegParams, numStackParams, builder);
-		return id;
+		return id.Result!AllocId;
 	}
 
-	AllocId addFunction(
+	Result!AllocId addFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
 		NumStackParams numStackParams,
 		ref CodeBuilder builder)
 	{
 		u32 index = functions.length;
-		functions.put(*allocator, VmFunction());
+		auto res = functions.put(*allocator, VmFunction());
+		if (res.isError) return Result!AllocId.fromError(res);
 		auto id = AllocId(index, MemoryKind.func_id);
 		setFunction(id, numResults, numRegParams, numStackParams, builder);
-		return id;
+		return id.Result!AllocId;
 	}
 
 	import vox.lib;
@@ -172,7 +186,7 @@ struct VmState {
 		functions[id.index] = VmFunction(VmFuncKind.bytecode, numResults.val, numRegParams.val, numStackParams.val, builder.stack, builder.code);
 	}
 
-	AllocId addExternalFunction(
+	Result!AllocId addExternalFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
 		VmExternalFn fn,
@@ -187,7 +201,7 @@ struct VmState {
 			userData);
 	}
 
-	AllocId addExternalFunction(
+	Result!AllocId addExternalFunction(
 		NumResults numResults,
 		NumRegParams numRegParams,
 		NumStackParams numStackParams,
@@ -209,11 +223,12 @@ struct VmState {
 			external : fn,
 			externalUserData : userData,
 		};
-		functions.put(*allocator, f);
-		return AllocId(index, MemoryKind.func_id);
+		auto res = functions.put(*allocator, f);
+		if (res.isError) return Result!AllocId.fromError(res);
+		return AllocId(index, MemoryKind.func_id).Result!AllocId;
 	}
 
-	AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
+	Result!AllocId pushStackAlloc(SizeAndAlign sizeAlign, MemoryFlags perm = MemoryFlags.read_write) {
 		assert(numFrameStackSlots < u8.max);
 		return memories[MemoryKind.stack_mem].allocate(*allocator, sizeAlign, perm);
 	}
@@ -334,15 +349,17 @@ struct VmState {
 		}
 	}
 
-	AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
+	Result!AllocId pointerPut(Memory* mem, Allocation* alloc, u32 offset, AllocId value) {
 		assert(value.isDefined);
 		static if (FAST_CHECKS) if (offset % ptrSize.inBytes != 0) panic("Unaligned offset");
 		AllocId oldPtr;
 		static if (OUT_REFS_PER_ALLOCATION) {
-			alloc.outRefs.put(*allocator, cast(u32)offset, value, oldPtr);
+			auto res = alloc.outRefs.put(*allocator, cast(u32)offset, value, oldPtr);
 		} else {
-			mem.outRefs.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
+			auto res = mem.outRefs.put(*allocator, cast(u32)(alloc.offset + offset), value, oldPtr);
 		}
+		if (res.isError) return Result!AllocId.fromError(res);
+
 		if (oldPtr.isDefined) {
 			changeAllocInRef(oldPtr, -1);
 		} else {
@@ -353,7 +370,7 @@ struct VmState {
 			mem.setPtrBit(ptrSlotIndex);
 		}
 		changeAllocInRef(value, 1);
-		return oldPtr;
+		return oldPtr.Result!AllocId;
 	}
 
 	AllocId pointerRemove(Memory* mem, Allocation* alloc, u32 offset) {
@@ -503,11 +520,11 @@ struct VmFunction {
 	void free(ref Allocator allocator) {
 		final switch (kind) {
 			case VmFuncKind.bytecode:
-				code.free(allocator);
+				code.free(allocator).unwrap();
 				break;
 			case VmFuncKind.external: break;
 		}
-		stackSlotSizes.free(allocator);
+		stackSlotSizes.free(allocator).unwrap();
 	}
 }
 

@@ -21,22 +21,22 @@ struct CodeBuilder {
 		return code.length;
 	}
 
-	private void U8(u8[] u...) { code.put(*allocator, u); }
+	private void U8(u8[] u...) { code.put(*allocator, u).unwrap(); }
 	private void U32(u32 u) {
-		code.put(*allocator, (u >>  0) & 0xFF);
-		code.put(*allocator, (u >>  8) & 0xFF);
-		code.put(*allocator, (u >> 16) & 0xFF);
-		code.put(*allocator, (u >> 24) & 0xFF);
+		code.put(*allocator, (u >>  0) & 0xFF).unwrap();
+		code.put(*allocator, (u >>  8) & 0xFF).unwrap();
+		code.put(*allocator, (u >> 16) & 0xFF).unwrap();
+		code.put(*allocator, (u >> 24) & 0xFF).unwrap();
 	}
 	private void U32z() {
-		code.put(*allocator, 0);
-		code.put(*allocator, 0);
-		code.put(*allocator, 0);
-		code.put(*allocator, 0);
+		code.put(*allocator, 0).unwrap();
+		code.put(*allocator, 0).unwrap();
+		code.put(*allocator, 0).unwrap();
+		code.put(*allocator, 0).unwrap();
 	}
 
 	void add_stack_slot(SizeAndAlign sizeAlign) {
-		stack.put(*allocator, sizeAlign);
+		stack.put(*allocator, sizeAlign).unwrap();
 	}
 
 	void emit_trap() { U8(VmOpcode.trap); }

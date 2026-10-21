@@ -53,7 +53,7 @@ struct NameMap {
 		return "<undefined id>";
 	}
 
-	Name getOrReg(ref Allocator allocator, const(char)[] str) {
+	Result!Name getOrReg(ref Allocator allocator, const(char)[] str) {
 		assert(str.length > 0);
 		assert(str.length <= uint.max);
 
@@ -74,15 +74,16 @@ struct NameMap {
 			// can use lower 31 bits
 			assert(entries.length < Name.HIGH_BIT, "Id map overflow");
 			id = cast(uint)entries.length;
-			map.put(allocator, key, id);
+			auto res = map.put(allocator, key, id);
+			if (res.isError) return Result!Name.fromError(res);
 			entries.put(NameMapEntry(NameMapString(cast(uint)start, len)));
 		}
 
-		return Name(id);
+		return Name(id).Result!Name;
 	}
 
 	// internal. Called in VoxContext.initialize()
-	void regCommonNames(ref Allocator allocator) {
+	Result!void regCommonNames(ref Allocator allocator) {
 		import vox.lib;
 		assert(entries.length == 0);
 		assert(map.length == 0);
@@ -93,10 +94,13 @@ struct NameMap {
 
 		foreach (size_t i, string memberName; __traits(allMembers, CommonIds)) {
 			string name = __traits(getAttributes, __traits(getMember, CommonIds, memberName))[0];
-			Name got = getOrReg(allocator, name);
+			auto res = getOrReg(allocator, name);
+			if (res.isError) return Result!void.fromError(res);
+			Name got = res.data;
 			Name expected = __traits(getMember, CommonIds, memberName);
 			enforce(got == expected, "%s %s", got.index, expected.index);
 		}
+		return Result!void();
 	}
 }
 

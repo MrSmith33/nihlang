@@ -33,7 +33,7 @@ void test_warmup(ref VmTestContext c) {
 	b.emit_mov(0, 1);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId);
 }
 
@@ -60,7 +60,7 @@ void test_ret_0(ref VmTestContext c) {
 	// Test return with 0 results 0 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 	assert(res.length == 0);
 	assert(c.vm.frameFirstReg == 0);
@@ -72,7 +72,7 @@ void test_ret_1(ref VmTestContext c) {
 	// Test return with 0 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
 	assert(res.length == 0);
 	assert(c.vm.frameFirstReg == 0);
@@ -84,7 +84,7 @@ void test_ret_2(ref VmTestContext c) {
 	// Test return with 2 results 2 parameters
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(2.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(2.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(42), VmReg(33));
 	assert(res.length == 2);
 	assert(c.vm.frameFirstReg == 0);
@@ -98,7 +98,7 @@ void test_stack_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
 	c.callFail(funcId);
 	c.expectStatus(VmStatus.ERR_CALL_INSUFFICIENT_STACK_ARGS);
@@ -107,8 +107,8 @@ void test_stack_0(ref VmTestContext c) {
 @Test
 void test_stack_1(ref VmTestContext c) {
 	// Test insufficient stack slot args call (bytecode -> bytecode)
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.emit_call(0, 0, funcB.index);
@@ -127,8 +127,8 @@ void test_stack_1(ref VmTestContext c) {
 @Test
 void test_stack_2(ref VmTestContext c) {
 	// Test insufficient stack slot args tailcall (bytecode -> bytecode)
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.emit_tail_call(0, 0, funcB.index);
@@ -150,9 +150,9 @@ void test_stack_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
-	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(16, 1));
+	AllocId stackMem = c.pushStackAlloc(SizeAndAlign(16, 1));
 	c.callFail(funcId);
 	c.expectStatus(VmStatus.ERR_CALL_INVALID_STACK_ARG_SIZES);
 }
@@ -160,8 +160,8 @@ void test_stack_3(ref VmTestContext c) {
 @Test
 void test_stack_4(ref VmTestContext c) {
 	// Test incorrect stack slot size of an argument (bytecode -> bytecode)
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.emit_stack_alloc(SizeAndAlign(8, 1));
@@ -181,8 +181,8 @@ void test_stack_4(ref VmTestContext c) {
 @Test
 void test_stack_5(ref VmTestContext c) {
 	// Test incorrect stack slot size of an argument tailcall (bytecode -> bytecode)
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.emit_stack_alloc(SizeAndAlign(8, 1));
@@ -204,9 +204,9 @@ void test_stack_6(ref VmTestContext c) {
 	// Test that native memory stack is preserved after return
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
-	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(8, 1));
+	AllocId stackMem = c.pushStackAlloc(SizeAndAlign(8, 1));
 	assert(c.vm.numFrameStackSlots == 1);
 
 	VmReg[] res = c.call(funcId);
@@ -220,9 +220,9 @@ void test_stack_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
-	AllocId stackMem = c.vm.pushStackAlloc(SizeAndAlign(8, 1));
+	AllocId stackMem = c.pushStackAlloc(SizeAndAlign(8, 1));
 	assert(c.vm.numFrameStackSlots == 1);
 
 	VmReg[] res = c.call(funcId);
@@ -239,10 +239,10 @@ void test_stack_8(ref VmTestContext c) {
 	b.emit_ret();
 	b.add_stack_slot(SizeAndAlign(8, 1));  // parameter
 	b.add_stack_slot(SizeAndAlign(16, 1)); // local
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, b);
 
-	AllocId local = c.vm.pushStackAlloc(SizeAndAlign(8, 1)); // native local
-	AllocId param = c.vm.pushStackAlloc(SizeAndAlign(8, 1)); // native parameter
+	AllocId local = c.pushStackAlloc(SizeAndAlign(8, 1)); // native local
+	AllocId param = c.pushStackAlloc(SizeAndAlign(8, 1)); // native parameter
 	assert(c.vm.numFrameStackSlots == 2);
 
 	VmReg[] res = c.call(funcId);
@@ -260,7 +260,7 @@ void test_stack_addr_0(ref VmTestContext c) {
 	b.emit_store_m64(1, 0);
 	b.emit_load_m64(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(42));
 
@@ -276,7 +276,7 @@ void test_stack_9(ref VmTestContext c) {
 	b.emit_const_s8(1, -1);
 	b.emit_store_m64(0, 1); // init local stack slot
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId);
 }
@@ -298,7 +298,7 @@ void test_stack_11(ref VmTestContext c) {
 	b.emit_stack_addr(0, 0);
 	b.emit_store_m64(0, 0); // init local stack slot with pointer
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId);
 }
@@ -306,8 +306,8 @@ void test_stack_11(ref VmTestContext c) {
 @Test
 void test_stack_12(ref VmTestContext c) {
 	// Check that pointer bits are removed from stack allocation on tail call
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.add_stack_slot(SizeAndAlign(8, 1));   // slot 0
@@ -336,14 +336,14 @@ void test_stack_13(ref VmTestContext c) {
 
 	Array!SizeAndAlign stack;
 	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
-	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_stack_alloc(SizeAndAlign(8, 1)); // slot 0
 	b.emit_tail_call(0, 0, extFuncId.index);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 }
 
@@ -357,7 +357,7 @@ void test_stack_14(ref VmTestContext c) {
 
 	Array!SizeAndAlign stack;
 	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
-	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.add_stack_slot(SizeAndAlign(8, 1));   // slot 0
@@ -365,7 +365,7 @@ void test_stack_14(ref VmTestContext c) {
 	b.emit_tail_call(0, 0, extFuncId.index);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 }
 
@@ -380,13 +380,13 @@ void test_stack_alloc_0(ref VmTestContext c) {
 
 	Array!SizeAndAlign stack;
 	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
-	AllocId extFuncId = c.vm.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(0.NumResults, 0.NumRegParams, 1.NumStackParams, stack, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_stack_alloc(SizeAndAlign(8, 1));
 	b.emit_call(0, 1, extFuncId.index);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId);
 }
@@ -399,7 +399,7 @@ void test_refs_0(ref VmTestContext c) {
 	b.add_stack_slot(SizeAndAlign(8, 1)); // local
 	b.emit_stack_addr(0, 0); // escape
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId);
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_REG);
@@ -412,7 +412,7 @@ void test_refs_1(ref VmTestContext c) {
 	b.add_stack_slot(SizeAndAlign(8, 1)); // local
 	b.emit_stack_addr(0, 0); // set non-result register
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.call(funcId);
 }
@@ -420,8 +420,8 @@ void test_refs_1(ref VmTestContext c) {
 @Test
 void test_refs_2(ref VmTestContext c) {
 	// Check stack reference escape via result register, tail call
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.add_stack_slot(SizeAndAlign(8, 1)); // local
@@ -449,7 +449,7 @@ void test_refs_3(ref VmTestContext c) {
 	b.emit_stack_addr(1, 0);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1); // store pointer to local slot into ptr
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	c.callFail(funcId, VmReg(memId));
 	c.expectStatus(VmStatus.ERR_ESCAPED_PTR_TO_STACK_IN_MEM);
@@ -462,8 +462,8 @@ void test_refs_4(ref VmTestContext c) {
 	MemoryKind memKind = cast(MemoryKind)c.test.getParam(TestParamId.memory);
 	AllocId memId = c.memAlloc(memKind, SizeAndAlign(8, 1)); // caller memory
 
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.add_stack_slot(SizeAndAlign(8, 1)); // local
@@ -490,7 +490,7 @@ void test_refs_5(ref VmTestContext c) {
 	b.emit_stack_addr(0, 0);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 0); // store pointer to local slot into local
 	b.emit_ret(); // must remove pointer to local from local
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.call(funcId);
 }
@@ -500,8 +500,8 @@ void test_refs_6(ref VmTestContext c) {
 	// Check that pointers are removed from stack allocation and references are correctly decremented
 	// If they were not removed, escape error occurs
 	// tail call
-	AllocId funcA = c.vm.addFunction();
-	AllocId funcB = c.vm.addFunction();
+	AllocId funcA = c.addFunction();
+	AllocId funcB = c.addFunction();
 
 	CodeBuilder a = CodeBuilder(c.vm.allocator);
 	a.add_stack_slot(SizeAndAlign(8, 1));
@@ -524,7 +524,7 @@ void test_trap_0(ref VmTestContext c) {
 	// Test trap
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId);
 	c.expectStatus(VmStatus.ERR_TRAP);
 }
@@ -541,7 +541,7 @@ void test_budget_1(ref VmTestContext c) {
 	// Test budget error
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	// check that budget of 0 is not enough to run single instruction
 	c.vm.budget = 0;
@@ -554,7 +554,7 @@ void test_budget_2(ref VmTestContext c) {
 	// Check that budget of 1 is enough to run a single instruction
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 
 	c.vm.budget = 1;
 	c.call(funcId);
@@ -572,7 +572,7 @@ void test_jump_0(ref VmTestContext c) {
 	u32 ret_addr = b.next_addr;
 	b.emit_ret();
 	b.patch_rip(patch_addr, ret_addr);
-	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 	c.expectResult(VmReg(0));
 }
@@ -589,7 +589,7 @@ void test_branch_0(ref VmTestContext c) {
 	b.emit_const_s8(0, 1);
 	b.emit_ret();
 	b.patch_rip(patch_addr, true_addr);
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
@@ -616,7 +616,7 @@ void test_branch_zero_0(ref VmTestContext c) {
 	b.emit_const_s8(0, 0);
 	b.emit_ret();
 	b.patch_rip(patch_addr, true_addr);
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(0));
@@ -638,7 +638,7 @@ void test_mov_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(42));
 	c.expectResult(VmReg(42));
 }
@@ -649,7 +649,7 @@ void test_mov_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId));
 	c.expectResult(VmReg(funcId));
 }
@@ -660,7 +660,7 @@ void test_mov_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0), VmReg(funcId, 42));
 	c.expectResult(VmReg(funcId, 42));
 }
@@ -672,7 +672,7 @@ void test_mov_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mov(0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(0));
 }
 
@@ -683,7 +683,7 @@ void test_cmp_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_cmp(cast(VmBinCond)(VmBinCond.max+1), 0, 1, 2);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId);
 	c.expectStatus(VmStatus.ERR_COND_OOB);
 }
@@ -697,7 +697,7 @@ void test_cmp_4(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	// ptr is null
@@ -725,7 +725,7 @@ void test_cmp_5(ref VmTestContext c) {
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	// ptr is null
@@ -752,7 +752,7 @@ void test_cmp_6(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.u64_gt, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	// ptr is null
@@ -779,7 +779,7 @@ void test_cmp_7(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.u64_ge, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	// ptr is null
@@ -809,7 +809,7 @@ void test_cmp_8(ref VmTestContext c) {
 	b.emit_trap();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId memId2 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId2, 10));
 	c.expectStatus(VmStatus.ERR_CMP_DIFFERENT_PTR);
 }
@@ -824,7 +824,7 @@ void test_cmp_9(ref VmTestContext c) {
 	b.emit_cmp(cond, 0, 0, 1);
 	b.emit_trap();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(memId1, 10));
 	c.expectStatus(VmStatus.ERR_CMP_REQUIRES_NO_PTR);
 	c.callFail(funcId, VmReg(memId1, 10), VmReg(10));
@@ -840,7 +840,7 @@ void test_cmp_10(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.s64_gt, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
@@ -864,7 +864,7 @@ void test_cmp_11(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.s64_ge, 0, 0, 1);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res;
 
 	res = c.call(funcId, VmReg(10), VmReg(10));
@@ -893,7 +893,7 @@ void test_cmp_12(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f32_ge, 3, 4, 5);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(cast(f32)100.0), VmReg(cast(f32)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
 	assert(res[1] == VmReg(1)); // 100 >= 50
@@ -913,7 +913,7 @@ void test_cmp_13(ref VmTestContext c) {
 	b.emit_cmp(VmBinCond.f64_ge, 3, 4, 5);
 	b.emit_ret();
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
-	AllocId funcId = c.vm.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(4.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(cast(f64)100.0), VmReg(cast(f64)50.0));
 	assert(res[0] == VmReg(1)); // 100 >  50
 	assert(res[1] == VmReg(1)); // 100 >= 50
@@ -928,7 +928,7 @@ void test_add_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(10));
 	c.expectResult(VmReg(20));
 }
@@ -939,7 +939,7 @@ void test_add_i64_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId, VmReg(funcId, 10), VmReg(20));
 	c.expectResult(VmReg(funcId, 30));
 }
@@ -950,7 +950,7 @@ void test_add_i64_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(funcId, 10), VmReg(funcId, 20));
 	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
@@ -961,7 +961,7 @@ void test_add_i64_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_add_i64(0, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(10), VmReg(funcId, 20));
 	c.expectStatus(VmStatus.ERR_PTR_SRC1);
 }
@@ -973,7 +973,7 @@ void test_sub_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_sub_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	// dst: non-ptr, src0: non-ptr, src1: non-ptr
 	c.call(funcId, VmReg(44), VmReg(10));
@@ -986,7 +986,7 @@ void test_sub_i64_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_sub_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	// dst: ptr0, src0: ptr0, src1: non-ptr
 	c.call(funcId, VmReg(funcId, 44), VmReg(10));
@@ -999,7 +999,7 @@ void test_sub_i64_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_sub_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	// dst: trap, src0: non-ptr, src1: ptr1
 	c.callFail(funcId, VmReg(44), VmReg(funcId, 10));
@@ -1012,7 +1012,7 @@ void test_sub_i64_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_sub_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 
 	// dst: trap, src0: ptr0, src1: ptr1
@@ -1026,7 +1026,7 @@ void test_sub_i64_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_sub_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	AllocId memId1 = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 
 	// dst: non-ptr, src0: ptr0, src1: ptr0
@@ -1041,7 +1041,7 @@ void test_mul_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_mul_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(32), VmReg(18));
 	c.expectResult(VmReg(32 * 18));
 }
@@ -1053,7 +1053,7 @@ void test_div_u64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_div_u64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(32), VmReg(18));
 	c.expectResult(VmReg(32 / 18));
 }
@@ -1065,7 +1065,7 @@ void test_div_s64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_div_s64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(-32), VmReg(18));
 	c.expectResult(VmReg(-32 / 18));
 }
@@ -1077,7 +1077,7 @@ void test_rem_u64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rem_u64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(32), VmReg(18));
 	c.expectResult(VmReg(32 % 18));
 }
@@ -1089,7 +1089,7 @@ void test_rem_s64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rem_s64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(-32), VmReg(18));
 	c.expectResult(VmReg(-32 % 18));
 }
@@ -1100,7 +1100,7 @@ void test_not_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_not_i64(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max));
 	c.expectResult(VmReg(0));
 }
@@ -1111,7 +1111,7 @@ void test_and_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_and_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
 	c.expectResult(VmReg(0xAAAAAAAA_AAAAAAAA));
 }
@@ -1122,7 +1122,7 @@ void test_or_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_or_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
 	c.expectResult(VmReg(u64.max));
 }
@@ -1133,7 +1133,7 @@ void test_xor_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_xor_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max), VmReg(0xAAAAAAAA_AAAAAAAA));
 	c.expectResult(VmReg(0x55555555_55555555));
 }
@@ -1144,7 +1144,7 @@ void test_shl_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shl_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFFLU), VmReg(65));
 	c.expectResult(VmReg(0xFFFFFFFF_FFFFFFFELU));
 }
@@ -1155,7 +1155,7 @@ void test_shl_i32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shl_i32(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFF_FFFF), VmReg(33));
 	c.expectResult(VmReg(0xFFFF_FFFE));
 }
@@ -1166,7 +1166,7 @@ void test_shl_i16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shl_i16(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFF), VmReg(17));
 	c.expectResult(VmReg(0xFFFE));
 }
@@ -1177,7 +1177,7 @@ void test_shl_i8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shl_i8(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFF), VmReg(9));
 	c.expectResult(VmReg(0xFE));
 }
@@ -1188,7 +1188,7 @@ void test_shr_u64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_u64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(65));
 	c.expectResult(VmReg(0x7FFFFFFF_FFFFFFF8));
 }
@@ -1199,7 +1199,7 @@ void test_shr_u32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_u32(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(33));
 	c.expectResult(VmReg(0x7FFF_FFF8));
 }
@@ -1210,7 +1210,7 @@ void test_shr_u16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_u16(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFF0), VmReg(17));
 	c.expectResult(VmReg(0x7FF8));
 }
@@ -1221,7 +1221,7 @@ void test_shr_u8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_u8(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_F0), VmReg(9));
 	c.expectResult(VmReg(0x78));
 }
@@ -1232,7 +1232,7 @@ void test_shr_s64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_s64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0LU), VmReg(65));
 	c.expectResult(VmReg(0xFFFFFFFF_FFFFFFF8LU));
 }
@@ -1243,7 +1243,7 @@ void test_shr_s32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_s32(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFF0), VmReg(33));
 	c.expectResult(VmReg(0xFFFF_FFF8));
 }
@@ -1254,7 +1254,7 @@ void test_shr_s16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_s16(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFF0), VmReg(17));
 	c.expectResult(VmReg(0xFFF8));
 }
@@ -1265,7 +1265,7 @@ void test_shr_s8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_shr_s8(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_F0), VmReg(9));
 	c.expectResult(VmReg(0xF8));
 }
@@ -1276,7 +1276,7 @@ void test_rotl_i8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotl_i8(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_D8), VmReg(9));
 	c.expectResult(VmReg(0xB1));
 }
@@ -1287,7 +1287,7 @@ void test_rotl_i16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotl_i16(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_D800), VmReg(17));
 	c.expectResult(VmReg(0xB001));
 }
@@ -1298,7 +1298,7 @@ void test_rotl_i32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotl_i32(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_D8000000), VmReg(33));
 	c.expectResult(VmReg(0xB000_0001));
 }
@@ -1309,7 +1309,7 @@ void test_rotl_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotl_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xD800_0000_0000_0000), VmReg(65));
 	c.expectResult(VmReg(0xB000_0000_0000_0001));
 }
@@ -1320,7 +1320,7 @@ void test_rotr_i8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotr_i8(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_B1), VmReg(9));
 	c.expectResult(VmReg(0xD8));
 }
@@ -1331,7 +1331,7 @@ void test_rotr_i16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotr_i16(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_B001), VmReg(17));
 	c.expectResult(VmReg(0xD800));
 }
@@ -1342,7 +1342,7 @@ void test_rotr_i32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotr_i32(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_B0000001), VmReg(33));
 	c.expectResult(VmReg(0xD800_0000));
 }
@@ -1353,7 +1353,7 @@ void test_rotr_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_rotr_i64(0, 0, 1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xB000_0000_0000_0001), VmReg(65));
 	c.expectResult(VmReg(0xD800_0000_0000_0000));
 }
@@ -1364,7 +1364,7 @@ void test_clz_i8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_clz_i8(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_FF));
 	c.expectResult(VmReg(0));
 
@@ -1381,7 +1381,7 @@ void test_clz_i16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_clz_i16(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_0001));
@@ -1396,7 +1396,7 @@ void test_clz_i32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_clz_i32(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0xFFFFFFFF_00000001));
@@ -1411,7 +1411,7 @@ void test_clz_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_clz_i64(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(1));
@@ -1426,7 +1426,7 @@ void test_ctz_i8_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ctz_i8(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_FF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0xFFFFFFFFFFFFFF_0C));
@@ -1441,7 +1441,7 @@ void test_ctz_i16_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ctz_i16(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_FFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0xFFFFFFFFFFFF_000C));
@@ -1456,7 +1456,7 @@ void test_ctz_i32_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ctz_i32(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0xFFFFFFFF_0000000C));
@@ -1471,7 +1471,7 @@ void test_ctz_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_ctz_i64(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(0xFFFFFFFF_FFFFFFFF));
 	c.expectResult(VmReg(0));
 	c.call(funcId, VmReg(0b1100));
@@ -1486,7 +1486,7 @@ void test_popcnt_i64_0(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_popcnt_i64(0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId, VmReg(u64.max));
 	c.expectResult(VmReg(64));
 	c.call(funcId, VmReg(0));
@@ -1502,7 +1502,7 @@ void test_const_s8_0(ref VmTestContext c) {
 	b.emit_const_s8(0, -1);
 	b.emit_const_s8(1,  1);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(2.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(2.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 	assert(res[0] == VmReg(-1));
 	assert(res[1] == VmReg( 1));
@@ -1517,7 +1517,7 @@ void test_load_mXX_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
 	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
 }
@@ -1530,7 +1530,7 @@ void test_load_mXX_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(funcId));
 	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
 }
@@ -1546,7 +1546,7 @@ void test_load_mXX_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId));
 	c.expectStatus(VmStatus.ERR_NO_SRC_ALLOC_READ_PERMISSION);
 }
@@ -1562,7 +1562,7 @@ void test_load_mXX_5(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, -1));
 	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
@@ -1578,7 +1578,7 @@ void test_load_mXX_6(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
 	c.expectStatus(VmStatus.ERR_READ_OOB);
 }
@@ -1595,7 +1595,7 @@ void test_load_mXX_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 0));
 	c.expectStatus(VmStatus.ERR_READ_UNINIT);
 }
@@ -1619,7 +1619,7 @@ void test_load_mXX_8(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	foreach(offset; 0..9) {
 		u64 shiftSize  = offset * 8;
@@ -1661,7 +1661,7 @@ void test_load_mXX_9(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, b);
 
 	foreach(offset; 0..9) {
 		u64 shiftSize  = offset * 8;
@@ -1690,7 +1690,7 @@ void test_load_mXX_10(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(memId, 8));
 	c.expectStatus(VmStatus.ERR_SRC_ALLOC_FREED);
 }
@@ -1704,7 +1704,7 @@ void test_store_mXX_1(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(0), VmReg(0));
 	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
@@ -1717,7 +1717,7 @@ void test_store_mXX_2(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(funcId), VmReg(0));
 	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
 }
@@ -1733,7 +1733,7 @@ void test_store_mXX_3(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId), VmReg(0));
 	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
 }
@@ -1749,7 +1749,7 @@ void test_store_mXX_4(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, -1), VmReg(0));
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
@@ -1765,7 +1765,7 @@ void test_store_mXX_5(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
 }
@@ -1789,7 +1789,7 @@ void test_store_mXX_6(ref VmTestContext c) {
 	b.emit_binop(store_op, 0, 1);
 	b.emit_binop(load_op, 0, 0);
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	foreach(offset; 0..9) {
 		VmReg[] res = c.call(funcId, VmReg(memId, offset), VmReg(value));
@@ -1816,7 +1816,7 @@ void test_store_mXX_7(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_store_ptr(c.vm.ptrSize, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	foreach(offset; 1..c.vm.ptrSize.inBytes) {
 		c.callFail(funcId, VmReg(memId, offset), VmReg(memId));
@@ -1840,7 +1840,7 @@ void test_store_mXX_8(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 0); // store memId
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0); //   load memId
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId));
 	c.expectResult(VmReg(memId));
@@ -1859,7 +1859,7 @@ void test_store_mXX_9(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 2); // store memId2 (overwrites memId1)
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  load memId2
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId1), VmReg(memId1), VmReg(memId2));
 	c.expectResult(VmReg(memId2));
@@ -1877,7 +1877,7 @@ void test_store_mXX_10(ref VmTestContext c) {
 	b.emit_store_ptr(c.vm.ptrSize, 0, 2); // store 0
 	b.emit_load_ptr(c.vm.ptrSize, 0, 0);  //  load 0
 	b.emit_ret();
-	AllocId funcId = c.vm.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 
 	VmReg[] res = c.call(funcId, VmReg(memId), VmReg(memId), VmReg(0));
 	c.expectResult(VmReg(0));
@@ -1893,7 +1893,7 @@ void test_store_mXX_11(ref VmTestContext c) {
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_binop(op, 0, 1);
 	b.emit_trap();
-	AllocId funcId = c.vm.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 2.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(memId, 8), VmReg(0));
 	c.expectStatus(VmStatus.ERR_DST_ALLOC_FREED);
 }
@@ -1912,14 +1912,14 @@ void test_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
 	b.emit_call(0, 1, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 	c.expectResult(VmReg(42));
 }
@@ -1928,8 +1928,8 @@ void test_call_0(ref VmTestContext c) {
 void test_call_1(ref VmTestContext c) {
 	// Bytecode function call
 
-	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
-	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcA = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 a(u64 number) {
 	//     return b(number) + 10;
@@ -1960,8 +1960,8 @@ void test_call_1(ref VmTestContext c) {
 void test_call_2(ref VmTestContext c) {
 	// Bytecode -> external -> bytecode call
 
-	AllocId funcA = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, Array!u8.init);
-	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcA = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	struct UserData {
 		AllocId funcB;
@@ -1978,7 +1978,7 @@ void test_call_2(ref VmTestContext c) {
 		assert(vm.registers[0] == VmReg(42 + 21));
 	}
 	auto user_data = UserData(funcB);
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, cast(VmExternalFn)&externFunc, &user_data);
+	AllocId extFuncId = c.addExternalFunction(1.NumResults, 1.NumRegParams, cast(VmExternalFn)&externFunc, &user_data);
 
 	// u64 a() {
 	//     return extern(10);
@@ -2017,7 +2017,7 @@ void test_call_3(ref VmTestContext c) {
 		assert(funcPtr.isDefined);
 		vm.call(funcPtr, VmReg(42));
 	}
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
 
 	// u64 a(u64 num) {
 	//     return num * 2;
@@ -2026,7 +2026,7 @@ void test_call_3(ref VmTestContext c) {
 	a.emit_const_s8(1, 2);
 	a.emit_mul_i64(0, 0, 1);
 	a.emit_ret();
-	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, a);
+	AllocId funcA = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, a);
 
 	// u64 b() {
 	//     return extern(&a);
@@ -2036,7 +2036,7 @@ void test_call_3(ref VmTestContext c) {
 	b.emit_call(0, 1, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcB = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcB = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcB);
 	c.expectResult(VmReg(84));
 }
@@ -2050,14 +2050,14 @@ void test_tail_call_0(ref VmTestContext c) {
 		state.regs[0] = VmReg(42);
 	}
 
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(1.NumResults, 1.NumRegParams, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.emit_const_s8(0, 10);
 	b.emit_tail_call(0, 0, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	VmReg[] res = c.call(funcId);
 	c.expectResult(VmReg(42));
 }
@@ -2072,7 +2072,7 @@ void test_tail_call_1(ref VmTestContext c) {
 
 	Array!SizeAndAlign stack;
 	stack.put(*c.vm.allocator, SizeAndAlign(8, 1));
-	AllocId extFuncId = c.vm.addExternalFunction(1.NumResults, 1.NumRegParams, 1.NumStackParams, stack, &externFunc);
+	AllocId extFuncId = c.addExternalFunction(1.NumResults, 1.NumRegParams, 1.NumStackParams, stack, &externFunc);
 
 	CodeBuilder b = CodeBuilder(c.vm.allocator);
 	b.add_stack_slot(SizeAndAlign(8, 1)); // local. Should be removed from stack
@@ -2080,7 +2080,7 @@ void test_tail_call_1(ref VmTestContext c) {
 	b.emit_tail_call(0, 0, extFuncId.index);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 0.NumRegParams, 0.NumStackParams, b);
 	c.call(funcId);
 	assert(c.vm.numFrameStackSlots == 0);
 }
@@ -2089,8 +2089,8 @@ void test_tail_call_1(ref VmTestContext c) {
 void test_tail_call_2(ref VmTestContext c) {
 	// Bytecode function tail call, non-zero first reg
 
-	AllocId funcA = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
-	AllocId funcB = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcA = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcB = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 a(u64 number) {
 	//     return b(number);
@@ -2137,7 +2137,7 @@ void test_memcopy_0(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	c.callFail(funcId, VmReg(5), VmReg(5), VmReg(5));
 	c.expectStatus(VmStatus.ERR_DST_NOT_PTR);
 }
@@ -2149,7 +2149,7 @@ void test_memcopy_1(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(funcId), VmReg(memId), VmReg(8));
 	c.expectStatus(VmStatus.ERR_NO_DST_MEM_WRITE_PERMISSION);
@@ -2162,7 +2162,7 @@ void test_memcopy_2(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(8));
 	c.expectStatus(VmStatus.ERR_NO_DST_ALLOC_WRITE_PERMISSION);
@@ -2175,7 +2175,7 @@ void test_memcopy_3(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.memFree(dstMem);
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
@@ -2190,7 +2190,7 @@ void test_memcopy_4(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(5), VmReg(5));
 	c.expectStatus(VmStatus.ERR_SRC_NOT_PTR);
@@ -2203,7 +2203,7 @@ void test_memcopy_5(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.read);
 	c.callFail(funcId, VmReg(memId), VmReg(funcId), VmReg(8));
 	c.expectStatus(VmStatus.ERR_NO_SRC_MEM_READ_PERMISSION);
@@ -2216,7 +2216,7 @@ void test_memcopy_6(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1), MemoryFlags.none);
 	c.callFail(funcId, VmReg(dstMem), VmReg(srcMem), VmReg(8));
@@ -2230,7 +2230,7 @@ void test_memcopy_7(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.memFree(srcMem);
@@ -2245,7 +2245,7 @@ void test_memcopy_8(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId), VmReg(memId));
 	c.expectStatus(VmStatus.ERR_LEN_IS_PTR);
@@ -2258,7 +2258,7 @@ void test_memcopy_9(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId, -1), VmReg(memId), VmReg(8));
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
@@ -2271,7 +2271,7 @@ void test_memcopy_10(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId, 8), VmReg(memId), VmReg(8));
 	c.expectStatus(VmStatus.ERR_WRITE_OOB);
@@ -2284,7 +2284,7 @@ void test_memcopy_11(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId, -1), VmReg(8));
 	c.expectStatus(VmStatus.ERR_READ_OOB);
@@ -2297,7 +2297,7 @@ void test_memcopy_12(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId memId = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(memId), VmReg(memId, 8), VmReg(8));
 	c.expectStatus(VmStatus.ERR_READ_OOB);
@@ -2311,7 +2311,7 @@ void test_memcopy_13(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 3.NumRegParams, 0.NumStackParams, b);
 	AllocId dstMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId srcMem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	foreach(offset; 0..8) {
@@ -2332,7 +2332,7 @@ void test_memcopy_14(ref VmTestContext c) {
 	b.emit_load_m64(0, 0);   //  read -1 from dst mem
 	b.emit_ret();
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(8), VmReg(-1));
@@ -2351,7 +2351,7 @@ void test_memcopy_15(ref VmTestContext c) {
 	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(24, 1));
 	VmReg[] res = c.call(funcId, VmReg(dst), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId, value));
@@ -2370,7 +2370,7 @@ void test_memcopy_16(ref VmTestContext c) {
 	u64 sizeMask = bitmask(c.vm.ptrSize.inBits);
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(c.vm.ptrSize.inBytes*2, 1));
 	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem, c.vm.ptrSize.inBytes), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
@@ -2384,7 +2384,7 @@ void test_memcopy_17(ref VmTestContext c) {
 	b.emit_memcopy(0, 1, 2);
 	b.emit_trap();
 
-	AllocId funcId = c.vm.addFunction(0.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(0.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId dst = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(16, 1));
 	AllocId src = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(8, 1));
 	c.callFail(funcId, VmReg(dst, 1), VmReg(src), VmReg(c.vm.ptrSize.inBytes), VmReg(funcId));
@@ -2414,7 +2414,7 @@ void test_memcopy_18(ref VmTestContext c) {
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 	auto ptrSize = c.vm.ptrSize.inBytes;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
 	VmReg[] res = c.call(funcId, VmReg(mem, ptrSize), VmReg(mem), VmReg(ptrSize*2), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
@@ -2433,7 +2433,7 @@ void test_memcopy_19(ref VmTestContext c) {
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 	auto ptrSize = c.vm.ptrSize.inBytes;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
 	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem, ptrSize), VmReg(ptrSize*2), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
@@ -2452,7 +2452,7 @@ void test_memcopy_20(ref VmTestContext c) {
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 	auto ptrSize = c.vm.ptrSize.inBytes;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
 	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem), VmReg(ptrSize*2), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
@@ -2471,7 +2471,7 @@ void test_memcopy_21(ref VmTestContext c) {
 	u64 value = 0x_88_77_66_55_44_33_22_11_UL;
 	auto ptrSize = c.vm.ptrSize.inBytes;
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
+	AllocId funcId = c.addFunction(1.NumResults, 4.NumRegParams, 0.NumStackParams, b);
 	AllocId mem = c.memAlloc(MemoryKind.heap_mem, SizeAndAlign(ptrSize*3, 1));
 	VmReg[] res = c.call(funcId, VmReg(mem), VmReg(mem), VmReg(0), VmReg(funcId, value));
 	c.expectResult(VmReg(funcId, value & sizeMask));
@@ -2539,7 +2539,7 @@ void test_ctfe_finalize(ref VmTestContext c) {
 void bench_0(ref VmTestContext c) {
 	// Benchmark fib
 
-	AllocId funcId = c.vm.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
+	AllocId funcId = c.addFunction(1.NumResults, 1.NumRegParams, 0.NumStackParams, Array!u8.init);
 
 	// u64 fib(u64 number) {
 	//     if (number <= 1) return number;

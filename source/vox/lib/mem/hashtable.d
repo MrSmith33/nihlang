@@ -112,23 +112,27 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 		}
 	}
 
-	void free(ref Allocator allocator) {
+	Result!void free(ref Allocator allocator) {
 		static if (SINGLE_ALLOC) {
 			size_t size = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * _capacity);
-			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..size]);
+			auto res = allocator.freeBlock((cast(ubyte*)keyBuckets)[0..size]);
+			if (res.isError) return Result!void.fromError(res);
 			//values = null; // not needed, because values ptr is derived from keys
 		} else {
 			size_t keySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * _capacity);
-			allocator.freeBlock((cast(ubyte*)keyBuckets)[0..keySize]);
+			auto res = allocator.freeBlock((cast(ubyte*)keyBuckets)[0..keySize]);
+			if (res.isError) return Result!void.fromError(res);
 			static if (store_values) {
 				size_t valSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * _capacity);
-				allocator.freeBlock((cast(ubyte*)values)[0..valSize]);
+				auto res2 = allocator.freeBlock((cast(ubyte*)values)[0..valSize]);
+				if (res2.isError) return Result!void.fromError(res2);
 			}
 			values = null;
 		}
 		keyBuckets = null;
 		_capacity = 0;
 		_length = 0;
+		return Result!void();
 	}
 
 	void clear() {
@@ -173,20 +177,28 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 			_length = 0; // needed because `put` will increment per item
 			foreach (i, ref bucket; oldKeyBuckets[0..oldCapacity]) {
 				if (bucket.used) {
-					static if (store_values) put(allocator, bucket.key, oldValues[i]);
-					else put(allocator, bucket.key);
+					static if (store_values) {
+						auto res = put(allocator, bucket.key, oldValues[i]);
+						if (res.isError) return Result!void.fromError(res);
+					} else {
+						auto res = put(allocator, bucket.key);
+						if (res.isError) return Result!void.fromError(res);
+					}
 				}
 			}
 
 			static if (SINGLE_ALLOC) {
 				size_t oldSize = max(Allocator.MIN_BLOCK_BYTES, Bucket_size * oldCapacity);
-				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldSize]);
+				auto res = allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldSize]);
+				if (res.isError) return Result!void.fromError(res);
 			} else {
 				size_t oldKeySize = max(Allocator.MIN_BLOCK_BYTES, KeyBucketT.sizeof * oldCapacity);
-				allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldKeySize]);
+				auto res = allocator.freeBlock((cast(ubyte*)oldKeyBuckets)[0..oldKeySize]);
+				if (res.isError) return Result!void.fromError(res);
 				static if (store_values) {
 					size_t oldValSize = max(Allocator.MIN_BLOCK_BYTES, Value.sizeof * oldCapacity);
-					allocator.freeBlock((cast(ubyte*)oldValues)[0..oldValSize]);
+					auto res2 = allocator.freeBlock((cast(ubyte*)oldValues)[0..oldValSize]);
+					if (res2.isError) return Result!void.fromError(res2);
 				}
 			}
 		}

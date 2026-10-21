@@ -3,8 +3,11 @@
 /// Authors: Andrey Penechko
 module vox.lib.error;
 
+import core.attribute : mustuse;
+
 @nogc nothrow:
 
+//@mustuse
 struct Result(T) {
 	static if (!is(T == void)) {
 		T data;
@@ -30,6 +33,13 @@ struct Result(T) {
 		typeof(this) res;
 		res.isError = err.isError;
 		return res;
+	}
+}
+
+T unwrap(T)(Result!T res, string file = __FILE__, int line = __LINE__) {
+	enforce(!res.isError, "Unwrapped error");
+	static if(!is(T == void)) {
+		return res.data;
 	}
 }
 

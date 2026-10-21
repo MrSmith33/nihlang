@@ -73,7 +73,7 @@ struct Parser {
 		return Result!void();
 	}
 
-	Name makeIdentifier(Token tok) {
+	Result!Name makeIdentifier(Token tok) {
 		const(char)[] str = tok.getTokenString(context.bufs.sources.data);
 		return context.bufs.nameMap.getOrReg(context.bufs.arrayArena, str);
 	}
@@ -81,11 +81,8 @@ struct Parser {
 	Result!Name expectIdentifier(Span afterWhat = Span.init) {
 		auto idTok = tok;
 		auto res = expectAndConsume(TokenType.id, "identifier", afterWhat);
-		if (res.isError) {
-			return Result!Name(res);
-		}
-		Name id = makeIdentifier(idTok);
-		return Result!Name(id);
+		if (res.isError) return Result!Name(res);
+		return makeIdentifier(idTok);
 	}
 
 	Result!void parse_declarations(ref AstNodes declarations, TokenType until) { // <declaration>*
@@ -119,9 +116,7 @@ struct Parser {
 				}
 
 				auto varDecl = context.appendAst!NameUse(NameWithPos(id, idLoc.start));
-				items.put(context.bufs.arrayArena, varDecl);
-
- 				return Result!void();
+				return items.put(context.bufs.arrayArena, varDecl);
 		}
 	}
 

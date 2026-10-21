@@ -132,7 +132,8 @@ void instr_stack_alloc(ref VmState vm) {
 	SizeAndAlign sizeAlign = *cast(SizeAndAlign*)&vm.code[vm.ip+1];
 	// TODO validation
 	if(vm.numFrameStackSlots == u8.max) panic("Too many stack slots for single stack frame");
-	vm.pushStackAlloc(sizeAlign);
+	auto res = vm.pushStackAlloc(sizeAlign);
+	if (res.isError) return vm.setTrap(VmStatus.ERR_STACK_OVERFLOW);
 	vm.ip += 5;
 }
 void instr_func_addr(ref VmState vm) {
@@ -181,7 +182,8 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 		// locals: allocate slots
 		u8 numCalleeStackLocals = cast(u8)callee.stackSlotSizes.length;
 		foreach(i; numStackParams..numCalleeStackLocals) {
-			vm.pushStackAlloc(slotSizes[i]);
+			auto res = vm.pushStackAlloc(slotSizes[i]);
+			if (res.isError) return vm.setTrap(VmStatus.ERR_STACK_OVERFLOW);
 		}
 	}
 
@@ -192,7 +194,8 @@ void instr_call_impl(ref VmState vm, FuncId calleeId, u8 arg0_idx) {
 		regDelta : arg0_idx,
 		numStackSlots : numCallerStackSlots,
 	};
-	vm.callerFrames.put(*vm.allocator, callerFrame);
+	auto res = vm.callerFrames.put(*vm.allocator, callerFrame);
+	if (res.isError) return vm.setTrap(VmStatus.ERR_STACK_OVERFLOW);
 
 	vm.func = calleeId;
 	// native functions do not care about ip
@@ -269,10 +272,11 @@ void instr_tail_call(ref VmState vm) {
 		if (vm.status != VmStatus.RUNNING) return;
 
 		Memory* mem = &vm.memories[MemoryKind.stack_mem];
+		// Assume that deallocations never fail
 		mem.popAndShiftAllocations(
 			*vm.allocator,
 			vm.frameFirstStackSlot,
-			vm.frameFirstStackSlot + numCallerStackSlots);
+			vm.frameFirstStackSlot + numCallerStackSlots).unwrap();
 	}
 
 	u8 numCallerRegisters = arg0_idx;

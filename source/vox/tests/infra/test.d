@@ -37,7 +37,7 @@ struct TestSuite {
 		}
 		auto contextIndex = cast(u8)contexts.length;
 		assert(contextIndex == contexts.length, "Out of context space");
-		contexts.put(allocator, context);
+		contexts.put(allocator, context).unwrap();
 		return contextIndex;
 	}
 }

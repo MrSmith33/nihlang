@@ -17,7 +17,7 @@ void collectTestDefinitions(alias M)(ref Allocator allocator, ref TestSuite suit
 		alias member = __traits(getMember, M, m);
 		foreach (attr; __traits(getAttributes, member)) {
 			static if (is(attr == Test)) {
-				suite.definitions.put(allocator, TestDefinition.init);
+				suite.definitions.put(allocator, TestDefinition.init).unwrap();
 				gatherTestDefinition!member(allocator, suite.definitions.back, contextId);
 				break;
 			}
@@ -43,7 +43,7 @@ void gatherTestDefinition(alias test)(ref Allocator allocator, ref TestDefinitio
 			def.ignore = true;
 		} else static if (is(typeof(attr) == TestParam)) {
 			static __gshared u32[] attr_values = attr.values;
-			def.parameters.put(allocator, TestParam(attr.id, attr_values));
+			def.parameters.put(allocator, TestParam(attr.id, attr_values)).unwrap();
 		} else static if (is(typeof(attr) == string)) {
 			def.source = attr;
 		}
@@ -71,7 +71,7 @@ void instantiateTest(ref Allocator allocator, ref TestSuite suite, TestDefinitio
 	u32 numPermutations = 1;
 
 	Array!MakerParam parameters;
-	scope(exit) parameters.free(allocator);
+	scope(exit) parameters.free(allocator).unwrap();
 
 	context.addTestInstanceParams(def, parameters);
 
@@ -88,8 +88,8 @@ void instantiateTest(ref Allocator allocator, ref TestSuite suite, TestDefinitio
 		if (p.values.length > 0) {
 			numPermutations *= p.values.length;
 			Array!u32 values;
-			values.put(allocator, p.values);
-			parameters.put(allocator, MakerParam(p.id, values));
+			values.put(allocator, p.values).unwrap();
+			parameters.put(allocator, MakerParam(p.id, values)).unwrap();
 		}
 	}
 
@@ -102,7 +102,7 @@ void instantiateTest(ref Allocator allocator, ref TestSuite suite, TestDefinitio
 	while(numPermutations) {
 		// gather parameters
 		Array!(TestInstance.Param) testParameters;
-		testParameters.voidPut(allocator, parameters.length);
+		testParameters.voidPut(allocator, parameters.length).unwrap();
 		foreach(i, ref param; parameters) {
 			testParameters[i] = TestInstance.Param(param.id, param.values[param.currentIndex]);
 			//writef(" (%s %s)", param.id, param.values[param.currentIndex]);
@@ -120,7 +120,7 @@ void instantiateTest(ref Allocator allocator, ref TestSuite suite, TestDefinitio
 			onlyThis : def.onlyThis,
 			source : def.source,
 		};
-		suite.instances.put(allocator, t);
+		suite.instances.put(allocator, t).unwrap();
 
 		// How many filtered instances should run
 		if (def.onlyThis) {

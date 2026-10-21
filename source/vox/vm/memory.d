@@ -153,11 +153,14 @@ struct Memory {
 	}
 
 	Result!void reserve(ref Allocator allocator, u32 size) {
-		memory.voidPut(allocator, size);
+		auto res = memory.voidPut(allocator, size);
+		if (res.isError) return Result!void.fromError(res);
+
 		// By default no pointers are in memory
 		auto data1 = pointerBitmap.voidPut(allocator, divCeil(size, ptrSize.inBits));
 		if (data1.isError) return Result!void.fromError(data1);
 		data1.data[] = 0;
+
 		static if (SANITIZE_UNINITIALIZED_MEM) {
 			// By default all bytes are uninitialized
 			auto data2 = initBitmap.voidPut(allocator, divCeil(size, Allocation.ALLOCATION_GRANULARITY));
@@ -191,7 +194,7 @@ struct Memory {
 		bytesUsed = 0;
 	}
 
-	AllocId allocate(ref Allocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
+	Result!AllocId allocate(ref Allocator allocator, SizeAndAlign sizeAlign, MemoryFlags perm) {
 		u32 index = allocations.length;
 		u32 offset = bytesUsed;
 		assert(offset % Allocation.ALLOCATION_GRANULARITY == 0);
@@ -200,7 +203,9 @@ struct Memory {
 		u32 alignedSize = alignValue(sizeAlign.size, Allocation.ALLOCATION_GRANULARITY);
 		bytesUsed += alignedSize;
 		if (bytesUsed >= memory.length) panic("Out of %s memory", memoryKindString[kind]);
-		allocations.put(allocator, Allocation(offset, sizeAlign, perm));
+		auto res = allocations.put(allocator, Allocation(offset, sizeAlign, perm));
+		if (res.isError) return Result!AllocId.fromError(res);
+
 		static if (SLOW_CHECKS) {
 			const PointerId fromSlot = memOffsetToPtrIndex(offset, ptrSize);
 			const PointerId numSlots = memOffsetToPtrIndex(alignedSize, ptrSize);
@@ -208,7 +213,7 @@ struct Memory {
 				panic("Pointer bitmap wasn't cleared, found %s bits in freshly allocated memory", numBits);
 			}
 		}
-		return AllocId(index, kind);
+		return AllocId(index, kind).Result!AllocId;
 	}
 
 	// only for stack allocations
@@ -232,11 +237,14 @@ struct Memory {
 		}
 	}
 
-	void popAndShiftAllocations(ref Allocator allocator, u32 from, u32 to) {
+	Result!void popAndShiftAllocations(ref Allocator allocator, u32 from, u32 to) {
 		assert(to <= allocations.length);
 		assert(from <= to);
-		if (from == to) return;
-		if (to == allocations.length) return popAllocations(to - from);
+		if (from == to) return Result!void();
+		if (to == allocations.length) {
+			popAllocations(to - from);
+			return Result!void();
+		}
 
 		const u32 fromByte = allocations[from].offset;
 		const u32 toByte   = allocations[to - 1].offset + allocations[to - 1].alignedSize;
@@ -287,7 +295,8 @@ struct Memory {
 				const u32 oldOffset = newOffset + byteOffset;
 				AllocId val;
 				assert(outRefs.remove(allocator, oldOffset, val));
-				outRefs.put(allocator, newOffset, val);
+				auto res = outRefs.put(allocator, newOffset, val);
+				if (res.isError) return Result!void.fromError(res);
 			}
 		}
 
@@ -309,6 +318,8 @@ struct Memory {
 		} else {
 			bytesUsed = 0;
 		}
+
+		return Result!void();
 	}
 
 	static if (SANITIZE_UNINITIALIZED_MEM)
@@ -356,7 +367,7 @@ struct Memory {
 }
 
 // Doesn't delete the heap allocations
-void moveMemToStatic(
+Result!void moveMemToStatic(
 	ref Allocator allocator,
 	ref Memory static_mem,
 	ref Memory heap_mem,
@@ -365,7 +376,7 @@ void moveMemToStatic(
 {
 	assert(root.kind == MemoryKind.static_mem, "Root must be in static memory");
 
-	static void visit(
+	static Result!void visit(
 		ref Allocator allocator,
 		ref Memory static_mem,
 		ref Memory heap_mem,
@@ -374,10 +385,13 @@ void moveMemToStatic(
 	{
 		assert(node.kind == MemoryKind.heap_mem, "Node must be in heap memory");
 		Allocation* heap_alloc = &heap_mem.allocations[node.index];
-		if (heap_alloc.isMarked) return;
+		if (heap_alloc.isMarked) return Result!void();
 
 		u32 perm = MemoryFlags.read | heap_alloc.isRuntimeWritable ? MemoryFlags.runtime_write : 0;
-		AllocId static_node = static_mem.allocate(allocator, heap_alloc.sizeAlign, cast(MemoryFlags)perm);
+		auto res = static_mem.allocate(allocator, heap_alloc.sizeAlign, cast(MemoryFlags)perm);
+		if (res.isError) return Result!void.fromError(res);
+
+		AllocId static_node = res.data;
 
 		{
 			Allocation* static_alloc = &static_mem.allocations[static_node.index];
@@ -410,13 +424,15 @@ void moveMemToStatic(
 				static if (OUT_REFS_PER_MEMORY) {
 					// writefln("copy ref %s|%s to %s:%s", node, static_node, offset, target);
 					Allocation* static_alloc = &static_mem.allocations[static_node.index];
-					static_mem.outRefs.put(allocator, static_alloc.offset + offset, target);
+					auto res = static_mem.outRefs.put(allocator, static_alloc.offset + offset, target);
+					if (res.isError) return Result!void.fromError(res);
 				}
 				continue;
 			}
 
 			// visit reallocates static_mem.outRefs, static_mem.allocations. Can't reuse static_alloc
-			visit(allocator, static_mem, heap_mem, target, ptrSize);
+			auto res2 = visit(allocator, static_mem, heap_mem, target, ptrSize);
+			if (res2.isError) return Result!void.fromError(res2);
 
 			Allocation* static_alloc = &static_mem.allocations[static_node.index];
 			Allocation* target_alloc = &heap_mem.allocations[target.index];
@@ -426,7 +442,8 @@ void moveMemToStatic(
 				target = target_alloc.getStaticMemIndex;
 			}
 			static if (OUT_REFS_PER_MEMORY) {
-				static_mem.outRefs.put(allocator, static_alloc.offset + offset, target_alloc.getStaticMemIndex);
+				auto res3 = static_mem.outRefs.put(allocator, static_alloc.offset + offset, target_alloc.getStaticMemIndex);
+				if (res3.isError) return Result!void.fromError(res3);
 			}
 		}
 
@@ -440,13 +457,17 @@ void moveMemToStatic(
 				static_alloc.numOutRefs = heap_alloc.numOutRefs;
 			}
 		}
+
+		return Result!void();
 	}
 
 	foreach(u32 offset, ref AllocId target; AllocationRefIterator(&static_mem, static_mem.allocations[root.index], ptrSize)) {
 		if (target.kind != MemoryKind.heap_mem) continue;
 		u32 target_index = target.index;
 		// reallocates outRefs. `target` becomes invalid in OUT_REFS_PER_MEMORY case
-		visit(allocator, static_mem, heap_mem, target, ptrSize);
+		auto res = visit(allocator, static_mem, heap_mem, target, ptrSize);
+		if (res.isError) return Result!void.fromError(res);
+
 		Allocation* target_alloc = &heap_mem.allocations[target_index];
 		static if (OUT_REFS_PER_ALLOCATION) {
 			target = target_alloc.getStaticMemIndex;
@@ -454,9 +475,12 @@ void moveMemToStatic(
 		static if (OUT_REFS_PER_MEMORY) {
 			Allocation* root_alloc = &static_mem.allocations[root.index];
 			const u32 newOffset = root_alloc.offset + offset;
-			static_mem.outRefs.put(allocator, newOffset, target_alloc.getStaticMemIndex);
+			auto res2 = static_mem.outRefs.put(allocator, newOffset, target_alloc.getStaticMemIndex);
+			if (res2.isError) return Result!void.fromError(res2);
 		}
 	}
+
+	return Result!void();
 }
 
 

@@ -219,7 +219,10 @@ struct Array(T)
 			return Result!void.fromError(newBlock);
 		}
 		newBlock.data[0..oldBlock.length] = oldBlock;
-		allocator.freeBlock(oldBlock);
+		auto res = allocator.freeBlock(oldBlock);
+		if (res.isError) {
+			return Result!void.fromError(res);
+		}
 		oldBlock = newBlock.data;
 		return Result!void();
 	}
