@@ -60,11 +60,13 @@ struct Driver {
 		if (astMem.isError) return Result!void.fromError(astMem);
 		context.bufs.ast.setBuffer(astMem.data);
 
+		context.initialize();
+
 		return Result!void();
 	}
 
 	void startCompilation() {
-		context.bufs.clear();
+		context.bufs.startCompilation();
 	}
 
 	void addHar(string harFilename, const(char)[] harData) {
@@ -114,21 +116,32 @@ struct Buffers {
 	Arena!u32 errors;
 	Arena!u32 ast;
 
-	void clear() {
+	// Stores ast.length after initialize() call
+	// to be reset on startCompilation()
+	usz initializedAstBufSize;
+
+	// Runs for each compilation
+	// TODO: Incompatible with multiple compilations at once
+	void startCompilation() {
 		sources.clear;
 		files.clear;
+
 		arrayArena.clear;
-		//nameMap
 		strings.clear;
 		errors.clear;
-		ast.clear;
+		ast.length = initializedAstBufSize;
+
+		nameMap.stringDataBuffer.clear;
+		nameMap.entries.clear;
+		nameMap.map = typeof(nameMap.map).init;
+		nameMap.fqnMap = typeof(nameMap.fqnMap).init;
+
+		nameMap.regCommonNames(arrayArena);
 
 		// 0 position is reserved for null position
 		sources.put(0);
 		// 0 position is reserved for no error
-		errors.put(0, 0, 0, 0);
-		// 0 position is reserved for null position
-		ast.put(0);
+		errors.put(0);
 	}
 }
 
@@ -147,6 +160,29 @@ struct Annotation {
 struct VoxContext {
 	@nogc nothrow:
 	Buffers bufs;
+
+	// Runs ones when context is created
+	void initialize() {
+		// populates nameMap with common identifiers like this, length, ptr, min, max, sizeof...
+		bufs.nameMap.regCommonNames(bufs.arrayArena);
+
+		// 0 position is reserved for null position
+		bufs.ast.put(0);
+
+		auto t_i32 = appendAst!BasicType(BasicTypeEnum.t_i32);
+		assert(t_i32 == 1);
+
+		bufs.initializedAstBufSize = bufs.ast.length;
+
+	}
+
+	string getString(Name name) {
+		return bufs.nameMap.get(name);
+	}
+
+	string getString(Span span) {
+		return span.getString(bufs.sources.data);
+	}
 
 	Span getTokenSpan(Position start) {
 		import vox.fe.lexer : Lexer;
@@ -204,6 +240,13 @@ struct VoxContext {
 	}
 }
 
+enum CommonAstNodes : AstIndex {
+	// reserved for undefined
+	undefined                = AstIndex(0),
+
+	type_i32                 = AstIndex(1),
+}
+
 struct AstNode {
 	uint data;
 }
@@ -214,6 +257,43 @@ alias AstNodes = Array!AstIndex;
 
 struct ModuleDecl {
 	AstNodes declarations;
+}
+
+struct BasicType {
+	BasicTypeEnum kind;
+	enum NumStorageSlots = divCeil(BasicType.sizeof, u32.sizeof);
+}
+
+
+enum BasicTypeEnum : u8 {
+	t_error,
+	t_auto,
+	t_noreturn,
+	t_void,
+	t_bool,
+	t_null,
+
+	t_i8,
+	t_i16,
+	t_i32,
+	t_i64,
+
+	t_u8,
+	t_u16,
+	t_u32,
+	t_u64,
+
+	t_f32,
+	t_f64,
+
+	// meta types
+	t_alias,
+	t_type,
+}
+
+struct NameUse {
+	NameWithPos identifier;
+	AstIndex target;
 }
 
 struct VariableDecl {

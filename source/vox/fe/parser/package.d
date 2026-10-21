@@ -42,27 +42,15 @@ struct Parser {
 		lexer.column = 0;
 		nextToken;
 
-		//return Result!void();
-
 		if (tok.type == TokenType.semicolon) {
 			return context.makeError!void(tok.location,
 				"Expected %s, got %s",
 				"declaration",
 				getTokenString());
 		}
-		//return Result!void();
-		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
-		//return expectIdentifier().Result!void;
-		//while (tok.type != TokenType.eoi) {
-		//	if (tok.type == TokenType.eoi) break;
-		//	parse_declaration();
-		//}
 
-		//while(true) {
-		//	auto tok = lexer.nextToken;
-		//	//writefln("  %s", cast(uint)tok.tok);
-		//	if (tok.tok == TokenType.eoi) break;
-		//}
+		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
+
 		return parse_declarations(modDecl.declarations, TokenType.eoi);
 	}
 
@@ -91,11 +79,12 @@ struct Parser {
 	}
 
 	Result!Name expectIdentifier(Span afterWhat = Span.init) {
+		auto idTok = tok;
 		auto res = expectAndConsume(TokenType.id, "identifier", afterWhat);
 		if (res.isError) {
 			return Result!Name(res);
 		}
-		Name id = makeIdentifier(tok);
+		Name id = makeIdentifier(idTok);
 		return Result!Name(id);
 	}
 
@@ -129,7 +118,7 @@ struct Parser {
 					return Result!void(res3);
 				}
 
-				auto varDecl = context.appendAst!VariableDecl();
+				auto varDecl = context.appendAst!NameUse(NameWithPos(id, idLoc.start));
 				items.put(context.bufs.arrayArena, varDecl);
 
  				return Result!void();
@@ -139,8 +128,9 @@ struct Parser {
 	Result!AstIndex expr() {
 		switch(tok.type) with(TokenType) {
 			case kw_i32:
+				auto use = context.appendAst!NameUse(NameWithPos(CommonIds.id_i32, tok.location.start), CommonAstNodes.type_i32);
 				nextToken; // skip i32
-				return Result!AstIndex();
+				return Result!AstIndex(use);
 			default:
  				return context.makeError!AstIndex(tok.location, "TODO: %s", getTokenString());
 		}

@@ -13,8 +13,18 @@ struct Name {
 	u32 index;
 	enum uint HIGH_BIT = 0x8000_0000;
 
+	uint strIndex() {
+		assert(!hasParent);
+		return index;
+	}
+	uint fqnIndex() {
+		assert(hasParent);
+		return index & ~HIGH_BIT;
+	}
+
 	bool isDefined() => index != 0;
 	bool isUndefined() => index == 0;
+	bool hasParent() => cast(bool)(index & HIGH_BIT);
 
 	size_t toHash() => int32_hash(index);
 }
@@ -31,6 +41,17 @@ struct NameMap {
 	Arena!NameMapEntry entries;
 	HashMap!(StringKey, uint, StringKey.init) map;
 	HashMap!(FullyQualifiedName, uint, FullyQualifiedName.init) fqnMap;
+
+	string get(Name id) {
+		if (id.isDefined) {
+			if (id.hasParent) {
+				id = entries[id.fqnIndex].fqn.id;
+			}
+			auto str = entries[id.strIndex].str;
+			return cast(string)stringDataBuffer.bufPtr[str.offset..str.offset+str.length];
+		}
+		return "<undefined id>";
+	}
 
 	Name getOrReg(ref Allocator allocator, const(char)[] str) {
 		assert(str.length > 0);
@@ -59,6 +80,30 @@ struct NameMap {
 
 		return Name(id);
 	}
+
+	// internal. Called in VoxContext.initialize()
+	void regCommonNames(ref Allocator allocator) {
+		import vox.lib;
+		assert(entries.length == 0);
+		assert(map.length == 0);
+		assert(stringDataBuffer.length == 0);
+
+		// Reserve zero entry for undefined Name
+		entries.put(NameMapEntry(NameMapString(0, 0)));
+
+		foreach (size_t i, string memberName; __traits(allMembers, CommonIds)) {
+			string name = __traits(getAttributes, __traits(getMember, CommonIds, memberName))[0];
+			Name got = getOrReg(allocator, name);
+			Name expected = __traits(getMember, CommonIds, memberName);
+			enforce(got == expected, "%s %s", got.index, expected.index);
+		}
+	}
+}
+
+enum CommonIds : Name {
+	// Name.init == Name(0)
+
+	@("i32")      id_i32      = Name(1),
 }
 
 private struct StringKey {
