@@ -5,8 +5,8 @@
 module vox.fe.parser;
 
 import vox.lib;
-import vox.source;
 import vox.context;
+import vox.fe;
 
 struct Parser {
 	@nogc nothrow:
@@ -34,8 +34,6 @@ struct Parser {
 	}
 
 	Result!void parseModule(ref FileInfo file) {
-		ModuleDecl modDecl;
-
 		lexer.input = context.bufs.sources.bufPtr;
 		lexer.position = file.offset;
 		lexer.line = 0;
@@ -51,7 +49,8 @@ struct Parser {
 
 		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
 
-		return parse_declarations(modDecl.declarations, TokenType.eoi);
+		file.node.memberScope = context.appendScope();
+		return parse_declarations(file.node.declarations, TokenType.eoi);
 	}
 
 	Result!void expect(TokenType type, string what, Span afterWhat = Span.init) {
@@ -115,7 +114,8 @@ struct Parser {
 					return Result!void(res3);
 				}
 
-				auto varDecl = context.appendAst!NameUse(NameWithPos(id, idLoc.start));
+				auto varDecl = context.appendAst!VariableDecl(NameWithPos(id, idLoc.start));
+				auto name = context.getAst!VariableDecl(varDecl).name.name;
 				return items.put(context.bufs.arrayArena, varDecl);
 		}
 	}

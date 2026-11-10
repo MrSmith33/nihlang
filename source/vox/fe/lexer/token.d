@@ -5,7 +5,7 @@ module vox.fe.lexer.token;
 
 import vox.lib.format;
 import vox.fe.lexer.token_type;
-import vox.source;
+import vox.fe.source;
 
 struct Token {
 	@nogc nothrow:

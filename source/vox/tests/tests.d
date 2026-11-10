@@ -45,4 +45,9 @@ void test3(ref VoxTestContext c) {
 }
 void test4(ref VoxTestContext c) {
 	c.compile();
+	//auto data1 = c.getGlobalPtr!i32("data1");
+	//assert(*data1 == 0);
+	//auto data2 = c.getGlobalPtr!i32("data2");
+	//assert(*data2 == 0);
+	//assert(data1 != data2);
 }

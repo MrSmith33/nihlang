@@ -1,7 +1,7 @@
 /// Copyright: Copyright (c) 2026 Andrey Penechko
 /// License: $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0)
 /// Authors: Andrey Penechko
-module vox.source.identifier;
+module vox.fe.source.identifier;
 
 import vox.lib;
 import vox.lib.mem.arena : Arena;
@@ -51,6 +51,13 @@ struct NameMap {
 			return cast(string)stringDataBuffer.bufPtr[str.offset..str.offset+str.length];
 		}
 		return "<undefined id>";
+	}
+
+	// Returns Name.init if not present
+	Name get(const(char)[] str) {
+		assert(str.length > 0);
+		assert(str.length <= uint.max);
+		return map.get(StringKey(str), 0).Name;
 	}
 
 	Result!Name getOrReg(ref Allocator allocator, const(char)[] str) {

@@ -5,7 +5,7 @@
 module vox.context;
 
 import vox.lib;
-import vox.fe.source;
+import vox.fe;
 
 // 0 One global context for all compilations
 //   Hosts all worker and all builds
@@ -99,8 +99,11 @@ struct Driver {
 			import vox.fe.parser;
 
 			Parser parser = Parser(&context);
-			auto res = parser.parseModule(file);
-			if (res.isError) return res;
+			auto res1 = parser.parseModule(file);
+			if (res1.isError) return res1;
+
+			auto res2 = file.node.register_names_nested(context);
+			if (res2.isError) return res2;
 		}
 		return Result!void();
 	}
@@ -175,7 +178,7 @@ struct VoxContext {
 		bufs.ast.put(0);
 
 		auto t_i32 = appendAst!BasicType(BasicTypeEnum.t_i32);
-		assert(t_i32 == 1);
+		assert(t_i32 == AstIndex(1));
 
 		bufs.initializedAstBufSize = bufs.ast.length;
 
@@ -228,17 +231,19 @@ struct VoxContext {
 
 	AstIndex appendAst(T, Args...)(Args args) {
 		uint resIndex = bufs.ast.uintLength;
-		T* obj = cast(T*)bufs.ast.nextPtr;
 		enum size_t numAllocatedSlots = divCeil(T.sizeof, uint.sizeof);
-		bufs.ast.voidPut(numAllocatedSlots);
+		T* obj = cast(T*)bufs.ast.voidPut(numAllocatedSlots).ptr;
 		*obj = T(args);
 		return AstIndex(resIndex);
 	}
 
-	T* getAst(T)(AstIndex index) {
-		if (!index) return null;
-		T* result = cast(T*)(&bufs.ast.bufPtr[index.storageIndex * uint.sizeof]);
-		return result;
+	ref T getAst(T)(AstIndex index) {
+		assert(index.isDefined);
+		return *cast(T*)(&bufs.ast.bufPtr[index.storageIndex]);
+	}
+
+	ScopeIndex appendScope() {
+		return appendAst!Scope.ScopeIndex;
 	}
 
 	// WASM doesn't like when we cast cast(SinkDelegate)&bufs.strings.put
@@ -259,13 +264,16 @@ struct AstNode {
 	uint data;
 }
 
-alias AstIndex = u32;
+struct AstIndex {
+	@nogc nothrow:
+
+	uint storageIndex;
+	bool isDefined() const { return storageIndex != 0; }
+	bool isUndefined() const { return storageIndex == 0; }
+}
 
 alias AstNodes = Array!AstIndex;
-
-struct ModuleDecl {
-	AstNodes declarations;
-}
+alias AstNodeMap = HashMap!(Name, AstIndex, Name.init);
 
 struct BasicType {
 	BasicTypeEnum kind;
@@ -302,10 +310,6 @@ enum BasicTypeEnum : u8 {
 struct NameUse {
 	NameWithPos identifier;
 	AstIndex target;
-}
-
-struct VariableDecl {
-	NameWithPos identifier;
 }
 
 // Single build/compilation, single VoxContext

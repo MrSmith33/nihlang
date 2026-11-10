@@ -20,6 +20,7 @@ struct VoxTestContext {
 	SinkDelegate sink;
 	TestInstance test;
 	Driver driver;
+	ref VoxContext context() => driver.context;
 
 	this(Allocator* allocator, SinkDelegate _sink) {
 		this.allocator = allocator;
@@ -43,7 +44,7 @@ struct VoxTestContext {
 	void compile(string file = __FILE__, int line = __LINE__) {
 		auto res = driver.compile();
 		if (res.isError) {
-			ref diag = driver.context.getError!Diagnostic(res.isError);
+			ref diag = context.getError!Diagnostic(res.isError);
 			panic(line, file, 1, "Compilation failed, but expected to succeeded");
 		}
 	}
@@ -51,14 +52,39 @@ struct VoxTestContext {
 	DiagnosticChecker compileFail(string file = __FILE__, int line = __LINE__) {
 		auto res = driver.compile();
 		if (res.isError) {
-			ref diag = driver.context.getError!Diagnostic(res.isError);
-			return DiagnosticChecker(&driver.context, sink, &diag);
+			ref diag = context.getError!Diagnostic(res.isError);
+			return DiagnosticChecker(&context(), sink, &diag);
 		}
 		panic(line, file, 1, "Compilation was expected to fail, but succeeded");
 	}
 
-	T* getGlobalPtr(T)(string name) {
+	T* getGlobalPtr(T)(string name, string file = __FILE__, int line = __LINE__) {
+		auto symName = context.bufs.nameMap.get(name);
+		if (symName.isUndefined) return null;
+
+		auto astIndex = findUniqueSymbol(symName, file, line);
+		if (astIndex.isUndefined) return null;
+
+		ref varDecl = context.getAst!VariableDecl(decl);
+
 		assert(false, "TODO");
-		return null;
+	}
+
+	AstIndex findUniqueSymbol(Name symName, string file = __FILE__, int line = __LINE__) {
+		AstIndex result;
+		ref c = driver.context;
+		foreach (ref fileInfo; c.bufs.files.data) {
+			auto symbol = fileInfo.node.memberScope.findSymbol(symName, c);
+			if (symbol.isDefined) {
+				if (result.isDefined) {
+					panic(line, file, 1, "Symbol %s is found in 2 places", c.getString(symName));
+				}
+				result = symbol;
+			}
+		}
+		if (result.isUndefined) {
+			panic(line, file, 1, "Symbol `%s` is not found in %s modules", c.getString(symName), c.bufs.files.length);
+		}
+		return result;
 	}
 }

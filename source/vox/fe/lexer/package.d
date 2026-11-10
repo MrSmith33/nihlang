@@ -7,7 +7,7 @@ import vox.lib;
 public import vox.fe.lexer.token;
 public import vox.fe.lexer.token_type;
 import vox.fe.lexer.tables;
-import vox.source;
+import vox.fe.source;
 
 struct Lexer
 {

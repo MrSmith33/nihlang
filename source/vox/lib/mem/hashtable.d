@@ -89,7 +89,7 @@ mixin template HashTablePart(KeyBucketT, StoreValues store_values)
 	pragma(inline, true)
 	private static size_t getHash(Key key) {
 		static if (Key.sizeof == 4) {
-			return int32_hash(key);
+			return int32_hash(*cast(u32*)&key);
 		} else static if (Key.sizeof == 8 && is(typeof(cast(size_t)key))) {
 			return cast(size_t)key;
 		} else return key.toHash();
