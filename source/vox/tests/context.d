@@ -6,8 +6,7 @@ module vox.tests.context;
 
 import vox.context;
 import vox.diagnostic.checker;
-import vox.fe.parser;
-import vox.fe.source;
+import vox.fe;
 import vox.lib;
 import vox.tests.infra;
 
@@ -74,7 +73,8 @@ struct VoxTestContext {
 		AstIndex result;
 		ref c = driver.context;
 		foreach (ref fileInfo; c.bufs.files.data) {
-			auto symbol = fileInfo.node.memberScope.findSymbol(symName, c);
+			ref mod = c.getAst!ModuleDecl(fileInfo.moduleNode);
+			auto symbol = mod.memberScope.findSymbol(symName, c);
 			if (symbol.isDefined) {
 				if (result.isDefined) {
 					panic(line, file, 1, "Symbol %s is found in 2 places", c.getString(symName));

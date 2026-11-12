@@ -16,6 +16,8 @@ struct Scope {
 	/// Imported modules
 	AstNodes imports;
 	///
+	AstIndex parentModule;
+	///
 	AstIndex parentScope;
 	/// This node is owner of all the definitions inside of this scope
 	AstIndex ownerSymbol;
@@ -50,12 +52,13 @@ struct ScopeIndex {
 	// null scope index is treated as empty scope and results in null AstIndex
 	AstIndex findSymbol(Name name, ref VoxContext context) {
 		if (isUndefined) return AstIndex.init;
-		ref Scope sc = context.getAst!Scope(AstIndex(storageIndex));
+		ref Scope sc = context.getAst!Scope(index);
 		return sc.symbolMap.get(name, AstIndex.init);
 	}
+
 	Result!void insertSymbol(Name name, AstIndex nodeIndex, ref VoxContext context) {
 		assert(isDefined, "scope is undefined");
-		ref Scope sc = context.getAst!Scope(AstIndex(storageIndex));
+		ref Scope sc = context.getAst!Scope(index);
 		return sc.insertSymbol(name, nodeIndex, context);
 	}
 }

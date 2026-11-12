@@ -6,6 +6,7 @@ module vox.fe.parser;
 
 import vox.lib;
 import vox.context;
+import vox.be;
 import vox.fe;
 
 struct Parser {
@@ -15,6 +16,8 @@ struct Parser {
 	VoxContext* context;
 	Lexer lexer;
 	Token tok;
+	AstIndex currentModule;
+	ScopeIndex currentScope;
 
 	void nextToken() {
 		do {
@@ -33,6 +36,13 @@ struct Parser {
 			return getSpanString(tok.location);
 	}
 
+	void pushScope(AstIndex owner) {
+		currentScope = context.appendScope();
+		ref Scope newScope = context.getScope(currentScope);
+		newScope.ownerSymbol = owner;
+		newScope.parentModule = currentModule;
+	}
+
 	Result!void parseModule(ref FileInfo file) {
 		lexer.input = context.bufs.sources.bufPtr;
 		lexer.position = file.offset;
@@ -49,8 +59,15 @@ struct Parser {
 
 		//writefln("--- %s at %s\n%s", file.name, file.offset, lexer.input[file.offset..file.offset+file.length]);
 
-		file.node.memberScope = context.appendScope();
-		return parse_declarations(file.node.declarations, TokenType.eoi);
+		currentModule = file.moduleNode;
+		pushScope(file.moduleNode);
+		ref mod = context.getAst!ModuleDecl(file.moduleNode);
+		mod.memberScope = currentScope;
+		ObjectModule localModule = {
+			kind : ObjectModuleKind.isLocal
+		};
+		mod.symIndex = context.bufs.objSymTab.addModule(localModule);
+		return parse_declarations(mod.declarations, TokenType.eoi);
 	}
 
 	Result!void expect(TokenType type, string what, Span afterWhat = Span.init) {
@@ -114,7 +131,7 @@ struct Parser {
 					return Result!void(res3);
 				}
 
-				auto varDecl = context.appendAst!VariableDecl(NameWithPos(id, idLoc.start));
+				auto varDecl = context.appendAst!VariableDecl(NameWithPos(id, idLoc.start), currentScope);
 				auto name = context.getAst!VariableDecl(varDecl).name.name;
 				return items.put(context.bufs.arrayArena, varDecl);
 		}

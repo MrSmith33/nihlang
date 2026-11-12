@@ -4,7 +4,8 @@
 module vox.fe.source.file;
 
 import vox.lib;
-import vox.fe.ast.decl.module_;
+import vox.fe;
+import vox.context;
 
 @nogc nothrow:
 
@@ -17,5 +18,5 @@ struct FileInfo {
 	// Doesn't include zero bytes at the end
 	u32 length;
 	// AST node
-	ModuleDecl node;
+	AstIndex moduleNode;
 }

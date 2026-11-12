@@ -4,8 +4,10 @@
 ///
 module vox.context;
 
-import vox.lib;
+import vox.be;
 import vox.fe;
+import vox.lib;
+import vox.vm;
 
 // 0 One global context for all compilations
 //   Hosts all worker and all builds
@@ -60,14 +62,24 @@ struct Driver {
 		if (astMem.isError) return Result!void.fromError(astMem);
 		context.bufs.ast.setBuffer(astMem.data);
 
+		auto objSymMem = allocator.allocBlock(_64KiB);
+		if (objSymMem.isError) return Result!void.fromError(objSymMem);
+		context.bufs.objSymTab.buffer.setBuffer(objSymMem.data);
+
 		auto initRes = context.initialize();
 		if (initRes.isError) return Result!void.fromError(initRes);
+
+		context.bufs.vm.allocator = &allocator;
+		enum static_bytes = 1*1024;
+		enum heap_bytes = 1*1024;
+		enum stack_bytes = 1*1024;
+		context.bufs.vm.reserveMemory(static_bytes, heap_bytes, stack_bytes);
 
 		return Result!void();
 	}
 
 	Result!void startCompilation() {
-		return context.bufs.startCompilation();
+		return context.startCompilation();
 	}
 
 	void addHar(string harFilename, const(char)[] harData) {
@@ -98,11 +110,14 @@ struct Driver {
 			import vox.fe.lexer.token_type;
 			import vox.fe.parser;
 
+			file.moduleNode = context.appendAst!ModuleDecl();
+
 			Parser parser = Parser(&context);
 			auto res1 = parser.parseModule(file);
 			if (res1.isError) return res1;
 
-			auto res2 = file.node.register_names_nested(context);
+			ref mod = context.getAst!ModuleDecl(file.moduleNode);
+			auto res2 = mod.register_names_nested(context);
 			if (res2.isError) return res2;
 		}
 		return Result!void();
@@ -119,6 +134,8 @@ struct Buffers {
 	Arena!char strings;
 	Arena!u32 errors;
 	Arena!u32 ast;
+	ObjectSymbolTable objSymTab;
+	VmState vm;
 
 	// Stores ast.length after initialize() call
 	// to be reset on startCompilation()
@@ -133,15 +150,20 @@ struct Buffers {
 		arrayArena.clear;
 		strings.clear;
 		errors.clear;
+		objSymTab.buffer.clear;
 		ast.length = initializedAstBufSize;
+
+		auto res1 = vm.resetMem;
+		if (res1.isError) return Result!void.fromError(res1);
+		vm.resetState;
 
 		nameMap.stringDataBuffer.clear;
 		nameMap.entries.clear;
 		nameMap.map = typeof(nameMap.map).init;
 		nameMap.fqnMap = typeof(nameMap.fqnMap).init;
 
-		auto res = nameMap.regCommonNames(arrayArena);
-		if (res.isError) return Result!void.fromError(res);
+		auto res2 = nameMap.regCommonNames(arrayArena);
+		if (res2.isError) return Result!void.fromError(res2);
 
 		// 0 position is reserved for null position
 		sources.put(0);
@@ -168,7 +190,7 @@ struct VoxContext {
 	@nogc nothrow:
 	Buffers bufs;
 
-	// Runs ones when context is created
+	// Runs once when context is created
 	Result!void initialize() {
 		// populates nameMap with common identifiers like this, length, ptr, min, max, sizeof...
 		auto res = bufs.nameMap.regCommonNames(bufs.arrayArena);
@@ -183,6 +205,10 @@ struct VoxContext {
 		bufs.initializedAstBufSize = bufs.ast.length;
 
 		return Result!void();
+	}
+
+	Result!void startCompilation() {
+		return bufs.startCompilation();
 	}
 
 	string getString(Name name) {
@@ -242,9 +268,16 @@ struct VoxContext {
 		return *cast(T*)(&bufs.ast.bufPtr[index.storageIndex]);
 	}
 
-	ScopeIndex appendScope() {
-		return appendAst!Scope.ScopeIndex;
+	AstIndex getAstNodeIndex(T)(ref T node) {
+		uint* ptr = cast(uint*)node;
+		ptrdiff_t diff = ptr - bufs.ast.bufPtr;
+		assert(diff > 0, "<= 0");
+		assert(diff < bufs.ast.length, "> length");
+		return AstIndex(cast(uint)diff);
 	}
+
+	ScopeIndex appendScope() => appendAst!Scope.ScopeIndex;
+	ref Scope getScope(ScopeIndex index) => getAst!Scope(index);
 
 	// WASM doesn't like when we cast cast(SinkDelegate)&bufs.strings.put
 	// wasm trap: indirect call type mismatch

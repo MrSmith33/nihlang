@@ -7,16 +7,18 @@ module vox.fe.ast.decl.module_;
 import vox.lib;
 import vox.context;
 import vox.fe;
+import vox.be;
 
 struct ModuleDecl {
 	@nogc nothrow:
 	AstNodes declarations;
 	ScopeIndex memberScope;
+	LinkIndex symIndex;
 
 	Result!void register_names_nested(ref VoxContext context) {
 		foreach(AstIndex decl; declarations) {
 			ref varDecl = context.getAst!VariableDecl(decl);
-			auto res = memberScope.insertSymbol(varDecl.name.name, decl, context);
+			auto res = varDecl.register_name(decl, context);
 			if (res.isError) return Result!void.fromError(res);
 		}
 		return Result!void.init;
